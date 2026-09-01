@@ -2,9 +2,9 @@
 name: papermono-rs
 description: >-
   Use when working in the papermono-rs repository: cargo xtask, ci,
-  detect-connected, monitor, backup / confirm / restore, the USB
-  session lock, clap / espflash host CLI rules, board crates
-  (`m5stack-papermono-lite`, `m5stack-papermono`), or this
+  detect-connected, monitor, backup / confirm / restore, flash-app,
+  build-fw, the USB session lock, clap / espflash host CLI rules, board
+  crates (`m5stack-papermono-lite`, `m5stack-papermono`), or this
   repository's Rust path on the M5Stack PaperMono or PaperMono-Lite.
   Board pins, rails, and datasheets live in the sibling
   m5stack-papermono-hardware skill — read that first for wiring.
@@ -30,9 +30,18 @@ that message. The always-on copy of that gate is the root
    catalog, **tool verification ledger**, USB session lock,
    `ESPFLASH_PORT`, no Cargo runner. Snapshot how-to:
    [firmware-snapshot-management.md](../../../docs/firmware-snapshot-management.md).
-2. **Layout** — [references/layout.md](references/layout.md).
-   Workspace paths, clap/espflash/MSRV, lockfile.
-3. **Hardware** —
+2. **Rust** — [references/rust.md](references/rust.md). Chip
+   crates, `docs/API-RULES.md`, `docs/CRATES.md`, Xtensa
+   `build-fw`.
+3. **Layout** — [references/layout.md](references/layout.md).
+   Workspace paths, clap/espflash/MSRV, lockfile. Splash
+   Ferris (SVG + 1bpp) lives under
+   `firmware/embassy-debug/assets/`
+   ([SOURCE.md](../../../firmware/embassy-debug/assets/SOURCE.md)).
+   Human how-to:
+   [getting-started.md](../../../docs/getting-started.md),
+   firmware package READMEs, root firmware-examples.
+4. **Hardware** —
    [`m5stack-papermono-hardware`](../m5stack-papermono-hardware/SKILL.md).
    Pins, rails, datasheets, SKU differences.
 
@@ -44,47 +53,80 @@ run those tools, `probe-rs`, or `cargo xtask` against hardware unless
 the human asked to run that live command:
 
 - Live: `detect-connected --probe`, live `backup-factory-firmware`,
-  `confirm-factory-firmware`, `restore-factory-firmware`, `monitor`
+  `confirm-factory-firmware`, `restore-factory-firmware`,
+  `flash-app`, `monitor`
 - Host-only (no USB): `detect-connected` without `--probe`,
-  `backup-factory-firmware --import`, `vet-idle-log`, `ci`
+  `backup-factory-firmware --import`, `vet-idle-log`,
+  `build-fw`, `ci`
 
 When a live ask is present, the **only** in-repo device I/O is
 `cargo xtask` as catalogued in [xtask.md](references/xtask.md).
 `monitor` needs the usbfs udev rule
 ([xtask.md](references/xtask.md#usbfs-udev-for-monitor)).
 
+When they accept `flash-app`, pack every **safe unattended**
+probe into that image (I2C roster, `FLAG`, `CHIP_ID`, lamp +
+`EPD_VDD`, leftover input levels). Do not split those across
+downloads. Host-only captures that need no button run in the
+same session. Radio stays default-off until asked; then
+`wifi n=` / `ble n=` (no MAC/BSSID/IRK, no NVS write) ride
+that listen. Sleep (`wake src=` / `sleep rtc=`) is the
+same: default-off until asked. The always-on copy is root `AGENTS.md`
+(**Pack one flash**).
+
 Implemented is not proven. Read the
 [tool verification ledger](references/xtask.md#tool-verification-ledger)
 before assuming a command works on silicon.
 
-**Lite (`C153-Lite`) live so far:** `detect-connected` (run and
-download), `--probe` (`NoReset`),
-`backup-factory-firmware --name stock-lite`,
-`confirm-factory-firmware --capture stock-lite`, `monitor`
-(`--for 20`, run mode, silent), and
-`restore-factory-firmware --yes --capture stock-lite` (then
-confirm still matched; unit still booted). Same USB IDs
-(`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash.
-Capture is this unit only (uncertain stock). Silicon rows:
+**Lite (`C153-Lite`) live so far:** `detect-connected` (run
+and download), `--probe` (`NoReset`), named backup /
+confirm / restore, `flash-app` (`factory` at `0x10000`;
+short-press red after), and `monitor` (stock silent;
+custom images print `simple-debug:`). Silicon facts:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-`C153` USB / JEDEC / partition table have not been measured.
-Lab EPD refresh times are on both SKUs
+`C153` USB / JEDEC / partition table have not been
+measured. Official HTML `epd_*` times are PaperMono lab
+reference only
 ([display.md](../m5stack-papermono-hardware/references/display.md)).
 
 A device may be attached for unrelated reasons; ignore it.
+
+## Ferris splash art
+
+In-repo under
+[`firmware/embassy-debug/assets/`](../../../firmware/embassy-debug/assets/).
+Catalog and encode:
+[SOURCE.md](../../../firmware/embassy-debug/assets/SOURCE.md).
+
+- **Original Ferris:** Karen Rustad Tölva,
+  [rustacean.net](https://rustacean.net/)
+  (`rustacean-flat-happy`). rustacean.net waives copyright
+  and neighboring rights (CC0-style dedication).
+- **Black-and-white line-art monification:** canardleteer
+  (`ferris-happy-line-art.svg`).
+- Firmware include is `ferris.1bpp` (360×240). Invert pair
+  is stored beside it, not linked into the image.
 
 ## Crate map
 
 | Path | Role |
 | --- | --- |
+| `crates/papermono-log/` | Host-tested USB-Serial/JTAG lines for both images |
+| `crates/ssd1677-otp/` | Panel OTP sequences. No MCU LUT |
+| `crates/m5pm1/` | PMIC registers + PWM0 |
+| `crates/m5ioe1/` | Expander banks + IP2315 gate typestate |
 | `crates/m5stack-papermono-lite/` | Board crate. `C153-Lite` + shared pin map |
 | `crates/m5stack-papermono/` | Board crate. `C153`; re-exports Lite; NFC + LoRa |
 | `host/papermono-host/` | Host library. Live methods take the USB lock |
 | `host/papermono-host/udev/` | usbfs udev rule for `monitor` |
 | `xtask/` | Clap front-end (`cargo xtask`, `publish = false`) |
 | `developer-data/` | Gitignored. Sealed snapshots under `backups/`; confirm JSON under `confirm-records/` |
-| `firmware/` | Not members yet. Planned `simple-debug` / `embassy-debug`. [firmware/AGENTS.md](../../../firmware/AGENTS.md) |
+| `firmware/simple-debug/` | Workspace member, not a default-member. Blocking `esp-hal` Lite heartbeat |
+| `firmware/embassy-debug/` | Workspace member, not a default-member. Embassy cards + lamp |
+
+Crate verdicts before adoption:
+[docs/CRATES.md](../../../docs/CRATES.md).
 
 Never commit a MAC, serial number, USB serial string, NVS blob,
 flash image, dump SHA, or unit-id. `developer-data/` is

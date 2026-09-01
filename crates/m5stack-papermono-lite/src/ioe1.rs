@@ -1,10 +1,12 @@
-//! M5IOE1 expander nets present on **both** SKUs.
+//! M5IOE1 **board nets** present on both SKUs.
 //!
-//! Values are Arduino `M5IOE1_PIN_n` / official `PYGn` indices.
-//! NFC enable, LoRa antenna switch, and LoRa reset are **not** here.
-//!
-//! Outputs default open-drain (including PWM). Pull-up or push-pull,
-//! or the pin does not drive high.
+//! Registers and bank helpers live in `m5ioe1`. NFC enable, LoRa
+//! antenna switch, and LoRa reset are **not** here.
+
+pub use m5ioe1::{
+    apply_bit, input_level, pin_bit, Bank, GPIO_DRV_H, GPIO_DRV_L, GPIO_I_H, GPIO_I_L, GPIO_M_H,
+    GPIO_M_L, GPIO_O_H, GPIO_O_L, IP2315_I2C_GATE, REV, UID_L,
+};
 
 /// `PYG1`: microSD detect (`TF_DET`). Insert = low when the slot
 /// switch is closed. Hardware skill `nyc-tf-det`.
@@ -19,9 +21,6 @@ pub const TOUCH_RST: u8 = 6;
 pub const RGB_GREEN: u8 = 8;
 /// `PYG9` PWM: RGB blue.
 pub const RGB_BLUE: u8 = 9;
-/// `PYG11`: IP2315 I2C gate. Keep the charger off the system bus
-/// except the charge transaction.
-pub const IP2315_I2C_GATE: u8 = 11;
 /// `PYG12`: PDM VDD enable.
 pub const PDM_VDD_ENABLE: u8 = 12;
 /// `PYG13`: touch VDD enable.
@@ -63,5 +62,11 @@ mod tests {
             assert_ne!(*assigned, 4, "NFC enable is full-SKU only");
             assert_ne!(*assigned, 10, "LoRa reset is full-SKU only");
         }
+    }
+
+    #[test]
+    fn pyg11_is_ip2315_gate() {
+        assert_eq!(pin_bit(IP2315_I2C_GATE), Some((Bank::High, 2)));
+        assert_eq!(pin_bit(EPD_VDD_ENABLE), Some((Bank::Low, 2)));
     }
 }

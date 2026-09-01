@@ -29,9 +29,11 @@ assuming a command works on a unit.
 | `backup-factory-firmware` | live dump yes; `--import` no | Uncertain stock: `--name SLUG` or `--as-original`. Write-once under `developer-data/backups/`. Dump length is the measured size. Alias `backup-firmware`. `--import DIR` is host-only (`flash.bin` / `flash-16mb.bin`; refuse `flash-32mb.bin` unless length matches) |
 | `confirm-factory-firmware` | yes | Compare live flash to the matching original, or `--capture SLUG`. Writes gitignored divergence JSON. Does not rewrite the snapshot |
 | `restore-factory-firmware` | yes | `write_bin` of **that unit's** original, or `--capture SLUG`. Requires `--yes`. Full image at `0x0`, or `--part LABEL`. Never a full-chip erase |
-| `vet-idle-log` | no | Stub. Exits “no image grammar” |
-| `ci` | no | Host-only: fmt, clippy, test, rumdl, machete, audit |
-| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). Needs the [usbfs udev rule](#usbfs-udev-for-monitor) |
+| `flash-app` | yes | `write_bin` of `--image FILE` (a `save-image` payload, not an ELF) into snapshot **`factory`** only. Requires `--yes` and a matching original or `--capture`. Lite factory is `0x10000` / `0xF00000`. Flasher stays in bootloader; short-press red to run. Never a caller-chosen offset, never `espflash flash`, never erase |
+| `vet-idle-log` | no | Idle grammar: `hello image=` / `sku=`, at least one `hb`, no `mac`, no `edge`, idle `btn_a=1 btn_b=1`. `--image embassy-debug` for the Embassy image. `--allow-activity` for a busy capture. Parse lives in `papermono-log`. There is no `learn-uart` |
+| `ci` | no | Host + firmware clippy: fmt, host clippy/test, `cargo +esp clippy -p simple-debug-fw`, `embassy-debug-fw` (default, `--no-default-features`, then `touch` / `mic` / `panel` / `touch,radio` / `touch,sleep` with `--no-default-features`), rumdl, machete, audit. Needs esp toolchain |
+| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). Needs the [usbfs udev rule](#usbfs-udev-for-monitor). After a listen, ACM may be gone; `--port /dev/bus/usb/BBB/DDD` from `lsusb` still works. `--reset` is in `--help` as **do not use**: Lite live DTR/RTS left CDC silent. Short-press red. Not download |
+| `build-fw` | no | Host-only. `cargo +esp` (`--locked`) then `espflash save-image --flash-size 16mb`. IMAGE is `simple-debug` or `embassy-debug`. ELF and `.bin` under `target/xtensa-esp32s3-none-elf/release-fw/` |
 
 ```shell
 cargo xtask detect-connected
@@ -41,11 +43,33 @@ cargo xtask detect-connected
 # cargo xtask backup-factory-firmware --as-original
 # cargo xtask confirm-factory-firmware --capture stock-lite
 # cargo xtask restore-factory-firmware --yes --capture stock-lite
+# cargo xtask build-fw simple-debug
+# cargo xtask build-fw embassy-debug
+# cargo xtask build-fw embassy-debug --no-default-features \
+#   --features touch
+# cargo xtask build-fw embassy-debug --no-default-features \
+#   --features touch,mic,radio
+# cargo xtask flash-app --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin --yes --capture stock-lite
+# cargo xtask vet-idle-log --input idle-simple.log
 # cargo xtask ci
 # cargo xtask monitor --for 20 --output idle-simple.log
 ```
 
-`flash-app`, `learn-uart`, and `build-fw` are **not ported**.
+`idle-simple.log` is gitignored. `flash-app` needs a `save-image`
+payload; run `cargo xtask build-fw` first.
+
+## Not ported (sticky-rs)
+
+These sticky-rs xtask items stay out until a later stage. Do not
+copy CH343, `app0` / 32 MB, or ACM DTR.
+
+| Sticky item | Why not now |
+| --- | --- |
+| Live `learn-uart` YAML, `learn-uart-only`, `diff-learn-uart` | Intentional. Parse + `vet-idle-log` only |
+| `simple-debug --features operator` | Drives that attended session |
+| `flash-app --allow-unknown-layout` | Lite factory geometry is known (`0x10000` / `0xF00000`) |
+| `monitor --acm-tty` | Papermono is usbfs CDC. ACM DTR is the trap |
+| `ci -p ssd1677-gray4 --no-default-features` | No such crate here |
 
 ## Tool verification ledger
 
@@ -66,8 +90,9 @@ Rules for advancing a row:
 1. Do not run a live command unless a human asked in that message.
 2. Do not skip a precondition that is still
    **Implemented, not live-tested**. `--probe`, backup, confirm
-   `--capture`, restore `--capture`, and `monitor` are **Live
-   tested** on Lite. A Lite result does not confirm `C153`.
+   `--capture`, restore `--capture`, `monitor`, and `flash-app`
+   are **Live tested** on Lite.
+   A Lite result does not confirm `C153`.
 3. A result on `C153-Lite` does not confirm `C153`.
 4. Silicon facts go to the hardware skill. This table is **tool**
    status.
@@ -75,17 +100,19 @@ Rules for advancing a row:
 The same rows are in
 [firmware-snapshot-management.md](../../../../docs/firmware-snapshot-management.md#tool-verification-ledger).
 
-| Command | Status | SKU / date | Next safe step |
+| Command | Status | SKU / date | Note |
 | --- | --- | --- | --- |
-| `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
-| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download inventory: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
-| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes (`0x1000000`). Capture under `developer-data/backups/captures/` (uncertain stock). espflash warns above 115200 (`ESPFLASH_BAUD` 921600); dump finished (~10.6 s/MiB). Do not commit the tree. Confirm `--capture stock-lite` matched later the same day |
-| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` after red-blink download: same `NoReset` / flash stub / 16×1 MiB windows as backup. Two flasher connects (board-info, then dump); baud warning both times. `elapsed=` is cumulative at **window start** (1/16 ≈ 0). ~10.6 s/MiB, ~3 min for 16 MB. Match stdout is `confirm: <unit-id> matches original` even for a capture; do not paste the id. Writes gitignored `confirm-records/` JSON even on match (region SHA; do not paste). Does not rewrite the snapshot. Default (no `--capture`, `original/`) untested. Post-restore confirm the same day still matched |
-| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` after red-blink download: `write_bin` 16×1 MiB at `0x0` (16777216 bytes). Matching capture: windows **skipped (checksum match)** (~1.7 s/window after skip). Window 16 dropped (`Communication error while flashing device`), reconnect, 2 retries left, then skip-match. Baud warning at 921600. ~70 s wall for the write. Confirm `--capture stock-lite` matched after. Short-press power: unit looked as before. `--part` and `original/` (no `--capture`) untested. Never erase-flash |
-| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Run mode after usbfs udev (`660` `root:dialout`). `--for 20 --output idle-simple.log`: CDC listen 115200, no ACM TTY, modem lines off. **Silent** (0 bytes). Needs CDC data bulk-in `0x81`, not vendor JTAG `0x83`. Drop warned `reattach cdc-acm data (if 1): kernel driver already attached (errno 16)`; ACM `ttyACM*` returned. [udev](#usbfs-udev-for-monitor) |
-| `vet-idle-log` | Stub | — | Leave until firmware grammar exists |
-| `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After a 16 MB-aware table is read from this unit and a snapshot exists |
+| `ci` | Host-only tested | host / 2026-08-31 | fmt, clippy, test, rumdl, machete, audit. Firmware clippy matrix |
+| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run and download: `303a:1001`. iSerial redacted |
+| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | Download, `NoReset`: ESP32-S3 v0.2, 40 MHz, 16 MB. MAC redacted |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` 16 MB capture. Do not commit dumps |
+| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched. No `--capture` untested |
+| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite`. `--part` / `original/` untested |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:`. [udev](#usbfs-udev-for-monitor) |
+| `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | DTR/RTS: 0 CDC bytes. Not a recapture path |
+| `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log`. `--image embassy-debug` |
+| `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug`; `save-image --flash-size 16mb` |
+| `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red after. Not Sticky `0x90000` |
 
 ## USB session lock
 

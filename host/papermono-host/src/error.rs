@@ -74,6 +74,19 @@ pub enum Error {
     },
     /// Restore without `--yes`.
     RestoreNotConfirmed,
+    /// `flash-app` without `--yes`.
+    FlashNotConfirmed,
+    /// Image is empty or an ELF, not a `save-image` payload.
+    ImageNotApp,
+    /// Image is larger than the snapshot `factory` partition.
+    ImageTooLarge {
+        /// Bytes in the file.
+        size: u64,
+        /// `factory.size` from the snapshot table.
+        max: u32,
+    },
+    /// Snapshot `factory` starts below the Lite measured app offset.
+    UnsafeFactoryOffset(u32),
     /// `--part` label is not in the snapshot table.
     UnknownPartition(String),
     /// Live dump or restore refused because flash size was never measured.
@@ -173,6 +186,19 @@ impl fmt::Display for Error {
                 write!(f, ". Wait for that dump, restore, probe, etc. to finish")
             }
             Self::RestoreNotConfirmed => write!(f, "restore refuses to write without --yes"),
+            Self::FlashNotConfirmed => write!(f, "flash-app refuses to write without --yes"),
+            Self::ImageNotApp => write!(
+                f,
+                "flash-app needs a save-image payload, not an ELF or empty file"
+            ),
+            Self::ImageTooLarge { size, max } => write!(
+                f,
+                "image is {size} bytes; snapshot factory partition is {max} bytes"
+            ),
+            Self::UnsafeFactoryOffset(offset) => write!(
+                f,
+                "refusing factory offset {offset:#x}; Lite factory starts at 0x10000 (nvs/phy sit below)"
+            ),
             Self::UnknownPartition(label) => write!(f, "no partition labelled {label:?}"),
             Self::SizeNotMeasured => write!(
                 f,

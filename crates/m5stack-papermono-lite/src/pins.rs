@@ -7,20 +7,26 @@
 //! product pages, absorbed in the hardware skill pin-map. Direction and
 //! polarity are official tables, not measured.
 //!
-//! GPIO5/6/21/38–41 are **not** here. Those nets are NFC/LoRa on
-//! `C153`. On Lite, do not drive them as extra GPIO.
+//! GPIO5/6/21/38–41 are **not** in [`ASSIGNED`]. Those nets are
+//! NFC/LoRa on `C153`. Lite leftover **input** names are below;
+//! do not drive them.
 
 /// M5PM1 `BOOT_OUT`. **Strapping** (WPU). Hardware skill
 /// `nyc-gpio0-strap`.
 pub const PMIC_BOOT_OUT: u8 = 0;
 /// M5PM1 IRQ (`G1_PY_IRQ`).
 pub const PMIC_IRQ: u8 = 1;
-/// USER_KEY1 (Button A).
-pub const KEY1: u8 = 2;
-/// USER_KEY2 (Button B). **Strapping** (floating at reset).
-pub const KEY2: u8 = 3;
+/// BUTTON A (UP). PinMap `USER_KEY1`. Lite: idle high, press low.
+pub const BUTTON_A: u8 = 2;
+/// BUTTON B (DOWN). PinMap `USER_KEY2`. **Strapping** (floating at reset).
+/// Lite: idle high, press low.
+pub const BUTTON_B: u8 = 3;
 /// FT6336G INT (`G4_TP_INT`).
 pub const TOUCH_INT: u8 = 4;
+/// Lite leftover: full-SKU LoRa IRQ. Input only. Do not drive.
+pub const LEFTOVER_LORA_IRQ: u8 = 5;
+/// Lite leftover: full-SKU ST25R3916 IRQ. Input only. Do not drive.
+pub const LEFTOVER_NFC_IRQ: u8 = 6;
 /// M5IOE1 IRQ (`PYB_IRQ`).
 pub const IOE1_IRQ: u8 = 7;
 
@@ -48,6 +54,9 @@ pub const EPD_DC: u8 = 17;
 /// EPD BUSY. Sheet: high = busy. Glass polarity:
 /// hardware skill `nyc-otp-busy`.
 pub const EPD_BUSY: u8 = 18;
+/// Lite leftover: full-SKU SX1262 BUSY. Input only. Do not drive.
+/// Sheet: no internal pull.
+pub const LEFTOVER_SX_BUSY: u8 = 21;
 
 /// Native USB D−. PDM is **not** on this pad.
 pub const USB_DM: u8 = 19;
@@ -77,8 +86,8 @@ pub const SYS_I2C_SCL: u8 = 48;
 pub const ASSIGNED: &[u8] = &[
     PMIC_BOOT_OUT,
     PMIC_IRQ,
-    KEY1,
-    KEY2,
+    BUTTON_A,
+    BUTTON_B,
     TOUCH_INT,
     IOE1_IRQ,
     SDMMC_DAT3,
@@ -127,7 +136,7 @@ mod tests {
             SDMMC_CMD, SDMMC_CLK,
         ] {
             assert_ne!(bus, PMIC_BOOT_OUT);
-            assert_ne!(bus, KEY2);
+            assert_ne!(bus, BUTTON_B);
             assert_ne!(bus, PDM_CLK);
             assert_ne!(bus, PDM_DAT);
         }
@@ -139,5 +148,20 @@ mod tests {
         assert_ne!(PDM_DAT, USB_DP);
         assert_eq!(PDM_CLK, 45);
         assert_eq!(PDM_DAT, 46);
+    }
+
+    #[test]
+    fn buzzer_is_gpio42() {
+        assert_eq!(BUZZER, 42);
+    }
+
+    #[test]
+    fn leftover_inputs_are_named_and_unassigned() {
+        assert_eq!(LEFTOVER_LORA_IRQ, 5);
+        assert_eq!(LEFTOVER_NFC_IRQ, 6);
+        assert_eq!(LEFTOVER_SX_BUSY, 21);
+        for leftover in [LEFTOVER_LORA_IRQ, LEFTOVER_NFC_IRQ, LEFTOVER_SX_BUSY] {
+            assert!(!ASSIGNED.contains(&leftover));
+        }
     }
 }

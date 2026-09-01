@@ -83,6 +83,36 @@ UserDemo’s **eval** order is different; name both
 GPIO numbers match [pin-map.md](pin-map.md). Expander polarity
 is still not measured.
 
+## M5IOE1 driver (`m5stack/M5IOE1`)
+
+UserDemo calls `ioe1.begin(&M5.In_I2C, 0x4F, 100000)` after
+`M5.begin` and `pm1.begin(0x6E)`. The Arduino library, not
+the chip UM strap table, is the eval **sequence**.
+
+- Library default address is `0x6F`. Board/UserDemo is
+  `0x4F` (`M5IOE1_DEFAULT_ADDR_2`). If `0x4F` fails, the
+  library’s next candidate is **`0x6F` only**. Auto-detect
+  `0xFF` also walks `0x70`–`0x76` (that range includes
+  charger `0x75`). UserDemo does **not** auto-detect. Do
+  not copy that walk while `PYG11` is unknown.
+- REV ASCII: `0x6F`–`0x76` expect `'A'` (UM). `0x4F`–`0x50`
+  expect `'W'` (board firmware). A `'W'` read is a match at
+  `0x4F`, not a bad chip.
+- Wake is START + address-write + STOP with **no data**
+  (`beginTransmission` / `endTransmission`, or M5Unified
+  `start`+`stop`). ACK during wake may timeout; the library
+  ignores that, waits 10 ms, then reads UID (16-bit) and
+  REV. Retry: 100 kHz, wait **800 ms**, 100 kHz, then
+  400 kHz.
+- `I2C_CFG` (`0x23`) SLEEP default 0 = no idle sleep (UM).
+  The wake is still part of `begin`. After success,
+  UserDemo `pm1.setI2cSleepTime(0)` twice.
+
+Bare-metal that only `read`s `0x4F` without that wake/retry
+is not the eval probe. Lite silicon: that `read` NAKed;
+official `begin` ACKed at board `0x4F` (`ioe_addr=4f`)
+([measure.md](measure.md)).
+
 ## Display (`hal_display.cpp`)
 
 Rotation 0 with official 480×800 tables. FreeInk 800×480 stays
@@ -100,8 +130,9 @@ row. After a non-quality refresh it waits 500 ms, then:
 Quality/text refreshes leave power-down to M5GFX. Fastest
 refreshes: ten local updates then one `epd_fast`; five fast
 then one `epd_quality`. Those four labels are the firmware
-enum titles; lab times (both SKUs) are in
-[display.md](display.md). Snapshot cache uses four gray
+enum titles; official HTML lab times (PaperMono,
+reference only) are in [display.md](display.md). Snapshot
+cache uses four gray
 representatives `{0, 96, 160, 255}`. Do not copy Sticky’s
 analog-off result onto this panel.
 

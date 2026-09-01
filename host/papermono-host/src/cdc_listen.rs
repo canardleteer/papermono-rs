@@ -22,8 +22,14 @@ const SET_CONTROL_LINE_STATE: u8 = 0x22;
 const CDC_COMM: u8 = 0x02;
 const CDC_ACM: u8 = 0x02;
 const CDC_DATA: u8 = 0x0A;
+/// CDC ACM `SET_CONTROL_LINE_STATE` bit 0.
+const DTR: u16 = 1;
+/// CDC ACM `SET_CONTROL_LINE_STATE` bit 1.
+const RTS: u16 = 2;
 
 const USB_TIMEOUT: Duration = Duration::from_millis(250);
+/// Hold between USB-Serial/JTAG DTR/RTS steps (`espflash` `UsbJtagSerialReset`).
+const USB_JTAG_RESET_HOLD: Duration = Duration::from_millis(100);
 
 static INTERRUPT: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_HANDLER: OnceLock<()> = OnceLock::new();
@@ -112,6 +118,33 @@ impl CdcListen {
             comm_num: layout.comm,
             data_num: layout.data,
         })
+    }
+
+    /// Pulse USB-Serial/JTAG DTR/RTS (`espflash` `UsbJtagSerialReset`).
+    ///
+    /// This is a **core** reset (`USB_UART_CHIP_RESET`). It does not
+    /// re-sample GPIO0 / leave ROM download. It is not a CH343 EN
+    /// pulse and not `--after watchdog-reset`. Default listen leaves
+    /// the lines deasserted.
+    ///
+    /// Lite live (2026-09-01): after this pulse, 25 s CDC listen got
+    /// 0 bytes; `303a:1001` stayed enumerated; ACM did not reappear.
+    /// Do not use it to recapture `t=0`. Short-press red instead.
+    pub fn usb_jtag_serial_reset(&self) -> Result<(), Error> {
+        let comm = self.comm.as_ref().ok_or_else(|| {
+            Error::Device("CDC comm interface closed before USB-JTAG reset".into())
+        })?;
+        log::info!("USB-Serial/JTAG core reset (DTR/RTS); not download, not watchdog");
+        set_line_state(comm, self.comm_num, false, false)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, true, false)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, false, true)?;
+        // Windows only propagates DTR when RTS is written (`espflash`).
+        set_line_state(comm, self.comm_num, false, true)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, false, false)?;
+        Ok(())
     }
 }
 
@@ -226,12 +259,21 @@ fn set_listen_coding(comm: &nusb::Interface, comm_num: u8) -> Result<(), Error> 
     )
     .wait()
     .map_err(|error| Error::Device(format!("SET_LINE_CODING: {error}")))?;
+    set_line_state(comm, comm_num, false, false)?;
+    Ok(())
+}
+
+fn control_line_state(dtr: bool, rts: bool) -> u16 {
+    (u16::from(dtr) * DTR) | (u16::from(rts) * RTS)
+}
+
+fn set_line_state(comm: &nusb::Interface, comm_num: u8, dtr: bool, rts: bool) -> Result<(), Error> {
     comm.control_out(
         ControlOut {
             control_type: ControlType::Class,
             recipient: Recipient::Interface,
             request: SET_CONTROL_LINE_STATE,
-            value: 0,
+            value: control_line_state(dtr, rts),
             index: u16::from(comm_num),
             data: &[],
         },
@@ -288,6 +330,14 @@ mod tests {
     #[test]
     fn interrupt_starts_clear() {
         assert!(!super::interrupt_requested());
+    }
+
+    #[test]
+    fn control_line_state_is_dtr_bit0_rts_bit1() {
+        assert_eq!(super::control_line_state(false, false), 0);
+        assert_eq!(super::control_line_state(true, false), 1);
+        assert_eq!(super::control_line_state(false, true), 2);
+        assert_eq!(super::control_line_state(true, true), 3);
     }
 
     #[test]

@@ -65,57 +65,30 @@ Confirm writes JSON under
 on every run, including a match. That file has unit-id and
 region SHA-256. Do not commit it or paste it.
 
-## Confirm (Lite, live)
+## Operator steps
 
-`cargo xtask confirm-factory-firmware --capture stock-lite`
-(2026-09-01) re-read the chip and matched the named capture.
+Hold red ~2 s until blink (download), then:
+
+```shell
+cargo xtask backup-factory-firmware --name SLUG
+cargo xtask confirm-factory-firmware --capture SLUG
+# cargo xtask restore-factory-firmware --yes --capture SLUG
+```
+
 Use `--capture SLUG` for a `--name` dump. Without it the tool
-looks under `original/` (that path is still untested).
+looks under `original/` (still untested). Confirm does not
+rewrite the snapshot. Stdout names a unit-id; do not paste it.
 
-Same download-mode read as backup: `NoReset`, flash stub,
-16×1 MiB windows, 16777216 bytes. Two flasher connects
-(board-info, then the dump), so the flash-stub line and the
-“baud rate higher than 115,200” warning appear twice.
-`ESPFLASH_BAUD` 921600 still finished (~10.6 s/MiB, ~3 min
-for 16 MB).
+Run-mode listen (needs
+[usbfs udev](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor)):
 
-`read-flash N/16 ... elapsed=` is time since dump **start**,
-logged **before** that window’s read. Window 1 is ~0; do not
-treat it as a 1 µs transfer. espflash writes each window to a
-`/tmp/papermono-xtask-*.bin` tempfile.
+```shell
+cargo xtask monitor --for 20 --output idle-simple.log
+```
 
-Stdout on match is `confirm: <unit-id> matches original` even
-when the baseline is a capture. Do not paste that unit-id.
-Confirm does not rewrite the snapshot.
-
-## Monitor (Lite, live)
-
-`cargo xtask monitor --for 20 --output idle-simple.log`
-(2026-09-01, run mode) opened usbfs CDC at 115200 with modem
-lines off. Twenty seconds produced **no bytes**. That is a
-listen result, not a missing port. Needs the
-[usbfs udev rule](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
-CDC data bulk-in is `0x81`; do not use vendor JTAG `0x83`.
-Drop may warn that the data interface kernel driver is already
-attached (`errno 16`); ACM `ttyACM*` came back after this run.
-
-## Restore (Lite, live)
-
-`cargo xtask restore-factory-firmware --yes --capture stock-lite`
-(2026-09-01, red-blink download) wrote the named capture at
-`0x0` in 16×1 MiB windows. Because confirm already matched,
-espflash **skipped** windows (`checksum match`, ~1.7 s each).
-Wall time ~70 s, not the ~3 min full read.
-
-Window 16 dropped with `Communication error while flashing
-device`; the host reconnects (up to 3 tries). The retry
-skip-matched. Then `restore write-bin finished`.
-
-Stay in download and run
-`confirm-factory-firmware --capture stock-lite` again. This
-unit matched. Short-press power: the board looked as it did
-before the restore. `--part` and restore without `--capture`
-are still untested.
+Stock UserDemo is silent. Custom images print `simple-debug:`
+lines. After `flash-app`, short-press red. Do not use
+`monitor --reset` to recapture on Lite.
 
 ## Tool verification ledger
 
@@ -126,21 +99,23 @@ before a live command.
 Status vocabulary: **Host-only tested**, **Live tested**,
 **Implemented, not live-tested**, **Stub**, **Not ported**.
 
-| Command | Status | SKU / date | Next safe step |
+| Command | Status | SKU / date | Note |
 | --- | --- | --- | --- |
-| `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
-| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
-| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes. Capture (uncertain stock). Baud warning at 921600; dump finished. Do not commit dumps. Confirm `--capture stock-lite` matched later the same day |
-| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite`: same windowed read as backup; live dump matched. Stdout names a unit-id (do not paste). `elapsed=` is cumulative at window start. Writes `confirm-records/` JSON even on match. Default (no `--capture`) untested. Post-restore confirm the same day still matched |
-| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite`: 16×1 MiB at `0x0`. Matching image: windows skipped (checksum match). Window 16 comm-error then reconnect skip-match. ~70 s. Confirm matched; unit still booted. `--part` / no `--capture` untested |
-| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Run mode after usbfs udev. `--for 20`: silent (0 bytes). CDC data bulk-in `0x81`, not JTAG `0x83`. See [xtask.md](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor) |
-| `vet-idle-log` | Stub | — | Firmware grammar |
-| `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After live table + snapshot |
+| `ci` | Host-only tested | host / 2026-08-31 | fmt, clippy, test, rumdl, machete, audit |
+| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run and download: `303a:1001` |
+| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | ESP32-S3 v0.2, 40 MHz, 16 MB |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite`. Do not commit dumps |
+| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched |
+| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:` |
+| `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
+| `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
+| `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
+| `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
 `--probe`, `backup-factory-firmware`, confirm `--capture`,
-`monitor`, and restore `--capture` are **Live tested** on Lite.
-Flash size is 16 MB; the live table matches UserDemo
-`partitions.csv`. A Lite result does not confirm `C153`. Do
-not commit `developer-data/` or print dump SHA / unit-id /
-MAC.
+`monitor`, restore `--capture`, and `flash-app` are **Live
+tested** on Lite. `build-fw` is host-only. Flash size is 16 MB;
+the live table matches UserDemo `partitions.csv`. A Lite result
+does not confirm `C153`. Do not commit `developer-data/` or
+print dump SHA / unit-id / MAC.

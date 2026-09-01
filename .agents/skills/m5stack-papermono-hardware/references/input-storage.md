@@ -2,16 +2,24 @@
 
 ## Keys
 
-ESP32 GPIO2 = KEY1 (Button A), GPIO3 = KEY2 (Button B). GPIO3 is
-a strapping pin. Power is the M5PM1 button, not a GPIO.
-Physical edges:
+Product photos label the two black side keys **BUTTON A
+(UP)** and **BUTTON B (DOWN)** (no KEY1 / KEY2 print).
+PinMap: GPIO2 = `USER_KEY1` = BUTTON A (UP), GPIO3 =
+`USER_KEY2` = BUTTON B (DOWN). GPIO3 is a strapping pin.
+Power is the red M5PM1 button, not a GPIO. Photos:
+[enclosure.md](enclosure.md). **Lite:** idle high, press
+low, in the default USB-C-down hold. `C153` still:
 [nyc-enclosure-edges](../resources/not-yet-confirmed.md#nyc-enclosure-edges).
 
 ## Buzzer
 
 GPIO42 PWM (`BB_PWM`). Mux off JTAG `MTMS` (ESP32-S3 Table
 2-4) before PWM. UserDemo LEDC: low-speed timer 3 / channel 7,
-10-bit, 50% duty, 40–12000 Hz. Resonance / SPL:
+10-bit, 50% duty, 40–12000 Hz. `embassy-debug` chirp is
+**parked**. The image that muxed this pad off JTAG for
+LEDC coincided with wedged card flips and a lamp that
+CDC moved but the LED did not. Do not take GPIO42 until
+that is isolated. Resonance / SPL:
 [nyc-buzzer](../resources/not-yet-confirmed.md#nyc-buzzer).
 
 ## microSD
@@ -55,6 +63,8 @@ the field off except while scanning
 uses `SPI3_HOST` at 8 MHz, RadioLib begin at 868.0 MHz (EU
 demo vs product 868–923). Mux GPIO39–41 off JTAG before SPI.
 Reset/ant via expander, enable M5PM1 G2.
+Module vs die:
+[nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora).
 Lite HTML **PinMap** omits RFID/LoRa; the Lite schematic still
 draws those blocks (gallery page 05). Do not init; leftover
 pads

@@ -10,57 +10,75 @@ This repository is a peer of
 The board contract and a safety-first host CLI (`cargo xtask`)
 are here. Board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
-`m5stack-papermono` (`C153`, NFC + LoRa). Firmware images are
-not workspace members yet.
-[firmware/AGENTS.md](firmware/AGENTS.md) is in place for when
-they land.
+`m5stack-papermono` (`C153`, NFC + LoRa).
+`simple-debug-fw` and `embassy-debug-fw` are workspace members,
+not default-members.
 
-Host tools (clap + `papermono-host`): detect, snapshot
-backup / confirm / restore, and a no-reset monitor. **Implemented
-is not proven.** See the
-[tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
-before treating a command as working on a unit. Operator how-to:
-[docs/firmware-snapshot-management.md](docs/firmware-snapshot-management.md).
-
+- Host tools are: `cargo xtask` over `host/papermono-host`.
 - **Read [docs/SAFETY.md](docs/SAFETY.md) before flashing or
-  probing a unit.** A mistake can damage the panel (DC imbalance /
-  invented LUTs), hang the system I2C bus (IP2315), or lose
+  probing a unit.** A mistake can damage the panel (DC imbalance
+  / invented LUTs), hang the system I2C bus (IP2315), or lose
   per-unit PHY calibration.
+- [Getting started](docs/getting-started.md) (host verify, Xtensa,
+  firmware install & run).
+- [Snapshot HOWTO](docs/firmware-snapshot-management.md).
+  Snapshot that unit before the first custom image if you care
+  about PHY cal.
 - [Hardware details](.agents/skills/m5stack-papermono-hardware/SKILL.md).
-  Pin map, rails, SKU differences, datasheet cache. Official
-  eval HAL:
-  [user-demo.md](.agents/skills/m5stack-papermono-hardware/references/user-demo.md).
+  Pin map, rails, SKU differences, datasheet cache.
 - Open measurements:
-  [not-yet-confirmed.md](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
-  Lite run and download USB is measured (`303a:1001`); Lite
-  flash size is 16 MB; Lite stock partition table matches
-  UserDemo `partitions.csv`. Lab EPD refresh times
-  (`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`)
-  are measured on **both** SKUs
-  ([display.md](.agents/skills/m5stack-papermono-hardware/references/display.md)).
-  Official docs are **not measured** unless a `nyc-*` recipe
-  closed or a Confirmed-live row exists. Name PaperMono
-  (`C153`) vs PaperMono-Lite (`C153-Lite`).
+  [not-yet-confirmed.md](docs/not-yet-confirmed.md)
+  (`nyc-*`). Name PaperMono (`C153`) vs PaperMono-Lite
+  (`C153-Lite`).
+- Crate verdicts: [docs/CRATES.md](docs/CRATES.md).
 - Other docs live in [`docs/`](./docs).
-  `docs/SAFETY.md` and `docs/DATASHEETS.md` are symlinks into the
-  hardware skill.
-
-## Host CLI
-
-```shell
-cargo xtask detect-connected
-cargo xtask ci
-```
-
-`--probe`, live backup, confirm, restore, and `monitor` need a
-human ask. Download is a power-button hold (~2 s until the red
-LED blinks), not DTR. QinHeng `1a86:55d3` is refused.
+  `docs/SAFETY.md`, `docs/DATASHEETS.md`, and
+  `docs/not-yet-confirmed.md` are symlinks into the hardware
+  skill.
 
 > [!IMPORTANT]
 >
 > Anything we have not measured on a PaperMono or PaperMono-Lite
 > in hand is still official-docs intent. The backlog is
-> [`nyc-*`](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
+> [`nyc-*`](docs/not-yet-confirmed.md).
+> **Implemented is not proven.** See the
+> [tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
+> before treating a command as working on a unit.
+
+## Firmware Examples
+
+<div align="center">
+  <img src="docs/assets/first-ferris.png"
+       alt="embassy-debug splash on PaperMono-Lite, USB-C down"
+       width="360">
+</div>
+
+- [plain](./firmware/simple-debug)
+  - [quick install](./docs/getting-started.md#path-a--without-embassy-simple-debug)
+- [embassy-rs](./firmware/embassy-debug)
+  - [quick install](./docs/getting-started.md#path-b--with-embassy-embassy-debug)
+
+## cargo xtask
+
+From the repo root (`cargo xtask <subcommand>`).
+`cargo xtask --help` lists flags.
+
+Live commands take `--port` or `ESPFLASH_PORT`; if unset they
+need exactly one Espressif USB-Serial/JTAG (`303a:1001`).
+QinHeng `1a86:55d3` is refused. Download is a power-button hold
+(~2 s until the red LED blinks), not DTR.
+
+| Command | USB? | Summary |
+| --- | --- | --- |
+| `detect-connected` | no, unless `--probe` | List `303a:1001` nodes. `--probe` opens the flasher |
+| `backup-factory-firmware` | live dump yes; `--import` no | Named capture under `developer-data/backups/`. Alias `backup-firmware` |
+| `confirm-factory-firmware` | yes | Compare live flash to that unit's original, or `--capture SLUG` |
+| `restore-factory-firmware` | yes | write-bin that unit's original or `--capture` (`--yes`). Never a full-chip erase |
+| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs a matching capture. Does not compile |
+| `vet-idle-log` | no | Host-only idle grammar on a `monitor` capture |
+| `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` |
+| `ci` | no | Host-only CI gate (fmt, host clippy/test, firmware clippy, rumdl, machete, audit) |
+| `monitor` | yes | USB-Serial/JTAG listen at 115200 (usbfs). After `flash-app`, short-press red |
 
 ## SKUs
 

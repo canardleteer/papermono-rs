@@ -11,7 +11,9 @@
 #[cfg(test)]
 extern crate std;
 
-pub use m5stack_papermono_lite::{addresses, display, ioe1, pins, pmic, touch, SKU as LITE_SKU};
+pub use m5stack_papermono_lite::{
+    addresses, buzzer, display, imu, ioe1, pins, pmic, rtc, touch, SKU as LITE_SKU,
+};
 
 pub mod lora;
 pub mod nfc;

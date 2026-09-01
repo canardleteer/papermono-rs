@@ -11,19 +11,23 @@ stacks are valid on this MCU:
 
 Encode [pin-map.md](pin-map.md) in the two board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
-`m5stack-papermono` (`C153`, NFC + LoRa). Chip drivers stay
+`m5stack-papermono` (`C153`, NFC + LoRa). That split is two
+crates, not a Cargo feature
+([crates/AGENTS.md](../../../../crates/AGENTS.md)). Chip drivers stay
 MCU-agnostic. Register facts come from
 [datasheets.md](../resources/datasheets.md). USB/flash geometry:
 [flashing.md](flashing.md). Observed silicon:
-[measure.md](measure.md) (Lite USB/flash; lab EPD refresh on
-both SKUs).
+[measure.md](measure.md) (Lite USB/flash). Official HTML
+`epd_*` times are PaperMono lab reference
+([display.md](display.md)).
 
 Named `enum` / `const` values, not magic bytes. Comments cite
 catalog id plus datasheet section number and title. Markdown
-prefers those titles. Refresh modes:
-[display.md](display.md) (`epd_quality`, `epd_text`,
-`epd_fast`, `epd_fastest`). When packages land under
-`firmware/`, also read
+prefers those titles. Firmware call site is `OtpRefresh`
+(`otp_gray` / `otp_mono` / `otp_partial`). `RefreshMode`
+is the official HTML **M5GFX LUT Refresh Speed** catalog
+only ([display.md](display.md)). Firmware packages also
+read
 [firmware/AGENTS.md](../../../../firmware/AGENTS.md).
 
 Do not mix this page with PlatformIO / `idf.py`. Those trees are
@@ -32,7 +36,7 @@ treat `esp-hal` as the only legal Rust stack. Never a generic
 SSD1677 four-gray LUT. Never Sticky latch GPIOs. Never `bq27xxx`.
 
 Board crates live under `crates/` (host-testable, no `esp-hal`).
-Xtensa images under `firmware/` are not workspace members yet.
+`simple-debug-fw` is a workspace member, not a default-member.
 Nearest rules:
 [firmware/AGENTS.md](../../../../firmware/AGENTS.md),
 [crates/AGENTS.md](../../../../crates/AGENTS.md).

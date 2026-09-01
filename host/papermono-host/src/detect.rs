@@ -126,13 +126,20 @@ pub struct UsbDeviceKey {
     pub pid: u16,
 }
 
-/// Map `--port` / by-id / ACM name to the USB device, without opening the TTY.
+/// Map `--port` / by-id / ACM name / usbfs path to the USB device.
 pub fn usb_device_key_for_port(port: &str) -> Result<UsbDeviceKey, Error> {
     usb_device_key_from(port, &sys_class_tty_dir())
 }
 
 /// Testable [`usb_device_key_for_port`].
 pub fn usb_device_key_from(port: &str, sys_tty: &Path) -> Result<UsbDeviceKey, Error> {
+    if let Some((busnum, devnum)) = parse_usbfs_bus_dev(port) {
+        return usb_device_key_from_bus_dev(busnum, devnum).ok_or_else(|| {
+            Error::Device(format!(
+                "no USB device at {port}; is the unit still plugged in?"
+            ))
+        });
+    }
     let tty = tty_name_for_port(port)
         .ok_or_else(|| Error::Device(format!("cannot map {} to a ttyACM/ttyUSB name", port)))?;
     usb_device_key_for_tty(sys_tty, &tty).ok_or_else(|| {
@@ -140,6 +147,48 @@ pub fn usb_device_key_from(port: &str, sys_tty: &Path) -> Result<UsbDeviceKey, E
             "no USB busnum/devnum in sysfs for {tty}; is the unit still plugged in?"
         ))
     })
+}
+
+/// `/dev/bus/usb/003/017` → bus 3, device 17.
+fn parse_usbfs_bus_dev(port: &str) -> Option<(u8, u8)> {
+    let path = Path::new(port);
+    let dev = path.file_name()?.to_str()?;
+    let bus = path.parent()?.file_name()?.to_str()?;
+    let usb = path.parent()?.parent()?.file_name()?.to_str()?;
+    let nodes = path.parent()?.parent()?.parent()?.file_name()?.to_str()?;
+    if usb != "usb" || nodes != "bus" {
+        return None;
+    }
+    Some((bus.parse().ok()?, dev.parse().ok()?))
+}
+
+fn usb_device_key_from_bus_dev(busnum: u8, devnum: u8) -> Option<UsbDeviceKey> {
+    let root = Path::new("/sys/bus/usb/devices");
+    for ent in fs::read_dir(root).ok()? {
+        let path = ent.ok()?.path();
+        let name = path.file_name()?.to_string_lossy();
+        if name.contains(':') {
+            continue;
+        }
+        let Some(b) = read_trimmed(&path.join("busnum")).and_then(|s| s.parse().ok()) else {
+            continue;
+        };
+        let Some(d) = read_trimmed(&path.join("devnum")).and_then(|s| s.parse().ok()) else {
+            continue;
+        };
+        if b != busnum || d != devnum {
+            continue;
+        }
+        let vid = parse_hex_u16(&read_trimmed(&path.join("idVendor"))?)?;
+        let pid = parse_hex_u16(&read_trimmed(&path.join("idProduct"))?)?;
+        return Some(UsbDeviceKey {
+            busnum: b,
+            devnum: d,
+            vid,
+            pid,
+        });
+    }
+    None
 }
 
 fn tty_name_for_port(port: &str) -> Option<String> {
@@ -453,6 +502,14 @@ pub fn require_papermono_usb_from(
     let (kind, vid, pid) =
         if let Some(found) = candidates.iter().find(|c| candidate_matches(c, port)) {
             (found.kind, found.vid, found.pid)
+        } else if let Some(key) =
+            parse_usbfs_bus_dev(port).and_then(|(b, d)| usb_device_key_from_bus_dev(b, d))
+        {
+            (
+                classify(Some(key.vid), Some(key.pid), Some(port)),
+                Some(key.vid),
+                Some(key.pid),
+            )
         } else {
             let tty = port_file_name(port)
                 .filter(|name| name.starts_with("ttyACM") || name.starts_with("ttyUSB"));
@@ -592,6 +649,13 @@ mod tests {
             parse_usb_serial_from_port(&path).as_deref(),
             Some("TESTUSB")
         );
+    }
+
+    #[test]
+    fn usbfs_path_parses_bus_and_device() {
+        assert_eq!(parse_usbfs_bus_dev("/dev/bus/usb/003/017"), Some((3, 17)));
+        assert_eq!(parse_usbfs_bus_dev("/dev/ttyACM0"), None);
+        assert_eq!(parse_usbfs_bus_dev("/dev/serial/by-id/foo"), None);
     }
 
     #[test]

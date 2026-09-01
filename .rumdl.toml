@@ -14,6 +14,7 @@ include = [
     "firmware/AGENTS.md",
     "firmware/*/README.md",
     "firmware/*/AGENTS.md",
+    "firmware/embassy-debug/assets/SOURCE.md",
     "docs/*.md",
     ".agents/skills/papermono-rs/SKILL.md",
     ".agents/skills/papermono-rs/references/*.md",
@@ -24,6 +25,7 @@ include = [
     ".agents/skills/m5stack-papermono-hardware/resources/external.md",
     ".agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md",
     ".agents/skills/m5stack-papermono-hardware/resources/enclosure/SOURCE.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/official-html/SOURCE.md",
 ]
 
 exclude = [
@@ -38,11 +40,15 @@ exclude = [
     # Symlinks into the hardware skill; lint the real files once.
     "docs/DATASHEETS.md",
     "docs/SAFETY.md",
+    "docs/not-yet-confirmed.md",
     # Vendor PDFs, pdftotext extracts, schematic gallery PNGs
     # (also gitignored).
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets/md/**",
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets/pdf/**",
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets/png/**",
+    # Vendor "view as markdown" product-page snapshots.
+    ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono.2026-09-01.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono-Lite.2026-09-01.md",
 ]
 
 # MD004 would restyle every `-` list to `*` (first-pass noise).

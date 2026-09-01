@@ -58,14 +58,20 @@ Open nets live in
 4. **Enclosure** —
    [references/enclosure.md](references/enclosure.md). Where keys,
    USB-C, and the SD slot sit. Vendored product photos:
-   [resources/enclosure/](resources/enclosure/SOURCE.md).
+   [resources/enclosure/](resources/enclosure/SOURCE.md)
+   (PNG for reading; WebP is upstream). Callouts: **BUTTON A
+   (UP)**, **BUTTON B (DOWN)**, red power.
 5. **Pin map and rails** — remaining hardware pages (official
    HTML **PinMap** tables until
    [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
    and friends close). Living tables:
    [catalog.md](references/catalog.md).
 6. **Official docs and firmware catalog** —
-   [references/catalog.md](references/catalog.md).
+   [references/catalog.md](references/catalog.md). Dated
+   **view as markdown** snapshots of the two product pages
+   (2026-09-01):
+   [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md).
+   Living HTML can still change.
 7. **Vendor datasheets** —
    [resources/datasheets.md](resources/datasheets.md). Registers,
    opcodes, timings for parts named on this model. **Vendor the
@@ -80,6 +86,10 @@ Open nets live in
 9. **Measurement backlog** — remaining open nets and confirmation
    recipes live in
    [resources/not-yet-confirmed.md](resources/not-yet-confirmed.md).
+   When a human accepts a flash to close NYC rows, pack every
+   **safe unattended** probe into that image (root `AGENTS.md`,
+   **Pack one flash**). Do not spend a boot on one recipe if
+   others can ride along.
 10. **External sources** — FreeInk PaperMono board profile:
     [resources/external.md](resources/external.md).
 
@@ -104,9 +114,9 @@ it does not silently pick a winner against the user.
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
    not confirm the other. Lite USB, chip rev, 16 MB flash
-   size, the stock partition table, and lab EPD refresh times
-   on **both** SKUs are observed; JEDEC/PSRAM/ACK lists stay
-   open.
+   size, and the stock partition table are observed.
+   Official HTML `epd_*` times are PaperMono lab reference,
+   not a silicon row. JEDEC/PSRAM/ACK lists stay open.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -152,16 +162,21 @@ Board pin tables: living HTML **PinMap** on the product pages
 ([catalog.md](references/catalog.md)), absorbed in
 [pin-map.md](references/pin-map.md).
 
-EPD refresh enum titles (lab times, both SKUs): `epd_quality`,
-`epd_text`, `epd_fast`, `epd_fastest`
-([display.md](references/display.md)). Rust under `crates/` and
-`firmware/` also reads [crates/AGENTS.md](../../../crates/AGENTS.md)
-and [firmware/AGENTS.md](../../../firmware/AGENTS.md).
+EPD call site is `OtpRefresh` (`otp_gray` / `otp_mono` /
+`otp_partial`). Official HTML **M5GFX LUT Refresh Speed**
+(`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`)
+is a PaperMono lab catalog only. What to do:
+[display.md](references/display.md). What not to do:
+[safety.md](references/safety.md). Rust under `crates/` and
+`firmware/` also reads
+[crates/AGENTS.md](../../../crates/AGENTS.md) and
+[firmware/AGENTS.md](../../../firmware/AGENTS.md).
 
 ## Product snapshot
 
 Official docs except where [measure.md](references/measure.md)
-has a silicon row. Lab EPD refresh times are on **both** SKUs.
+has a silicon row. Official HTML `epd_*` times are PaperMono
+lab reference only ([display.md](references/display.md)).
 Confirm JEDEC on a physical unit (`C153` and/or `C153-Lite`)
 via
 [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
@@ -172,18 +187,18 @@ before treating manufacturer bytes as confirmed.
 | MCU | ESP32-S3R8, Xtensa LX7 dual-core, up to 240 MHz | Same |
 | RAM | 8 MB in-package octal PSRAM | Same |
 | Flash | 16 MB | Same |
-| Display | 3.97" 480×800, 4-gray, SSD1677 SPI; lab `epd_*` times in [display.md](references/display.md) | Same |
+| Display | 3.97" 480×800, 4-gray, SSD1677 SPI; official HTML `epd_*` reference in [display.md](references/display.md) | Same |
 | Touch | FT6336G `0x38`; active area 5–475 / 5–795 | Same |
-| Frontlight | M5PM1 G3 PWM → AW9967 (`EINK_BL`) | Same |
+| Frontlight | M5PM1 G3 PWM0 → AW9967 (`EINK_BL`) | Same |
 | USB debug | Native pads; Arduino CDC flags (intent) | Run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit |
 | Battery | 1150 mAh 1S, IP2315 charger `0x75` | Same |
 | PMIC | M5PM1 `0x6E` | Same |
-| Expander | M5IOE1 **board `0x4F`** (chip UM `0x6F`–`0x76`) | Same |
+| Expander | M5IOE1 **board `0x4F`** (UM `0x6F`–`0x76`; lib fallback `0x6F`) | Same |
 | IMU | BMI270 `0x68` | Same |
 | RTC | RX8130CE `0x32` | Same |
 | Audio | PDM LMD4737T261-AC02 (GPIO45/46); buzzer GPIO42 | Same |
 | NFC | ST25R3916 `0x50` | **Absent** |
-| LoRa | SX1262 Stamp LoRa-1262, 868–923 MHz | **Absent** |
+| LoRa | Stamp LoRa-1262 (contains SX1262), 868–923 MHz | **Absent** |
 | Storage | microSD SDMMC GPIO8–13 | Same |
 | Case | Gray; 74.7 g | White; 72.4 g |
 | Size | 62.0 × 101.0 × 8.0 mm | Same |
@@ -203,13 +218,15 @@ flash size is 16 MB
    are PDM CLK/DAT here (and ESP32-S3 strapping pins). Power is
    the M5PM1 button and rails, not `PWR_HOLD` / `PWR_LOCK`.
 2. **GPIO0 and GPIO3 are strapping pins** (ESP32-S3 datasheet
-   v2.2 §3). GPIO0 is M5PM1 `BOOT_OUT`. GPIO3 is KEY2. Do not
-   wiggle them until hold time after `CHIP_PU`.
-3. **E-paper OTP first.** The panel has built-in OTP waveforms.
-   M5Stack says M5GFX LUTs are currently unstable and warns that
-   custom external waveforms must stay DC-balanced. Do not invent
-   a 105-byte `0x32` table (Table 7-1 is 105 bytes). After ~10
-   partials, do a full refresh.
+   v2.2 §3). GPIO0 is M5PM1 `BOOT_OUT`. GPIO3 is BUTTON B
+   (DOWN) / PinMap `USER_KEY2`. Do not wiggle them until hold
+   time after `CHIP_PU`.
+3. **E-paper OTP first.** Call `OtpRefresh` (panel OTP). Do
+   not invent a 105-byte `0x32` table (Table 7-1 is 105
+   bytes) and do not map `RefreshMode` / `epd_*` onto OTP
+   `0x22`. What to do: [display.md](references/display.md).
+   What not to do: [safety.md](references/safety.md). After
+   ~10 partials, one OTP mono full.
 4. **Park IP2315 off the system I2C bus** except for the charge
    transaction. M5IOE1 `PYG11_PWM3` gates `0x75`. Sheet: I2C
    high is VBAT; pins 8/9 mux LED vs I2C; at VIN both must
@@ -221,7 +238,8 @@ flash size is 16 MB
 6. **Ship a 16 MB-aware partition table.** Do not inherit 8 MB
    DevKit limits. Do not copy Sticky’s 32 MB / `0x90000` geometry.
 7. **Lite has no NFC and no LoRa.** Do not init ST25R3916 or
-   SX1262 on `C153-Lite`. Do not treat those GPIOs as free until
+   Stamp LoRa-1262 / SX1262 on `C153-Lite`. Do not treat those
+   GPIOs as free until
    [nyc-lite-nfc-pads](resources/not-yet-confirmed.md#nyc-lite-nfc-pads)
    / [nyc-lite-lora-pads](resources/not-yet-confirmed.md#nyc-lite-lora-pads)
    close.
@@ -232,7 +250,10 @@ flash size is 16 MB
 9. **M5PM1 and M5IOE1 GPIO default open-drain** (including
    PWM). Configure push-pull or provide a pull-up. M5IOE1 chip
    UM samples `0x6F`–`0x76` from IO7; this board is labeled
-   `0x4F` — name both; do not leave IO7 floating on a rework.
+   `0x4F` (driver REV `'W'` there, `'A'` on the UM range).
+   Official `begin` is START+STOP wake then UID/REV; fallback
+   `0x6F`. Do not auto-detect `0x70`–`0x76` (`0x75` is the
+   charger). Do not leave IO7 floating on a rework.
 10. **Mux GPIO39–42 off JTAG** (ESP32-S3 Table 2-4 / §2.3.4)
     before LoRa SPI (39–41) or the buzzer (42).
 
@@ -250,10 +271,12 @@ datasheet-versus-docs conflict. Search
 TRM. The cache does **not** replace the pin map or enclosure.
 
 It does not help for board wiring you already have from official
-pin tables, or for third-party project structure. For **official
-M5Stack HTML docs** as an offline markdown corpus, use the
-user-global `skill-corpus-vendoring` skill — do not invent a
-second datasheet pipeline.
+pin tables, or for third-party project structure. Official
+product-page HTML as **view as markdown** (2026-09-01) lives
+in
+[resources/official-html/](resources/official-html/SOURCE.md).
+That is not a datasheet cache. Do not invent a second
+datasheet pipeline.
 
 When citing a register, opcode, or timing:
 
@@ -281,8 +304,10 @@ later IPFS CIDv1.
 
 ## Bring-up order (official intent)
 
-Two vendor sequences. **Not measured.** Name both when they
-disagree ([sources.md](references/sources.md)).
+Two vendor sequences. Lite official M5IOE1 `begin` ACKed
+([measure.md](references/measure.md)); the rest is **not
+measured**. Name both when they disagree
+([sources.md](references/sources.md)).
 
 Arduino / M5PM1 docs:
 
@@ -323,7 +348,9 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 | Rust stacks (not a host toolchain) | [references/rust.md](references/rust.md) |
 | Vendor C++ / PlatformIO sequences | [references/cpp-platformio.md](references/cpp-platformio.md) |
 | Official UserDemo eval HAL | [references/user-demo.md](references/user-demo.md) |
+| M5GFX `Panel_SSD1677_4Gray` / OTP-Demo panel SPI | [references/display.md](references/display.md), [references/cpp-platformio.md](references/cpp-platformio.md) |
 | Official URLs, firmware list | [references/catalog.md](references/catalog.md) |
+| Official HTML **view as markdown** (2026-09-01) | [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md) |
 | Vendor datasheets (catalog; local cache) | [resources/datasheets.md](resources/datasheets.md) |
 | Conflicts and citations | [references/sources.md](references/sources.md) |
 | Measurement backlog | [resources/not-yet-confirmed.md](resources/not-yet-confirmed.md) |
@@ -335,7 +362,9 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id).
 - **Flash:** 16 MB. Lite measured 16 MB and a UserDemo-matching
   table at `0x8000`. PlatformIO still uses `qio_opi` and
-  `default_16MB.csv` (different table). Runtime DIO vs QIO is
+  `default_16MB.csv` (different table). `simple-debug-fw` CDC:
+  80 MHz CPU, 40 MHz XTAL. UserDemo runtime DIO vs QIO / 240
+  MHz still
   [nyc-cpu-flash-runtime](resources/not-yet-confirmed.md#nyc-cpu-flash-runtime).
 - **Canvas:** official 480×800. FreeInk uses 800×480. Conflict:
   [nyc-canvas-orient](resources/not-yet-confirmed.md#nyc-canvas-orient).
@@ -344,12 +373,14 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
   for **touch deep sleep** (ESP stays powered down; PMIC I2C
   idle sleep 1 s) — that path is eval intent, not a current.
 - **Strapping (v2.2 §3):** GPIO0 (WPU, `BOOT_OUT`), GPIO3
-  (floating, KEY2), GPIO45/46 (WPD, PDM). Latched at chip reset;
-  ordinary IO after `tH` ≥ 3 ms.
+  (floating, BUTTON B / `USER_KEY2`), GPIO45/46 (WPD, PDM).
+  Latched at chip reset; ordinary IO after `tH` ≥ 3 ms.
 - **JTAG pads:** GPIO39–42 default F0 is pad JTAG. Mux to GPIO
   before LoRa SPI or the buzzer.
 - **Expander / PMIC GPIO:** default open-drain. Board M5IOE1
-  is `0x4F`; chip UM samples `0x6F`–`0x76` from IO7.
+  is `0x4F` (REV `'W'`); chip UM samples `0x6F`–`0x76` from
+  IO7 (REV `'A'`). Driver fallback is `0x6F`, not a `0x75`
+  walk. Wake/retry: [user-demo.md](references/user-demo.md).
 
 ## Do not
 

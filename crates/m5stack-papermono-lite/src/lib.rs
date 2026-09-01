@@ -2,7 +2,8 @@
 //!
 //! This crate holds the **shared** electrical map: GPIOs, I2C addresses,
 //! expander and PMIC nets, and panel geometry that both SKUs use. Chip
-//! registers live in driver crates. MCU peripherals live in firmware.
+//! registers live in `m5pm1`, `m5ioe1`, and `ssd1677-otp`. MCU
+//! peripherals live in firmware.
 //! There is no `esp-hal` dependency. Host tests compile on the workspace
 //! default rustc.
 //!
@@ -13,7 +14,9 @@
 //!
 //! # Not in this crate
 //!
-//! - Waveform LUTs (OTP first; do not invent a 105-byte table)
+//! - Waveform LUTs (call [`display::OtpRefresh`]; do not invent
+//!   a 105-byte `0x32` table or map [`display::RefreshMode`]
+//!   onto OTP `0x22` bytes)
 //! - Sticky GPIO45/46 power-latch sequences (those pins are PDM here)
 //! - IP2315 traffic except a gated charge transaction
 //! - `esp-hal` pin types (firmware maps [`pins`] once)
@@ -25,11 +28,21 @@
 #[cfg(test)]
 extern crate std;
 
+/// M5IOE1 chip crate (registers + IP2315 gate typestate).
+pub use m5ioe1;
+/// M5PM1 chip crate (registers + PWM0 / ADC).
+pub use m5pm1;
+/// SSD1677 panel-OTP chip crate (`OtpRefresh`, no MCU LUT).
+pub use ssd1677_otp;
+
 pub mod addresses;
+pub mod buzzer;
 pub mod display;
+pub mod imu;
 pub mod ioe1;
 pub mod pins;
 pub mod pmic;
+pub mod rtc;
 pub mod touch;
 
 /// Official SKU code for this crate (`C153-Lite`).
