@@ -6,6 +6,7 @@
 | --- | --- |
 | `host/` | Default-members. Host libraries (not `xtask`) |
 | `host/papermono-host/` | Host library. Detect, backup / confirm / restore, monitor |
+| `host/papermono-host/udev/` | usbfs udev rule for `monitor` |
 | `xtask/` | Clap front-end (`cargo xtask`) |
 | `developer-data/` | Gitignored. Snapshots under `backups/`; confirm JSON under `confirm-records/` |
 | `docs/` | [SAFETY.md](../../../../docs/SAFETY.md) (symlink), [firmware-snapshot-management.md](../../../../docs/firmware-snapshot-management.md), [DATASHEETS.md](../../../../docs/DATASHEETS.md) (symlink) |

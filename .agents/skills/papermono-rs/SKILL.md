@@ -49,6 +49,8 @@ the human asked to run that live command:
 
 When a live ask is present, the **only** in-repo device I/O is
 `cargo xtask` as catalogued in [xtask.md](references/xtask.md).
+`monitor` needs the usbfs udev rule
+([xtask.md](references/xtask.md#usbfs-udev-for-monitor)).
 
 Implemented is not proven. Read the
 [tool verification ledger](references/xtask.md#tool-verification-ledger)
@@ -56,13 +58,15 @@ before assuming a command works on silicon.
 
 **Lite (`C153-Lite`) live so far:** `detect-connected` (run and
 download), `--probe` (`NoReset`),
-`backup-factory-firmware --name stock-lite`, and
-`confirm-factory-firmware --capture stock-lite`. Same USB IDs
+`backup-factory-firmware --name stock-lite`,
+`confirm-factory-firmware --capture stock-lite`, `monitor`
+(`--for 20`, run mode, silent), and
+`restore-factory-firmware --yes --capture stock-lite` (then
+confirm still matched; unit still booted). Same USB IDs
 (`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash.
 Capture is this unit only (uncertain stock). Silicon rows:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-Restore / `monitor` are not live-tested.
 `C153` USB / JEDEC / partition table have not been measured.
 Lab EPD refresh times are on both SKUs
 ([display.md](../m5stack-papermono-hardware/references/display.md)).
@@ -74,6 +78,7 @@ A device may be attached for unrelated reasons; ignore it.
 | Path | Role |
 | --- | --- |
 | `host/papermono-host/` | Host library. Live methods take the USB lock |
+| `host/papermono-host/udev/` | usbfs udev rule for `monitor` |
 | `xtask/` | Clap front-end (`cargo xtask`, `publish = false`) |
 | `developer-data/` | Gitignored. Sealed snapshots under `backups/`; confirm JSON under `confirm-records/` |
 | `firmware/` | Not members yet. [firmware/AGENTS.md](../../../firmware/AGENTS.md) |

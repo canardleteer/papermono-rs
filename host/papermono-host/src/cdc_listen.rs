@@ -165,6 +165,12 @@ struct CdcLayout {
     bulk_in: u8,
 }
 
+/// CDC ACM comm + data bulk-in only.
+///
+/// ESP32-S3 USB-Serial/JTAG also has a vendor JTAG interface with
+/// its own bulk-in (`0x83`) after CDC data (`0x81`). Taking the last
+/// bulk-in on the device then opening it on the data interface fails
+/// with "specified endpoint does not exist on this interface".
 fn find_cdc_layout(
     config: &nusb::descriptors::ConfigurationDescriptor<'_>,
 ) -> Result<CdcLayout, Error> {
@@ -177,16 +183,15 @@ fn find_cdc_layout(
         }
         if alt.class() == CDC_COMM && alt.subclass() == CDC_ACM {
             comm = Some(alt.interface_number());
+            continue;
         }
-        if alt.class() == CDC_DATA {
-            data = Some(alt.interface_number());
+        if alt.class() != CDC_DATA {
+            continue;
         }
+        data = Some(alt.interface_number());
         for ep in alt.endpoints() {
             if ep.transfer_type() == TransferType::Bulk && ep.direction() == Direction::In {
                 bulk_in = Some(ep.address());
-                if data.is_none() {
-                    data = Some(alt.interface_number());
-                }
             }
         }
     }
@@ -246,10 +251,13 @@ fn map_usb_open(error: nusb::Error) -> Error {
         || text.contains("Access denied")
     {
         return Error::Device(format!(
-            "{text}. Claim the Espressif USB-Serial/JTAG over usbfs so monitor does not open the ACM TTY \
-             (cdc-acm can assert DTR). Add a udev rule and replug: \
-             SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"303a\", ATTR{{idProduct}}==\"1001\", \
-             MODE=\"0660\", GROUP=\"dialout\"."
+            "{text}. `monitor` claims usbfs so it does not open the ACM TTY \
+             (cdc-acm can assert DTR). Copy \
+             host/papermono-host/udev/99-papermono-usb.rules to \
+             /etc/udev/rules.d/, run `sudo udevadm control --reload-rules` \
+             and `sudo udevadm trigger`, then unplug and replug. \
+             Check `ls -l /dev/bus/usb/BBB/DDD` from `lsusb` Bus/Device \
+             (zero-pad to 3 digits); expect GROUP dialout MODE 0660."
         ));
     }
     Error::Device(format!("USB open failed: {text}"))
@@ -267,6 +275,16 @@ mod tests {
         ]
     }
 
+    /// ESP32-S3 USB-Serial/JTAG: CDC plus a later vendor JTAG bulk-in.
+    fn esp32s3_jtag_serial_config() -> Vec<u8> {
+        vec![
+            9, 2, 71, 0, 3, 1, 0, 0x80, 50, 9, 4, 0, 0, 1, 0x02, 0x02, 0x01, 0, 7, 5, 0x82, 0x03,
+            8, 0, 10, 9, 4, 1, 0, 2, 0x0A, 0x00, 0x00, 0, 7, 5, 0x01, 0x02, 64, 0, 0, 7, 5, 0x81,
+            0x02, 64, 0, 0, 9, 4, 2, 0, 2, 0xFF, 0xFF, 0x00, 0, 7, 5, 0x02, 0x02, 64, 0, 0, 7, 5,
+            0x83, 0x02, 64, 0, 0,
+        ]
+    }
+
     #[test]
     fn interrupt_starts_clear() {
         assert!(!super::interrupt_requested());
@@ -275,6 +293,16 @@ mod tests {
     #[test]
     fn layout_finds_acm_and_bulk_in() {
         let bytes = tiny_cdc_config();
+        let config = ConfigurationDescriptor::new(&bytes).expect("config");
+        let layout = find_cdc_layout(&config).expect("cdc");
+        assert_eq!(layout.comm, 0);
+        assert_eq!(layout.data, 1);
+        assert_eq!(layout.bulk_in, 0x81);
+    }
+
+    #[test]
+    fn layout_ignores_vendor_jtag_bulk_in() {
+        let bytes = esp32s3_jtag_serial_config();
         let config = ConfigurationDescriptor::new(&bytes).expect("config");
         let layout = find_cdc_layout(&config).expect("cdc");
         assert_eq!(layout.comm, 0);

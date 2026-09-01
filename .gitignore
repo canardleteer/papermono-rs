@@ -17,9 +17,10 @@
 /backups/
 
 # Host-check UART captures from `monitor --output`. Names are the
-# static examples in AGENTS.md. Do not commit them.
+# static examples in the papermono-rs skill. Do not commit them.
 /idle-embassy.log
 /idle-simple.log
+/idle.log
 
 # NOTE(canardleteer): Flash images and device dumps: these contain per-unit
 # NVS, Wi-Fi RF calibration, MAC, and serial number. Never commit them. See

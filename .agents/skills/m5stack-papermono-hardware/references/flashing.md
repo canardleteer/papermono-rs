@@ -64,9 +64,13 @@ string. `C153`, whether a second CDC interface appears, and
 [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid).
 
 Prefer a stable by-id node. ACM numbers move. The host user
-needs `dialout` (or equivalent). On Lite, udev by-id embeds the
-USB iSerial (MAC-shaped). Host `detect-connected` redacts that
-token; do not commit a by-id path.
+needs `dialout` (or equivalent). **`cargo xtask monitor` also
+needs usbfs** (not just ACM): copy
+`host/papermono-host/udev/99-papermono-usb.rules` as in
+[xtask.md](../../papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
+On Lite, udev by-id embeds the USB iSerial (MAC-shaped). Host
+`detect-connected` redacts that token; do not commit a by-id
+path.
 
 `303a:1001` is also the usual ESP32-S3 DevKit USB-Serial/JTAG
 id. Inventory cannot tell a DevKit from PaperMono. If more than

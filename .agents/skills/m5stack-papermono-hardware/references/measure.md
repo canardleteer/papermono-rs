@@ -40,7 +40,9 @@ Still open ([nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid)):
 run mode (`303a:1001`).
 
 - Prefer a stable by-id node. ACM numbers move.
-- The host user needs `dialout` (or equivalent).
+- The host user needs `dialout` (or equivalent). `monitor`
+  also needs the usbfs udev rule in the papermono-rs skill
+  [xtask.md](../../papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
 - Do not commit a USB serial string (Lite iSerial was
   MAC-shaped).
 
@@ -94,8 +96,11 @@ treat shipping stock as that later commit.
 
 The same day, `confirm-factory-firmware --capture stock-lite`
 re-read the chip; live flash matched that capture (full
-dump). Confirm does not rewrite the snapshot. Do not commit
-dumps, NVS, PHY, image SHA, or the confirm-records JSON.
+dump). After `restore-factory-firmware --yes --capture
+stock-lite` the same day, confirm matched again and a
+short-press power left the unit looking as before. Confirm
+does not rewrite the snapshot. Do not commit dumps, NVS, PHY,
+image SHA, or the confirm-records JSON.
 
 `C153` table still
 [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).

@@ -31,7 +31,7 @@ assuming a command works on a unit.
 | `restore-factory-firmware` | yes | `write_bin` of **that unit's** original, or `--capture SLUG`. Requires `--yes`. Full image at `0x0`, or `--part LABEL`. Never a full-chip erase |
 | `vet-idle-log` | no | Stub. Exits “no image grammar” |
 | `ci` | no | Host-only: fmt, clippy, test, rumdl, machete, audit |
-| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). **Not live-tested.** Opening the kernel ACM node can still reset; this path claims usbfs instead |
+| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). Needs the [usbfs udev rule](#usbfs-udev-for-monitor) |
 
 ```shell
 cargo xtask detect-connected
@@ -40,9 +40,9 @@ cargo xtask detect-connected
 # cargo xtask backup-factory-firmware --name stock-lite
 # cargo xtask backup-factory-firmware --as-original
 # cargo xtask confirm-factory-firmware --capture stock-lite
-# cargo xtask restore-factory-firmware --yes
+# cargo xtask restore-factory-firmware --yes --capture stock-lite
 # cargo xtask ci
-# cargo xtask monitor --for 20 --output idle.log
+# cargo xtask monitor --for 20 --output idle-simple.log
 ```
 
 `flash-app`, `learn-uart`, and `build-fw` are **not ported**.
@@ -65,10 +65,9 @@ Rules for advancing a row:
 
 1. Do not run a live command unless a human asked in that message.
 2. Do not skip a precondition that is still
-   **Implemented, not live-tested**. `--probe`, backup, and
-   confirm `--capture` are **Live tested** on Lite (16 MB).
-   Restore / `monitor` still need a human ask. A Lite result
-   does not confirm `C153`.
+   **Implemented, not live-tested**. `--probe`, backup, confirm
+   `--capture`, restore `--capture`, and `monitor` are **Live
+   tested** on Lite. A Lite result does not confirm `C153`.
 3. A result on `C153-Lite` does not confirm `C153`.
 4. Silicon facts go to the hardware skill. This table is **tool**
    status.
@@ -82,9 +81,9 @@ The same rows are in
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download inventory: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
 | `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes (`0x1000000`). Capture under `developer-data/backups/captures/` (uncertain stock). espflash warns above 115200 (`ESPFLASH_BAUD` 921600); dump finished (~10.6 s/MiB). Do not commit the tree. Confirm `--capture stock-lite` matched later the same day |
-| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` after red-blink download: same `NoReset` / flash stub / 16×1 MiB windows as backup. Two flasher connects (board-info, then dump); baud warning both times. `elapsed=` is cumulative at **window start** (1/16 ≈ 0). ~10.6 s/MiB, ~3 min for 16 MB. Match stdout is `confirm: <unit-id> matches original` even for a capture; do not paste the id. Writes gitignored `confirm-records/` JSON even on match (region SHA; do not paste). Does not rewrite the snapshot. Default (no `--capture`, `original/`) untested. Next: restore / `monitor` |
-| `restore-factory-firmware` | Implemented, not live-tested | — | Do not run until a human wants a write of **that unit’s** image |
-| `monitor` | Implemented, not live-tested | — | Human ask; record silent vs printed |
+| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` after red-blink download: same `NoReset` / flash stub / 16×1 MiB windows as backup. Two flasher connects (board-info, then dump); baud warning both times. `elapsed=` is cumulative at **window start** (1/16 ≈ 0). ~10.6 s/MiB, ~3 min for 16 MB. Match stdout is `confirm: <unit-id> matches original` even for a capture; do not paste the id. Writes gitignored `confirm-records/` JSON even on match (region SHA; do not paste). Does not rewrite the snapshot. Default (no `--capture`, `original/`) untested. Post-restore confirm the same day still matched |
+| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` after red-blink download: `write_bin` 16×1 MiB at `0x0` (16777216 bytes). Matching capture: windows **skipped (checksum match)** (~1.7 s/window after skip). Window 16 dropped (`Communication error while flashing device`), reconnect, 2 retries left, then skip-match. Baud warning at 921600. ~70 s wall for the write. Confirm `--capture stock-lite` matched after. Short-press power: unit looked as before. `--part` and `original/` (no `--capture`) untested. Never erase-flash |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Run mode after usbfs udev (`660` `root:dialout`). `--for 20 --output idle-simple.log`: CDC listen 115200, no ACM TTY, modem lines off. **Silent** (0 bytes). Needs CDC data bulk-in `0x81`, not vendor JTAG `0x83`. Drop warned `reattach cdc-acm data (if 1): kernel driver already attached (errno 16)`; ACM `ttyACM*` returned. [udev](#usbfs-udev-for-monitor) |
 | `vet-idle-log` | Stub | — | Leave until firmware grammar exists |
 | `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After a 16 MB-aware table is read from this unit and a snapshot exists |
 
@@ -92,6 +91,37 @@ The same rows are in
 
 `papermono_host::try_acquire` is the **one** exclusive USB session
 for this board. Inventory without `--probe` does not take it.
+
+## usbfs udev for `monitor`
+
+Backup / confirm / restore talk to the ACM node. `dialout` is
+enough for those. **`monitor` claims usbfs** so Linux `cdc-acm`
+never opens the TTY (that can assert DTR and reset the S3).
+
+Copy
+[99-papermono-usb.rules](../../../../host/papermono-host/udev/99-papermono-usb.rules)
+to `/etc/udev/rules.d/`:
+
+```shell
+sudo cp host/papermono-host/udev/99-papermono-usb.rules \
+  /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Unplug and replug. Stay in `dialout` (re-login if you just
+joined the group). Then:
+
+```shell
+lsusb | grep 303a:1001
+# Bus 003 Device 013 → /dev/bus/usb/003/013
+ls -l /dev/bus/usb/003/013
+```
+
+Expect `crw-rw---- 1 root dialout`. `00B/00D` in older notes
+were placeholders; zero-pad the **Bus** and **Device** from
+`lsusb` to three digits. `root root` `crw-rw-r--` is still
+denied.
 
 ## Contracts
 
