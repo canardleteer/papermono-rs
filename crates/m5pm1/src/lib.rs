@@ -151,9 +151,8 @@ impl<I2C> M5pm1<I2C> {
 impl<I2C: I2c> M5pm1<I2C> {
     /// Named-register read.
     pub fn read_at(&mut self, reg: u8) -> Result<u8, I2C::Error> {
-        self.i2c.write(self.addr, &[reg])?;
         let mut val = [0u8];
-        self.i2c.read(self.addr, &mut val)?;
+        self.i2c.write_read(self.addr, &[reg], &mut val)?;
         Ok(val[0])
     }
 
@@ -225,6 +224,19 @@ mod tests {
         )]);
         let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
         pm1.set_pwm0_duty(FRONTLIGHT_DUTY).unwrap();
+        pm1.release().done();
+    }
+
+    #[test]
+    fn read_operations() {
+        let txns = [
+            Transaction::write_read(DEFAULT_ADDRESS, std::vec![DEVICE_ID], std::vec![0x42]),
+            Transaction::write_read(DEFAULT_ADDRESS, std::vec![VBAT_L], std::vec![0x51, 0x0F]),
+        ];
+        let i2c = Mock::new(&txns);
+        let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
+        assert_eq!(pm1.read_at(DEVICE_ID).unwrap(), 0x42);
+        assert_eq!(pm1.read_le16(VBAT_L).unwrap(), 3921);
         pm1.release().done();
     }
 }
