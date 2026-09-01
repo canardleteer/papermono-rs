@@ -9,6 +9,8 @@ include = [
     "README.md",
     "AGENTS.md",
     "docs/*.md",
+    ".agents/skills/papermono-rs/SKILL.md",
+    ".agents/skills/papermono-rs/references/*.md",
     ".agents/skills/m5stack-papermono-hardware/SKILL.md",
     ".agents/skills/m5stack-papermono-hardware/references/*.md",
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets.md",

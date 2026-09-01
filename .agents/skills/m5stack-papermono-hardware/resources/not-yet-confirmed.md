@@ -5,9 +5,11 @@ file**; the fact goes into the matching `references/` page. Do
 not grow a confirmed-history section here.
 
 **No PaperMono (`C153`) has been measured for this skill.**
-PaperMono-Lite (`C153-Lite`) has a run-mode USB ID in
-[flashing.md](../references/flashing.md#usb-measured). Official
-docs, UserDemo, OTP-Demo, and FreeInk do not close a row.
+PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
+IDs in [flashing.md](../references/flashing.md#usb-measured)
+and a chip / 16 MB flash row in
+[measure.md](../references/measure.md). Official docs,
+UserDemo, OTP-Demo, and FreeInk do not close a row.
 Firmware evidence is intent.
 
 **Name the SKU.** Confirm on a physical unit of that variant.
@@ -76,18 +78,22 @@ a row that asks anyone to invent an unread register map.
 
 ### nyc-flash-id
 
+**Lite partial:** chip ESP32-S3 v0.2, crystal 40 MHz, flash
+**16 MB**, secure boot and flash encryption disabled. Written
+in [measure.md](../references/measure.md). Still need JEDEC
+manufacturer bytes, PSRAM size (Features did not name it),
+eFuse flash mode/voltage, and the same row on **`C153`**.
+
 With the unit in download mode and a human ask, run `esptool.py
-flash-id` / `espflash board-info`. Record **SKU** (`C153` or
-`C153-Lite`), chip rev, crystal, flash JEDEC + size, PSRAM,
-eFuse mode and voltage. Do not print MAC. Write the table in
-[measure.md](../references/measure.md).
+flash-id` / `espflash board-info`. Record **SKU**, chip rev,
+crystal, flash JEDEC + size, PSRAM, eFuse mode and voltage.
+Do not print MAC.
 
 ### nyc-usb-vid
 
-**Lite run mode is written** (`303a:1001`, Espressif USB
-JTAG/serial debug unit). Still need:
+**Lite run and download are written** (`303a:1001`, Espressif
+USB JTAG/serial debug unit). Still need:
 
-- Same `lsusb` in **download** mode (hold ~2 s, red blink).
 - **PaperMono (`C153`)** run and download.
 - Whether a second CDC interface or UART0/CH343 appears
   (CH343 should not).
@@ -98,8 +104,10 @@ Do not commit iSerial. Write
 
 ### nyc-download-mode
 
-Hold the power button until the red LED blinks, release, then
-`espflash board-info`. Time the hold. Note which LED die blinks.
+**Lite:** power-button hold until the red LED blinks, then
+`cargo xtask detect-connected --probe` (`NoReset`) returned
+board-info. USB IDs did not change. Still need hold seconds
+and which LED die blinks. `C153` not measured.
 Write [flashing.md](../references/flashing.md).
 
 ### nyc-cpu-flash-runtime

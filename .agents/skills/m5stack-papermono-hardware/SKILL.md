@@ -27,7 +27,8 @@ are wiring evidence, not a flash path here.
 
 Official docs, UserDemo, OTP-Demo, and FreeInk are not a
 measurement. Observed silicon:
-[measure.md](references/measure.md). Lite run-mode USB is in
+[measure.md](references/measure.md). Lite USB (run and
+download) is in
 [flashing.md](references/flashing.md#usb-measured). There are
 two SKUs: PaperMono (`C153`) and PaperMono-Lite
 (`C153-Lite`). Name which one you measured.
@@ -45,8 +46,9 @@ Open nets live in
 3. **Observed silicon** —
    [references/measure.md](references/measure.md). Chip, flash,
    USB, factory image, and which peripherals ACK **on a
-   PaperMono or PaperMono-Lite in hand**. Lite run-mode USB is
-   in [flashing.md](references/flashing.md#usb-measured). Name
+   PaperMono or PaperMono-Lite in hand**. Lite USB (run and
+   download) is in
+   [flashing.md](references/flashing.md#usb-measured). Name
    the SKU. A result on one variant does not confirm the
    other. That beats SDK profiles when they disagree on those
    fields.
@@ -94,8 +96,8 @@ it does not silently pick a winner against the user.
    on-unit partition facts
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
-   not confirm the other. Lite run-mode USB is the first
-   observed row; chip/flash/ACK lists are still empty.
+   not confirm the other. Lite USB, chip rev, and 16 MB flash
+   size are observed; JEDEC/PSRAM/ACK lists stay open.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -134,7 +136,7 @@ before treating them as confirmed.
 | Display | 3.97" 480×800, 4-gray, SSD1677 SPI | Same |
 | Touch | FT6336G `0x38`; active area 5–475 / 5–795 | Same |
 | Frontlight | M5PM1 G3 PWM → AW9967 (`EINK_BL`) | Same |
-| USB debug | Native pads; Arduino CDC flags (intent) | Run mode: `303a:1001` Espressif USB JTAG/serial debug unit |
+| USB debug | Native pads; Arduino CDC flags (intent) | Run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit |
 | Battery | 1150 mAh 1S, IP2315 charger `0x75` | Same |
 | PMIC | M5PM1 `0x6E` | Same |
 | Expander | M5IOE1 **board `0x4F`** (chip UM `0x6F`–`0x76`) | Same |
@@ -149,10 +151,11 @@ before treating them as confirmed.
 
 Xtensa target when using Rust: `xtensa-esp32s3-none-elf`
 (`no_std`) or the ESP-IDF Rust target (`std`). USB-C is native
-Espressif USB, not a CH343. **Lite run mode:** `303a:1001`
-“USB JTAG/serial debug unit”
-([flashing.md](references/flashing.md#usb-measured)). `C153`
-and download mode:
+Espressif USB, not a CH343. **Lite run and download:**
+`303a:1001` “USB JTAG/serial debug unit”
+([flashing.md](references/flashing.md#usb-measured)). Lite
+flash size is 16 MB
+([measure.md](references/measure.md)). `C153`:
 [nyc-usb-vid](resources/not-yet-confirmed.md#nyc-usb-vid).
 
 ## Hard rules (all stacks)

@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["host/*", "xtask"]
+# Firmware members (Xtensa) are not here yet. When they land, keep them
+# out of default-members so host `cargo test` / `cargo clippy` never
+# pull that target. Do not pass `--workspace` on the host rustc then.
+default-members = ["host/*", "xtask"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/canardleteer/papermono-rs"
+authors = ["canardleteer"]
+keywords = ["embedded", "esp32s3", "papermono"]
+categories = ["embedded", "hardware-support"]
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "warn"

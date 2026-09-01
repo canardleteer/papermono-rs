@@ -1,0 +1,79 @@
+---
+name: papermono-rs
+description: >-
+  Use when working in the papermono-rs repository: cargo xtask, ci,
+  detect-connected, monitor, backup / confirm / restore, the USB
+  session lock, clap / espflash host CLI rules, or this repository's
+  Rust path on the M5Stack PaperMono or PaperMono-Lite. Board pins,
+  rails, and datasheets live in the sibling
+  m5stack-papermono-hardware skill — read that first for wiring.
+---
+
+# papermono-rs
+
+Host tools and Rust software path for **this repository**. Board
+wiring, enclosure, and datasheets are
+[`m5stack-papermono-hardware`](../m5stack-papermono-hardware/SKILL.md).
+Read that skill first for pins and rails. Do not mix a stack’s APIs
+into the pin map.
+
+This repository is **host-verified by default**. Landing xtask source
+is not permission to open a port. Do not open USB-Serial/JTAG unless
+the human **explicitly asked to run** a live command on a device in
+that message. The always-on copy of that gate is the root
+`AGENTS.md`.
+
+## How to read this skill
+
+1. **xtask** — [references/xtask.md](references/xtask.md). Command
+   catalog, **tool verification ledger**, USB session lock,
+   `ESPFLASH_PORT`, no Cargo runner. Snapshot how-to:
+   [firmware-snapshot-management.md](../../../docs/firmware-snapshot-management.md).
+2. **Layout** — [references/layout.md](references/layout.md).
+   Workspace paths, clap/espflash/MSRV, lockfile.
+3. **Hardware** —
+   [`m5stack-papermono-hardware`](../m5stack-papermono-hardware/SKILL.md).
+   Pins, rails, datasheets, SKU differences.
+
+## Do not connect unless asked
+
+Discovery and flash I/O go through `cargo xtask`, not bare
+`espflash`, `esptool`, `idf.py flash`, or PlatformIO upload. Do not
+run those tools, `probe-rs`, or `cargo xtask` against hardware unless
+the human asked to run that live command:
+
+- Live: `detect-connected --probe`, live `backup-factory-firmware`,
+  `confirm-factory-firmware`, `restore-factory-firmware`, `monitor`
+- Host-only (no USB): `detect-connected` without `--probe`,
+  `backup-factory-firmware --import`, `vet-idle-log`, `ci`
+
+When a live ask is present, the **only** in-repo device I/O is
+`cargo xtask` as catalogued in [xtask.md](references/xtask.md).
+
+Implemented is not proven. Read the
+[tool verification ledger](references/xtask.md#tool-verification-ledger)
+before assuming a command works on silicon.
+
+**Lite (`C153-Lite`) live so far:** `detect-connected` (run and
+download) and `--probe` (`NoReset`). Same USB IDs
+(`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash. Silicon
+rows: hardware
+[measure.md](../m5stack-papermono-hardware/references/measure.md).
+Backup / confirm / restore / `monitor` are not live-tested.
+`C153` has not been measured.
+
+A device may be attached for unrelated reasons; ignore it.
+
+## Crate map
+
+| Path | Role |
+| --- | --- |
+| `host/papermono-host/` | Host library. Live methods take the USB lock |
+| `xtask/` | Clap front-end (`cargo xtask`, `publish = false`) |
+| `developer-data/` | Gitignored. Sealed snapshots under `backups/` |
+| `firmware/` | Not present yet. Not workspace members |
+
+Never commit a MAC, serial number, USB serial string, NVS blob, or
+flash image. Never add a Cargo `runner`. Never `erase-flash`. Never
+`espflash flash`. Do not invent Sticky `0x90000` / 32 MB geometry.
+Do not init NFC or LoRa on PaperMono-Lite.

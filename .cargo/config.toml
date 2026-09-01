@@ -1,0 +1,10 @@
+# Alias only. There is deliberately no [target.*.runner]: cargo run must
+# not flash a device. Detect / factory backup / restore / confirm /
+# monitor is `cargo xtask …` and is not invoked by agents unless a
+# human explicitly asks.
+#
+# No workspace [build] target and no [unstable] build-std: those would
+# break host `std` crates.
+
+[alias]
+xtask = "run --package xtask --"

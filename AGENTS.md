@@ -1,7 +1,8 @@
 # papermono-rs
 
 Board contract for the M5Stack PaperMono and PaperMono-Lite.
-Firmware packages and host tools are not in this repository yet.
+Host tools live under `host/papermono-host/` and `xtask/`.
+Firmware packages are not in this repository yet.
 
 ## Hardware safety (read before writing code)
 
@@ -33,19 +34,23 @@ those pages and excludes the symlinks.
 
 ## Layout
 
-This tree is hardware-docs first. A Cargo workspace, `firmware/`,
-and `cargo xtask` are not here yet. Some directories may later
-have a topical `AGENTS.md`; the nearest file wins on conflict
-with this one.
+Cargo workspace: `host/*` and `xtask` are default-members.
+`firmware/` is not a member yet. Host CLI catalog and the tool
+verification ledger:
+[papermono-rs xtask](.agents/skills/papermono-rs/references/xtask.md).
+Some directories may later have a topical `AGENTS.md`; the
+nearest file wins on conflict with this one.
 
 ## Do not connect to a physical device
 
-This repository has **no in-repo flash or UART tool yet**.
-Landing skill source is not permission to open a port. Do not
+Landing xtask source is not permission to open a port. Do not
 run `espflash`, `esptool`, `idf.py flash`, PlatformIO upload,
 `probe-rs`, or any serial monitor against hardware unless the
 human **explicitly asked to run** that live command on a device
-in that message.
+in that message. The only in-repo device I/O is `cargo xtask`.
+
+Host-only (no port): `detect-connected` without `--probe`,
+`backup-factory-firmware --import`, `vet-idle-log`, `ci`.
 
 A device may be attached for unrelated reasons; ignore it. Never
 commit a MAC address, serial number, USB serial string, NVS blob,
@@ -63,9 +68,11 @@ flattening them.
 | Pin, rail, display, touch, sensor, enclosure, measurement backlog, or datasheet catalog | [m5stack-papermono-hardware](.agents/skills/m5stack-papermono-hardware/SKILL.md) (and a [sources.md](.agents/skills/m5stack-papermono-hardware/references/sources.md) conflict row if sources disagree). `docs/DATASHEETS.md` is a symlink of `resources/datasheets.md` |
 | Hardware safety | [safety.md](.agents/skills/m5stack-papermono-hardware/references/safety.md) (`docs/SAFETY.md` is a symlink) **and** this file if it restates a row |
 | Agent rules that belong to one directory | that directory’s `AGENTS.md` (nearest file wins on conflict) |
+| Host CLI, xtask catalog, or tool verification ledger | [papermono-rs](.agents/skills/papermono-rs/SKILL.md) |
 
-One skill for now:
-[m5stack-papermono-hardware](.agents/skills/m5stack-papermono-hardware/SKILL.md).
+Skills:
+[m5stack-papermono-hardware](.agents/skills/m5stack-papermono-hardware/SKILL.md),
+[papermono-rs](.agents/skills/papermono-rs/SKILL.md).
 
 ## Working rules
 
@@ -106,16 +113,20 @@ and maintain this file according to the
 across compatible agent clients, without assumptions about
 user-specific paths or session state.
 
-One skill:
+Skills:
 
 - [m5stack-papermono-hardware](.agents/skills/m5stack-papermono-hardware/SKILL.md)
   — board contract (pins, rails, datasheets, SKU differences,
   source precedence). The skill user weighs conflicts.
+- [papermono-rs](.agents/skills/papermono-rs/SKILL.md)
+  — `cargo xtask`, USB session lock, tool verification ledger.
 
 Vendor datasheets are official for registers of chips named on
 this model; observed hardware still outranks a datasheet default.
 See
 [Authority](.agents/skills/m5stack-papermono-hardware/SKILL.md#authority).
 PaperMono (`C153`) has not been measured. PaperMono-Lite
-(`C153-Lite`) has a run-mode USB ID in the hardware skill
-([flashing.md](.agents/skills/m5stack-papermono-hardware/references/flashing.md#usb-measured)).
+(`C153-Lite`) has run- and download-mode USB IDs
+(`303a:1001`) and a 16 MB flash size in the hardware skill
+([flashing.md](.agents/skills/m5stack-papermono-hardware/references/flashing.md#usb-measured),
+[measure.md](.agents/skills/m5stack-papermono-hardware/references/measure.md)).

@@ -7,8 +7,15 @@
 
 This repository is a peer of
 [`sticky-rs`](https://github.com/canardleteer/sticky-rs).
-The first drop is the board contract. Firmware packages and host
-tools are not here yet.
+The board contract and a safety-first host CLI (`cargo xtask`)
+are here. Firmware packages are not.
+
+Host tools (clap + `papermono-host`): detect, snapshot
+backup / confirm / restore, and a no-reset monitor. **Implemented
+is not proven.** See the
+[tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
+before treating a command as working on a unit. Operator how-to:
+[docs/firmware-snapshot-management.md](docs/firmware-snapshot-management.md).
 
 - **Read [docs/SAFETY.md](docs/SAFETY.md) before flashing or
   probing a unit.** A mistake can damage the panel (DC imbalance /
@@ -18,12 +25,24 @@ tools are not here yet.
   Pin map, rails, SKU differences, datasheet cache.
 - Open measurements:
   [not-yet-confirmed.md](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
-  Lite run-mode USB is measured (`303a:1001`). Official docs
-  are **not measured** unless a `nyc-*` recipe closed. Name
-  PaperMono (`C153`) vs PaperMono-Lite (`C153-Lite`).
+  Lite run and download USB is measured (`303a:1001`); Lite
+  flash size is 16 MB. Official docs are **not measured**
+  unless a `nyc-*` recipe closed. Name PaperMono (`C153`) vs
+  PaperMono-Lite (`C153-Lite`).
 - Other docs live in [`docs/`](./docs).
   `docs/SAFETY.md` and `docs/DATASHEETS.md` are symlinks into the
   hardware skill.
+
+## Host CLI
+
+```shell
+cargo xtask detect-connected
+cargo xtask ci
+```
+
+`--probe`, live backup, confirm, restore, and `monitor` need a
+human ask. Download is a power-button hold (~2 s until the red
+LED blinks), not DTR. QinHeng `1a86:55d3` is refused.
 
 > [!IMPORTANT]
 >

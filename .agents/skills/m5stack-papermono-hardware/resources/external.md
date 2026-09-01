@@ -2,8 +2,8 @@
 
 Companion material, not this board contract. Prefer live silicon
 ([measure.md](../references/measure.md)) and the pin map in this
-skill when they disagree. Lite run-mode USB is measured;
-other silicon rows are still empty.
+skill when they disagree. Lite USB, chip rev, and 16 MB flash
+size are measured; JEDEC, PSRAM, and ACK lists stay open.
 
 ## FreeInk SDK (`FREEINK_DEVICE_PAPERMONO`)
 

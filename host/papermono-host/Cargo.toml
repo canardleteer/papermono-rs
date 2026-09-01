@@ -1,0 +1,35 @@
+[package]
+name = "papermono-host"
+version = "0.1.0"
+description = "Host API for PaperMono / PaperMono-Lite USB detect, snapshots, and no-reset monitor"
+readme = "README.md"
+publish = true
+edition.workspace = true
+# Matches cargo-espflash / espflash 4.5. Workspace crates stay 1.85.
+rust-version = "1.88"
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Library used by cargo-espflash. The cargo plugin itself has no lib target.
+# `cli` is intentionally off: no SemVer, and we must not pull ELF-flash helpers.
+espflash = { version = "4.5.0", default-features = false, features = [
+  "serialport",
+] }
+# Advisory flock for live USB commands (no unsafe in this crate).
+fs4 = "0.13.1"
+log = "0.4.27"
+# USB CDC listen without opening the ACM TTY (cdc-acm can assert DTR).
+nusb = "0.2.7"
+# Ctrl-C must run Drop so we reattach cdc-acm (not a process-kill).
+ctrlc = "3.4.7"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+# Enumeration needs libudev; we only open ESPFLASH_PORT. Same as espflash.
+serialport = { version = "4.7.2", default-features = false }
+sha2 = "0.10.9"
+tempfile = "3.20.0"
+
+[lints]
+workspace = true

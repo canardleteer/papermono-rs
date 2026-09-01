@@ -34,7 +34,7 @@ External: [external.md](../resources/external.md). Vendor C++:
 
 | Source | Layer | Use |
 | --- | --- | --- |
-| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured)) | Observed | Lite run-mode USB `303a:1001`. Chip, flash, ACK list, `C153` still empty |
+| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash. JEDEC, PSRAM, ACK list, `C153` still empty |
 | [PaperMono docs](https://docs.m5stack.com/en/core/PaperMono) | Official | Pin map, specs, e-paper notes, SKU compare |
 | [PaperMono-Lite docs](https://docs.m5stack.com/en/core/PaperMono-Lite) | Official | Lite pin map (no NFC/LoRa sections) |
 | Schematic PDFs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md)) | Official | Nets. Walk PDF pages |
