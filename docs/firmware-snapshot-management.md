@@ -28,6 +28,10 @@ factory-reset image you can share.
 - Dump length is the **measured** flash size (official 16 MB →
   `0x1000000`). Refuse `flash-32mb.bin` unless that length
   matches.
+- UserDemo `partitions.csv` is eval **intent**, not this unit’s
+  table at `0x8000`. Diff a dump against that CSV and PIO
+  `default_16MB.csv`; they are not the same
+  ([user-demo.md](../.agents/skills/m5stack-papermono-hardware/references/user-demo.md)).
 
 ## Two snapshot kinds
 

@@ -113,14 +113,19 @@ Write [flashing.md](../references/flashing.md).
 ### nyc-cpu-flash-runtime
 
 Boot factory or UserDemo. Read UART/CDC log for CPU MHz and
-flash mode (DIO/QIO). That is runtime, not eFuse.
+flash mode (DIO/QIO). UserDemo `sdkconfig.defaults` asks for
+240 MHz and octal SPIRAM; that is intent, not a log.
 [measure.md](../references/measure.md).
 
 ### nyc-partition-table
 
 Read the table at `0x8000` from **that unit**. Diff against
-UserDemo `partitions.csv` and PIO `default_16MB.csv`. Do not
-commit the dump. [flashing.md](../references/flashing.md).
+UserDemo `partitions.csv` (nvs `0x9000`/`0x6000`, phy
+`0xf000`/`0x1000`, factory `0x10000`/`0xF00000`) and PIO
+`default_16MB.csv`. Those two vendor tables are not the same.
+Do not commit the dump.
+[flashing.md](../references/flashing.md),
+[user-demo.md](../references/user-demo.md).
 
 ### nyc-nvs-phy
 
@@ -161,9 +166,13 @@ on USB, then isolate. Record current and done indication.
 
 ### nyc-pm1-wake
 
-Run the official IMU-wake and RTC-timer-wake Arduino recipes.
-Confirm ESP runs `setup()` again. Not a current measurement.
-[power-and-sleep.md](../references/power-and-sleep.md).
+Run the official IMU-wake and RTC-timer-wake Arduino recipes,
+or UserDemo `enterImuWakeShutdown` / `enterRtc10sWakeShutdown`.
+Confirm ESP runs `setup()` / `app_main` again. UserDemo also
+has ESP `ext0` GPIO4 touch deep sleep; that is a different
+path. Not a current measurement.
+[power-and-sleep.md](../references/power-and-sleep.md),
+[user-demo.md](../references/user-demo.md).
 
 ### nyc-epd-spi-clock
 
@@ -176,7 +185,10 @@ Name the SKU.
 
 OTP-Demo: BUSY idle level, busy-during-refresh level, and
 whether a Seeed-style analog-off standby recovers without a
-hardware reset. [display.md](../references/display.md).
+hardware reset. UserDemo analog-off sequence is named in
+[user-demo.md](../references/user-demo.md); do not treat that
+as a measured recovery.
+[display.md](../references/display.md).
 
 ### nyc-lut-path
 
@@ -228,14 +240,15 @@ surprise ACK. [pin-map.md](../references/pin-map.md).
 
 ### nyc-pdm-mic
 
-Enable `PYG12`, 16 kHz left (or whatever the vendor demo uses).
-Log RMS/peak. Mute is a failed experiment, not a destroy row.
+Enable `PYG12`, 16 kHz right (UserDemo `hal_mic.cpp`). Log
+RMS/peak. Mute is a failed experiment, not a destroy row.
 [sensors.md](../references/sensors.md).
 
 ### nyc-sdmmc-width
 
-Identify a card at 1-bit and at 4-bit. Official DAT0–3 vs
-FreeInk 1-bit. [input-storage.md](../references/input-storage.md).
+Identify a card at 1-bit and at 4-bit. Official DAT0–3 and
+UserDemo 4-bit vs FreeInk 1-bit.
+[input-storage.md](../references/input-storage.md).
 
 ### nyc-tf-det
 
@@ -249,8 +262,11 @@ read of SX1262 status. [pin-map.md](../references/pin-map.md).
 
 ### nyc-nfc-ack
 
-Full SKU only. `0x50` ACK after NFC rail. Do not leave RF on.
-[pin-map.md](../references/pin-map.md).
+Full SKU only. `0x50` ACK after NFC rail. UserDemo
+`probeNfcIdentity` is the eval probe (cite those constants,
+not an unread register map). Do not leave RF on.
+[pin-map.md](../references/pin-map.md),
+[user-demo.md](../references/user-demo.md).
 
 ### nyc-lite-nfc-pads
 

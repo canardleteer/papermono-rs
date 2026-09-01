@@ -32,7 +32,8 @@ Do not invent a 105-byte `0x32` table. SSD1677 Table 7-1 names
 
 ## Orientation
 
-Official tables: 480×800. Touch active area is in that space.
+Official tables: 480×800. UserDemo `Hal::init` calls
+`display.setRotation(0)`. Touch active area is in that space.
 FreeInk profile: 800×480. USB-down mapping is
 [nyc-canvas-orient](../resources/not-yet-confirmed.md#nyc-canvas-orient).
 
@@ -54,8 +55,11 @@ stays high; exit needs **HWRESET**.
 Idle level on a physical unit, and whether a Seeed-style
 analog-off standby recovers without that reset:
 [nyc-otp-busy](../resources/not-yet-confirmed.md#nyc-otp-busy).
-Do not copy Sticky’s “`0xC0` did not drop BUSY” result onto this
-module.
+UserDemo `hal_display.cpp` names analog-off as
+`writeCommand(0x22)` / `0x03` then Master Activation `0x20`,
+and analog-on as `0xC0` ([user-demo.md](user-demo.md)). That
+is eval intent. Do not copy Sticky’s “`0xC0` did not drop
+BUSY” result onto this module.
 
 ## M5GFX refresh times (lab, official)
 
@@ -68,7 +72,10 @@ Reference only, PaperMono, M5GFX modes:
 | `epd_fast` | 0.34 s |
 | `epd_fastest` | 0.07 s |
 
-Unstable LUT warning still applies. Partial ghosting recipe:
+Unstable LUT warning still applies. UserDemo still drives the
+panel through M5GFX `epd_quality` / `epd_text` / `epd_fast` /
+`epd_fastest` (fastest: ten local then one fast; five fast
+then one quality). Partial ghosting recipe:
 [nyc-partial-ghost](../resources/not-yet-confirmed.md#nyc-partial-ghost).
 
 ## Panel datasheet

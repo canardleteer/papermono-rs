@@ -76,4 +76,10 @@ A device may be attached for unrelated reasons; ignore it.
 Never commit a MAC, serial number, USB serial string, NVS blob, or
 flash image. Never add a Cargo `runner`. Never `erase-flash`. Never
 `espflash flash`. Do not invent Sticky `0x90000` / 32 MB geometry.
-Do not init NFC or LoRa on PaperMono-Lite.
+Do not init NFC or LoRa on PaperMono-Lite. Official eval
+firmware is
+[M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
+(one ELF; runtime NFC probe). Sequences live in the hardware
+skill
+[user-demo.md](../m5stack-papermono-hardware/references/user-demo.md).
+Do not `idf.py flash` it from this repo.

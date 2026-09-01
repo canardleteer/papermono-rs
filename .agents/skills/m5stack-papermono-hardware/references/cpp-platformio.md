@@ -47,7 +47,8 @@ product’s pinout. Pins still come from M5Unified + this skill.
 
 - Factory / eval:
   [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
-  (MIT). HAL under `main/hal/`. `partitions.csv` is intent
+  (MIT). HAL under `main/hal/`. Pin the commit and sequences
+  in [user-demo.md](user-demo.md). `partitions.csv` is intent
   ([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
 - OTP:
   [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)
@@ -56,7 +57,10 @@ product’s pinout. Pins still come from M5Unified + this skill.
 
 Include order (ESP-IDF): `M5Unified.h` before `M5PM1.h` /
 `M5IOE1.h` unless `CONFIG_I2C_BUS_BACKWARD_CONFIG` (upstream
-README).
+README). UserDemo `Hal::init` still calls `M5.begin` first.
+`main/idf_component.yml` pins `m5stack/m5pm1` ^1.0.7,
+`m5stack/m5ioe1` ^1.0.9, `espressif/arduino-esp32` ^3.3.10
+at the V1.2 commit.
 
 ## Arduino / UiFlow2
 

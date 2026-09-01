@@ -10,7 +10,8 @@ Physical edges:
 ## Buzzer
 
 GPIO42 PWM (`BB_PWM`). Mux off JTAG `MTMS` (ESP32-S3 Table
-2-4) before PWM. Resonance / SPL:
+2-4) before PWM. UserDemo LEDC: low-speed timer 3 / channel 7,
+10-bit, 50% duty, 40–12000 Hz. Resonance / SPL:
 [nyc-buzzer](../resources/not-yet-confirmed.md#nyc-buzzer).
 
 ## microSD
@@ -20,8 +21,11 @@ Enable M5IOE1 `PYG14`. Detect `PYG1`, pulled up by the card
 power domain; insert pulls low (official).
 
 Official pin table and schematic name four data lines
-(`DAT0` / `CD/DAT3` in the extract). FreeInk says native
-**1-bit** SDMMC. Wiring vs which width firmware uses:
+(`DAT0` / `CD/DAT3` in the extract). UserDemo
+`hal_tf_card.cpp` mounts **4-bit** (`slot_config.width = 4`)
+after `PYG14` high and a 300 ms wait; detect insert = LOW.
+FreeInk says native **1-bit** SDMMC. Wiring vs which width a
+physical unit actually trains:
 [nyc-sdmmc-width](../resources/not-yet-confirmed.md#nyc-sdmmc-width).
 Detect polarity:
 [nyc-tf-det](../resources/not-yet-confirmed.md#nyc-tf-det).
@@ -44,10 +48,13 @@ DevKits; pass `--port` if more than one is plugged in.
 ## NFC and LoRa (full SKU)
 
 ST25R3916 `0x50` (sheet `50h`), IRQ GPIO6. Full schematic:
-`I2C_EN=VDD; I2C mode`. SX1262 on SPI1 (spec ≤16 MHz), IRQ
-GPIO5, BUSY GPIO21 (no internal pull), NSS GPIO41. Mux
-GPIO39–41 off JTAG before SPI. Reset/ant via expander, enable
-M5PM1 G2.
+`I2C_EN=VDD; I2C mode`. UserDemo SKU probe and NFC app keep
+the field off except while scanning
+([user-demo.md](user-demo.md)). SX1262 GPIOs 38/40/39/41/21/5
+(spec ≤16 MHz). Product table names that bus SPI1; UserDemo
+uses `SPI3_HOST` at 8 MHz, RadioLib begin at 868.0 MHz (EU
+demo vs product 868–923). Mux GPIO39–41 off JTAG before SPI.
+Reset/ant via expander, enable M5PM1 G2.
 Lite: do not init; leftover pads
 [nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads)
 /

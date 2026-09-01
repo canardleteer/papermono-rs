@@ -22,7 +22,9 @@ before treating a command as working on a unit. Operator how-to:
   invented LUTs), hang the system I2C bus (IP2315), or lose
   per-unit PHY calibration.
 - [Hardware details](.agents/skills/m5stack-papermono-hardware/SKILL.md).
-  Pin map, rails, SKU differences, datasheet cache.
+  Pin map, rails, SKU differences, datasheet cache. Official
+  eval HAL:
+  [user-demo.md](.agents/skills/m5stack-papermono-hardware/references/user-demo.md).
 - Open measurements:
   [not-yet-confirmed.md](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
   Lite run and download USB is measured (`303a:1001`); Lite

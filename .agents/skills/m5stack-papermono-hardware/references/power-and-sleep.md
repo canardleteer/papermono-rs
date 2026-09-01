@@ -43,6 +43,18 @@ L1 retain + IMU/RTC wake: `setLdoEnable(true)`,
 repeats L0/L1/L2 and the ESP32 runs `setup()` again. That is
 documented Arduino behavior, not a measured current.
 
+UserDemo eval paths (`app_sleep_wake.cpp`, `app_shutdown.cpp`;
+[user-demo.md](user-demo.md)):
+
+- IMU: BMI270 any-motion INT1 → PM1 G4 falling, then
+  `pm1.shutdown()` with LDO hold. Probe `0x68`, fallback
+  `0x69`.
+- RTC: `rtc.setTimerIRQ(10000)` → PM1 G0 falling, then
+  `pm1.shutdown()`.
+- Touch: ESP `esp_deep_sleep_start` with `ext0` on GPIO4 low;
+  touch EN/RST stay high; PM1/M5IOE1 I2C idle sleep 1 s.
+- Shutdown: `ldoSetPowerHold(false)` then `pm1.shutdown()`.
+
 ## Charger (IP2315)
 
 I2C 7-bit `0x75` (sheet 8-bit write `0xEA` / read `0xEB`),
@@ -64,6 +76,8 @@ Official pin map: M5PM1 G3 PWM (`BL_FB`). Schematic V0.6.2:
 **AW9967DNR** on `EINK_BL`. Those are the same path (PWM
 drives the boost), not a pick-one conflict. FreeInk’s AW9967
 name is schematic-true. M5PM1 PWM defaults to open-drain.
+UserDemo sets the lamp with `display.setBrightness` (M5GFX →
+that PWM).
 
 ## Do not
 

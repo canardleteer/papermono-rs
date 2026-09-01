@@ -33,7 +33,7 @@ Do not copy Sticky GPIO numbers onto this product.
 | 19 | USB | USB D− | both | Native USB pads. PDM is **not** here |
 | 20 | USB | USB D+ | both | Native USB pads |
 | 21 | Input | SX1262 BUSY | full | No internal pull (Table 2-1). Lite: [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads) |
-| 38 | Output | LoRa SPI MOSI | full | SPI1 |
+| 38 | Output | LoRa SPI MOSI | full | Schematic/product “SPI1”. UserDemo `SPI3_HOST` |
 | 39 | Output | LoRa SPI CLK | full | Mux off JTAG `MTCK` |
 | 40 | Input | LoRa SPI MISO | full | Mux off JTAG `MTDO` |
 | 41 | Output | SX1262 NSS | full | Mux off JTAG `MTDI` |
@@ -60,7 +60,7 @@ Whether UART0 also enumerates, and `C153` / download:
 | M5PM1 | `0x6E` | both | UM V 1.9; GPIO default open-drain |
 | M5IOE1 | `0x4F` | both | Schematic / docs. Chip UM V 1.4 is `0x6F`–`0x76` from IO7 |
 | IP2315 | `0x75` | both | 8-bit `0xEA`/`0xEB`. Gated by `PYG11_PWM3` |
-| ST25R3916 | `0x50` | full | Sheet `50h`. Schematic `I2C_EN=VDD` |
+| ST25R3916 | `0x50` | full | Sheet `50h`. Schematic `I2C_EN=VDD`. UserDemo SKU probe at this address |
 
 One bus: SDA=47, SCL=48, schematic `IIC PULL_UP`. Chip caps:
 M5PM1/M5IOE1 100 kHz default / 400 kHz; FT6336G SCL 10–400 kHz;
@@ -111,12 +111,12 @@ closed pulls detect low.
 | Bus | Pins | Devices |
 | --- | --- | --- |
 | SPI2 | MOSI 14, SCLK 15, CS 16, DC 17, BUSY 18 | SSD1677 (MOSI-only in the pin table) |
-| SPI1 | MOSI 38, MISO 40, CLK 39, NSS 41, BUSY 21, IRQ 5 | Stamp LoRa-1262 (full) |
+| LoRa SPI | MOSI 38, MISO 40, CLK 39, NSS 41, BUSY 21, IRQ 5 | Stamp LoRa-1262 (full). Product table: SPI1. UserDemo: `SPI3_HOST` on those GPIOs ([user-demo.md](user-demo.md)) |
 | SDMMC | CMD 12, CLK 13, DAT0–3 11/10/9/8 | microSD |
 
 EPD and SD do **not** share a controller. Schematic names
-`DAT0` and `CD/DAT3`. Firmware 1-bit vs 4-bit on a physical
-unit:
+`DAT0` and `CD/DAT3`. UserDemo mounts 4-bit SDMMC; FreeInk
+says 1-bit. Live width on a physical unit:
 [nyc-sdmmc-width](../resources/not-yet-confirmed.md#nyc-sdmmc-width).
 SSD1677 write spec max 20 MHz; clock on a unit:
 [nyc-epd-spi-clock](../resources/not-yet-confirmed.md#nyc-epd-spi-clock).

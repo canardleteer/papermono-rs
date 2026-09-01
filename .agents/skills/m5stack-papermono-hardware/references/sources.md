@@ -40,7 +40,7 @@ External: [external.md](../resources/external.md). Vendor C++:
 | Schematic PDFs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md)) | Official | Nets. Walk PDF pages |
 | [M5PM1 & M5IOE1 Arduino](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Official (intent) | L0–L3B, expander pin names, wake examples |
 | [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official (intent) | OTP path; panel PN `DEPG0397BBS770F3HP-XM` |
-| [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo) | Official (intent) | HAL, `partitions.csv` |
+| [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo) | Official (intent) | Eval HAL: SKU probe, rails, SDMMC 4-bit, LoRa `SPI3_HOST`, sleep paths, `partitions.csv`. See [user-demo.md](user-demo.md) (`c109910`, V1.2) |
 | ESP32-S3 datasheet v2.2 ([datasheets.md](../resources/datasheets.md)) | Official (named MCU) | Straps GPIO0/3/45/46, JTAG 39–42, USB 19/20, I2C |
 | SSD1677 Rev 1.0 / M5PM1 V 1.9 / M5IOE1 V 1.4 / FT6336G / IP2315 / BMI270 / ST25R3916 / SX1262 ([datasheets.md](../resources/datasheets.md)) | Official (named parts) | Registers, opcodes, timings. Observed still outranks a default |
 | Product photos ([enclosure.md](enclosure.md)) | Official | Case color, overall look. Not a pinout |
@@ -58,15 +58,17 @@ the rest of this table is not. Name `C153` vs `C153-Lite`.
 
 | Topic | Official / named | Other sources |
 | --- | --- | --- |
-| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo | FreeInk host-authored LUTs, “3-level grayscale” |
-| Canvas | 480×800 | FreeInk 800×480 |
-| Frontlight | Official HTML: M5PM1 G3 PWM `BL_FB`. Schematic V0.6.2: AW9967DNR on `EINK_BL` (PWM drives the IC) | FreeInk README AW9967 (schematic-true) |
-| M5IOE1 address | Schematic / pin map `0x4F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7 at power-on |
-| microSD | DAT0–DAT3 in the pin table | FreeInk “native 1-bit SDMMC” |
+| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo. UserDemo uses M5GFX `epd_*` modes plus analog-off `0x22`/`0x03` then `0x20` ([user-demo.md](user-demo.md)) | FreeInk host-authored LUTs, “3-level grayscale”. Sticky analog-off result is the wrong product |
+| Canvas | 480×800. UserDemo `setRotation(0)` | FreeInk 800×480 |
+| Frontlight | Official HTML: M5PM1 G3 PWM `BL_FB`. Schematic V0.6.2: AW9967DNR on `EINK_BL` (PWM drives the IC). UserDemo `display.setBrightness` | FreeInk README AW9967 (schematic-true) |
+| M5IOE1 address | Schematic / pin map `0x4F`. UserDemo `IO_EXPANDER_ADDR = 0x4F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7 at power-on |
+| microSD | DAT0–DAT3 in the pin table. UserDemo `slot_config.width = 4` | FreeInk “native 1-bit SDMMC” |
 | Size / weight | HTML: 62.0 × 101.0 × 8.0 mm; 74.7 g / Lite 72.4 g | Older product PDF: 61 mm / “work in progress” |
 | USB debug | Lite run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Sticky skill: CH343 `1a86:55d3` (wrong product). `C153` not measured |
-| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`) | Sticky: 32 MB (wrong product). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| Power | M5PM1 button | Sticky GPIO45/46 latch (wrong product; those pins are PDM here) |
+| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`). UserDemo CSV: nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`; PIO `default_16MB.csv` is a different table | Sticky: 32 MB (wrong product). Live dump: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| Power / wake | M5PM1 button. Arduino: IMU/RTC wake via PM1 G4/G0 then `shutdown()`. UserDemo adds ESP `ext0` GPIO4 touch deep sleep | Sticky GPIO45/46 latch (wrong product; those pins are PDM here) |
+| LoRa SPI host | Pin table / schematic name those GPIOs SPI1 | UserDemo `hal_lora.cpp` uses ESP-IDF `SPI3_HOST` (SPI0/1 are flash). 868.0 MHz RadioLib begin vs product 868–923 MHz |
+| Bring-up | Arduino: M5PM1 then M5IOE1 then peripherals | UserDemo: 500 ms, `M5.begin`, then PM1/IOE1, then NFC identity probe for SKU |
 
 ## Gaps
 

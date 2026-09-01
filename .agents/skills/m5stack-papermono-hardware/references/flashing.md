@@ -14,8 +14,8 @@ Other rows stay official intent until their `nyc-*` ids close.
 | PSRAM | 8 MB octal; PIO `qio_opi` | Not in Lite `board-info` Features. [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
 | USB | Native pads. Vendor Arduino: CDC on boot | Lite run **and** download: `303a:1001`. `C153`, `probe-rs`: [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
 | Download | Power-button hold ~2 s, red LED blink | Lite: hold-until-red-blink then `--probe` (`NoReset`) worked. Seconds / which die: [nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode) |
-| Partition table | UserDemo `partitions.csv`; PIO `default_16MB.csv` | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
-| Runtime DIO/QIO, CPU MHz | Capability 240 MHz | [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
+| Partition table | UserDemo `partitions.csv` (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`); PIO `default_16MB.csv` | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| Runtime DIO/QIO, CPU MHz | Capability 240 MHz. UserDemo `sdkconfig.defaults`: `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240`, octal SPIRAM, 16 MB flash | [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
 | PHY / NVS | ESP32-S3 typically stores RF cal in NVS; M5 publishes restore images | [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy) |
 
 Lite measured flash length: `0x1000000`. Do not copy Sticky

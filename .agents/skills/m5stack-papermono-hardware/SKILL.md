@@ -67,7 +67,9 @@ Open nets live in
    local cache** when that work needs a sheet (see
    [Vendor datasheets](#vendor-datasheets-local-cache)).
 8. **Vendor C++ evidence** —
-   [references/cpp-platformio.md](references/cpp-platformio.md).
+   [references/cpp-platformio.md](references/cpp-platformio.md)
+   and the official eval HAL
+   [references/user-demo.md](references/user-demo.md).
    Sequences from Arduino / ESP-IDF trees (intent and ordering,
    never electrical fact).
 9. **Measurement backlog** — remaining open nets and confirmation
@@ -187,7 +189,9 @@ flash size is 16 MB
    / [nyc-lite-lora-pads](resources/not-yet-confirmed.md#nyc-lite-lora-pads)
    close.
 8. **Display SPI is not shared with microSD.** EPD is SPI2
-   (GPIO14–18). SD is SDMMC (GPIO8–13). LoRa (full SKU) is SPI1.
+   (GPIO14–18). SD is SDMMC (GPIO8–13). LoRa (full SKU) uses
+   GPIO38–41 / 5 / 21; UserDemo attaches that bus to
+   `SPI3_HOST`, not ESP-IDF `SPI1_HOST`.
 9. **M5PM1 and M5IOE1 GPIO default open-drain** (including
    PWM). Configure push-pull or provide a pull-up. M5IOE1 chip
    UM samples `0x6F`–`0x76` from IO7; this board is labeled
@@ -237,7 +241,10 @@ later IPFS CIDv1.
 
 ## Bring-up order (official intent)
 
-Vendor Arduino / M5Unified sequences. **Not measured.**
+Two vendor sequences. **Not measured.** Name both when they
+disagree ([sources.md](references/sources.md)).
+
+Arduino / M5PM1 docs:
 
 1. Device is already powered by the M5PM1 button. System I2C is
    GPIO47 SDA / GPIO48 SCL.
@@ -249,10 +256,15 @@ Vendor Arduino / M5Unified sequences. **Not measured.**
    boot: OTP full refresh, not an invented LUT.
 6. Touch: `PYG13` VDD, `PYG6` RST; FT6336G `0x38`; INT GPIO4.
 7. Sensors on the same I2C: BMI270 `0x68`, RX8130CE `0x32`.
-8. Full SKU only: ST25R3916 `0x50`, SX1262 on SPI1 after
-   `LoRa_EN` (M5PM1 G2).
+8. Full SKU only: ST25R3916 `0x50`, SX1262 on the LoRa GPIOs
+   after `LoRa_EN` (M5PM1 G2).
 
-Factory UserDemo also exercises mic, SD, RGB, buzzer, Wi-Fi.
+UserDemo eval HAL
+([user-demo.md](references/user-demo.md)): 500 ms wait,
+`M5.begin` (display/touch via M5Unified, internal mic/spk/imu
+off), then M5PM1/M5IOE1, then **runtime NFC identity probe**
+to choose Pro vs Lite. NFC and LoRa apps install only when
+that probe succeeds. Mic, SD, and LoRa init stay deferred.
 
 ## Subsystem map
 
@@ -270,6 +282,7 @@ Factory UserDemo also exercises mic, SD, RGB, buzzer, Wi-Fi.
 | USB, flash geometry, PSRAM | [references/flashing.md](references/flashing.md) |
 | Rust stacks (not a host toolchain) | [references/rust.md](references/rust.md) |
 | Vendor C++ / PlatformIO sequences | [references/cpp-platformio.md](references/cpp-platformio.md) |
+| Official UserDemo eval HAL | [references/user-demo.md](references/user-demo.md) |
 | Official URLs, firmware list | [references/catalog.md](references/catalog.md) |
 | Vendor datasheets (catalog; local cache) | [resources/datasheets.md](resources/datasheets.md) |
 | Conflicts and citations | [references/sources.md](references/sources.md) |
@@ -281,12 +294,17 @@ Factory UserDemo also exercises mic, SD, RGB, buzzer, Wi-Fi.
 - **PSRAM:** 8 MB octal in the product table. Close
   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id).
 - **Flash:** 16 MB. PlatformIO uses `qio_opi` and
-  `default_16MB.csv`. Runtime DIO vs QIO is
+  `default_16MB.csv`. UserDemo `partitions.csv` uses a 15 MB
+  factory app at `0x10000` — different table, still intent
+  ([user-demo.md](references/user-demo.md)). Runtime DIO vs QIO
+  is
   [nyc-cpu-flash-runtime](resources/not-yet-confirmed.md#nyc-cpu-flash-runtime).
 - **Canvas:** official 480×800. FreeInk uses 800×480. Conflict:
   [nyc-canvas-orient](resources/not-yet-confirmed.md#nyc-canvas-orient).
-- **Wake:** M5PM1, not ESP32 `ext1` GPIO4 as on Sticky. IMU INT
-  and RTC INT go to M5PM1 GPIOs.
+- **Wake:** M5PM1, not Sticky `ext1` GPIO4. IMU INT and RTC INT
+  go to M5PM1 GPIOs. UserDemo also uses ESP `ext0` on GPIO4
+  for **touch deep sleep** (ESP stays powered down; PMIC I2C
+  idle sleep 1 s) — that path is eval intent, not a current.
 - **Strapping (v2.2 §3):** GPIO0 (WPU, `BOOT_OUT`), GPIO3
   (floating, KEY2), GPIO45/46 (WPD, PDM). Latched at chip reset;
   ordinary IO after `tH` ≥ 3 ms.

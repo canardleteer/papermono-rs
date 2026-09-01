@@ -40,4 +40,6 @@ encodings stay unnamed. Do not copy GT911 `0x814E` or invent
 Map touch samples onto the framebuffer after
 [nyc-canvas-orient](../resources/not-yet-confirmed.md#nyc-canvas-orient)
 is known. Official portrait 480×800 vs FreeInk 800×480 is a
-conflict, not a silent rotate.
+conflict, not a silent rotate. UserDemo uses `M5.Touch` after
+`setRotation(0)` and wakes ESP deep sleep with `ext0` on
+GPIO4 low ([user-demo.md](user-demo.md)).

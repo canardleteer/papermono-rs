@@ -77,9 +77,10 @@ Per-unit MAC, USB serial, and factory serial omitted.
 ## Factory image (intent only)
 
 [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
-is published ESP-IDF source for hardware evaluation. It has a
-`partitions.csv`. That file is **vendor intent**, not a live dump
-of a shipping unit
+is published ESP-IDF source for hardware evaluation. Sequences
+and the CSV live in
+[user-demo.md](user-demo.md). `partitions.csv` is **vendor
+intent**, not a live dump of a shipping unit
 ([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
 
 OTP path:
