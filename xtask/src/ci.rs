@@ -3,6 +3,7 @@
 //! One workspace, one lockfile. Never `--workspace` on the host rustc
 //! once firmware members exist (that would pull Xtensa). There are no
 //! firmware packages yet; do not add `cargo +esp` until one lands.
+//! Board crates under `crates/` are default-members.
 
 use std::env;
 use std::path::Path;

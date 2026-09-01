@@ -8,7 +8,12 @@ respect-gitignore = true
 include = [
     "README.md",
     "AGENTS.md",
+    "crates/AGENTS.md",
+    "crates/*/README.md",
+    "crates/*/AGENTS.md",
     "firmware/AGENTS.md",
+    "firmware/*/README.md",
+    "firmware/*/AGENTS.md",
     "docs/*.md",
     ".agents/skills/papermono-rs/SKILL.md",
     ".agents/skills/papermono-rs/references/*.md",

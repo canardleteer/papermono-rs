@@ -8,7 +8,10 @@
 This repository is a peer of
 [`sticky-rs`](https://github.com/canardleteer/sticky-rs).
 The board contract and a safety-first host CLI (`cargo xtask`)
-are here. Firmware packages are not workspace members yet.
+are here. Board crates:
+`m5stack-papermono-lite` (`C153-Lite`, shared map) and
+`m5stack-papermono` (`C153`, NFC + LoRa). Firmware images are
+not workspace members yet.
 [firmware/AGENTS.md](firmware/AGENTS.md) is in place for when
 they land.
 

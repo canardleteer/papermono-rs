@@ -154,8 +154,9 @@ Board pin tables: living HTML **PinMap** on the product pages
 
 EPD refresh enum titles (lab times, both SKUs): `epd_quality`,
 `epd_text`, `epd_fast`, `epd_fastest`
-([display.md](references/display.md)). Rust under `firmware/`
-also reads [firmware/AGENTS.md](../../../firmware/AGENTS.md).
+([display.md](references/display.md)). Rust under `crates/` and
+`firmware/` also reads [crates/AGENTS.md](../../../crates/AGENTS.md)
+and [firmware/AGENTS.md](../../../firmware/AGENTS.md).
 
 ## Product snapshot
 

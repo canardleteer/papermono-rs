@@ -3,9 +3,10 @@ name: papermono-rs
 description: >-
   Use when working in the papermono-rs repository: cargo xtask, ci,
   detect-connected, monitor, backup / confirm / restore, the USB
-  session lock, clap / espflash host CLI rules, or this repository's
-  Rust path on the M5Stack PaperMono or PaperMono-Lite. Board pins,
-  rails, and datasheets live in the sibling
+  session lock, clap / espflash host CLI rules, board crates
+  (`m5stack-papermono-lite`, `m5stack-papermono`), or this
+  repository's Rust path on the M5Stack PaperMono or PaperMono-Lite.
+  Board pins, rails, and datasheets live in the sibling
   m5stack-papermono-hardware skill — read that first for wiring.
 ---
 
@@ -77,11 +78,13 @@ A device may be attached for unrelated reasons; ignore it.
 
 | Path | Role |
 | --- | --- |
+| `crates/m5stack-papermono-lite/` | Board crate. `C153-Lite` + shared pin map |
+| `crates/m5stack-papermono/` | Board crate. `C153`; re-exports Lite; NFC + LoRa |
 | `host/papermono-host/` | Host library. Live methods take the USB lock |
 | `host/papermono-host/udev/` | usbfs udev rule for `monitor` |
 | `xtask/` | Clap front-end (`cargo xtask`, `publish = false`) |
 | `developer-data/` | Gitignored. Sealed snapshots under `backups/`; confirm JSON under `confirm-records/` |
-| `firmware/` | Not members yet. [firmware/AGENTS.md](../../../firmware/AGENTS.md) |
+| `firmware/` | Not members yet. Planned `simple-debug` / `embassy-debug`. [firmware/AGENTS.md](../../../firmware/AGENTS.md) |
 
 Never commit a MAC, serial number, USB serial string, NVS blob,
 flash image, dump SHA, or unit-id. `developer-data/` is

@@ -1,10 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["host/*", "xtask"]
+members = ["crates/*", "host/*", "xtask"]
 # Firmware members (Xtensa) are not here yet. When they land, keep them
 # out of default-members so host `cargo test` / `cargo clippy` never
 # pull that target. Do not pass `--workspace` on the host rustc then.
-default-members = ["host/*", "xtask"]
+default-members = ["crates/*", "host/*", "xtask"]
 
 [workspace.package]
 edition = "2021"

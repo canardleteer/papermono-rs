@@ -2,7 +2,8 @@
 
 Board contract for the M5Stack PaperMono and PaperMono-Lite.
 Host tools live under `host/papermono-host/` and `xtask/`.
-Firmware packages are not in this repository yet.
+Board crates live under `crates/`. Firmware images are not
+workspace members yet.
 
 ## Hardware safety (read before writing code)
 
@@ -34,8 +35,8 @@ those pages and excludes the symlinks.
 
 ## Layout
 
-Cargo workspace: `host/*` and `xtask` are default-members.
-`firmware/` is not a member yet.
+Cargo workspace: `crates/*`, `host/*`, and `xtask` are
+default-members. `firmware/` is not a member yet.
 [firmware/AGENTS.md](firmware/AGENTS.md) is already in place
 for when packages land. Host CLI catalog and the tool
 verification ledger:
@@ -71,6 +72,7 @@ flattening them.
 | Hardware safety | [safety.md](.agents/skills/m5stack-papermono-hardware/references/safety.md) (`docs/SAFETY.md` is a symlink) **and** this file if it restates a row |
 | Agent rules that belong to one directory | that directory’s `AGENTS.md` (nearest file wins on conflict) |
 | Host CLI, xtask catalog, or tool verification ledger | [papermono-rs](.agents/skills/papermono-rs/SKILL.md) |
+| Board crates under `crates/` | [crates/AGENTS.md](crates/AGENTS.md) **and** the hardware skill pin-map |
 | Firmware packages under `firmware/` | [firmware/AGENTS.md](firmware/AGENTS.md) **and** the hardware skill (pins, opcodes, refresh modes) |
 
 Skills:
@@ -92,8 +94,9 @@ Skills:
   EPD refresh enum titles: `epd_quality`, `epd_text`,
   `epd_fast`, `epd_fastest`
   ([display.md](.agents/skills/m5stack-papermono-hardware/references/display.md)).
-  When writing under `firmware/`, also read
-  [firmware/AGENTS.md](firmware/AGENTS.md).
+  When writing under `firmware/` or `crates/`, also read
+  [firmware/AGENTS.md](firmware/AGENTS.md) and
+  [crates/AGENTS.md](crates/AGENTS.md).
 - **Do not invent registers or opcodes.** If the datasheet has
   not been read, expose a documented raw primitive and record the
   gap in the hardware skill catalog
@@ -136,9 +139,11 @@ Skills:
   source precedence). The skill user weighs conflicts.
 - [papermono-rs](.agents/skills/papermono-rs/SKILL.md)
   — `cargo xtask`, USB session lock, tool verification ledger.
+- [crates/AGENTS.md](crates/AGENTS.md) — two board crates
+  (`m5stack-papermono-lite`, `m5stack-papermono`).
 - [firmware/AGENTS.md](firmware/AGENTS.md) — named constants,
-  datasheet citations, and `epd_*` refresh enums when firmware
-  packages land (nearest file wins).
+  datasheet citations, `epd_*` refresh enums, and planned
+  Xtensa images (nearest file wins).
 
 Vendor datasheets are official for registers of chips named on
 this model; observed hardware still outranks a datasheet default.
