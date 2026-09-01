@@ -13,7 +13,9 @@ authors.workspace = true
 [dependencies]
 clap = { version = "4.5.41", features = ["derive", "env"] }
 env_logger = "0.11.8"
+image = { version = "0.25.9", default-features = false, features = ["png"] }
 papermono-host = { path = "../host/papermono-host" }
+resvg = { version = "0.48.1", default-features = false }
 sha2 = "0.10.9"
 
 [lints]
