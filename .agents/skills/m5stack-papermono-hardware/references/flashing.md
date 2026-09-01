@@ -1,0 +1,68 @@
+# USB, flash, PSRAM
+
+How to read a unit: [measure.md](measure.md). Layers:
+[sources.md](sources.md). This page is geometry, not a host-tool
+cheatsheet. Consuming projects supply their own flash path.
+
+Name `C153` vs `C153-Lite`. USB run-mode on Lite is measured
+below. Other rows stay official intent until their `nyc-*` ids
+close.
+
+| Item | Official / vendor intent | Open |
+| --- | --- | --- |
+| Flash size | 16 MB | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| PSRAM | 8 MB octal; PIO `qio_opi` | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| USB | Native pads. Vendor Arduino: CDC on boot | [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) (download; `C153`; `probe-rs`) |
+| Download | Power-button hold ~2 s, red LED blink | [nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode) |
+| Partition table | UserDemo `partitions.csv`; PIO `default_16MB.csv` | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| Runtime DIO/QIO, CPU MHz | Capability 240 MHz | [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
+| PHY / NVS | ESP32-S3 typically stores RF cal in NVS; M5 publishes restore images | [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy) |
+
+Physical size if JEDEC confirms 16 MB: `0x1000000`. Do not copy
+Sticky `0x2000000` / `0x90000`.
+
+Keep `*.bin` flash images out of git. Do not restore one unit’s
+full-chip image onto another until you know NVS contents are not
+identity.
+
+## USB (measured)
+
+**PaperMono-Lite (`C153-Lite`), powered on (run mode).** Host
+`dmesg` / `lsusb` from a live unit. USB serial string omitted
+(it was a MAC-shaped iSerial; do not commit one).
+
+| Field | Value |
+| --- | --- |
+| SKU | `C153-Lite` |
+| Mode | Run (unit on; not download-button) |
+| VID:PID | `303a:1001` |
+| bcdDevice | `1.01` |
+| Manufacturer | Espressif |
+| Product | USB JTAG/serial debug unit |
+| Speed | Full-speed |
+| QinHeng CH343 (`1a86:55d3`) | Not in that log |
+
+This is native Espressif USB-Serial/JTAG on USB-C, not a
+CH343. Vendor Arduino `USB_CDC_ON_BOOT` is still **intent**;
+this factory/run enumeration used the JTAG/serial product
+string. `C153`, download-mode IDs, whether a second CDC
+interface appears, and `probe-rs list` stay
+[nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid).
+
+Prefer a stable by-id node. ACM numbers move. The host user
+needs `dialout` (or equivalent).
+
+## PSRAM
+
+Octal 8 MB in the product table. 80 MHz is a firmware config,
+not an eFuse field. Gray4 frames belong in PSRAM once size is
+confirmed. DMA descriptors stay in internal RAM.
+
+## Do not
+
+- Use Sticky 32 MB `n16r8` notes (that was the *wrong* CrossPoint
+  limit on a 32 MB Sticky). Here 16 MB is the documented size.
+- Assume `probe-rs` works because the product string says
+  JTAG. Run `probe-rs list` on a unit first (`nyc-usb-vid`).
+- `erase-flash` before you have a snapshot you accept losing PHY
+  for (`nyc-nvs-phy`).

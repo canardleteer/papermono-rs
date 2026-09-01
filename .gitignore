@@ -1,0 +1,38 @@
+# Normal Rust Repository Things
+/target
+
+# NOTE(canardleteer): These will become more relevant, as more of the
+# repository is migrated.
+
+# papermono-rs firmware
+/firmware/*/target
+
+# NOTE(canardleteer): Clone-local private / personalized files. Per-unit
+# factory originals (NVS, RF calibration, MAC, serials) live under
+# developer-data/backups/. Never commit this tree. See docs/SAFETY.md.
+/developer-data/
+
+# Leftover pre-move path. Do not use. Still ignored so a stray dump
+# cannot land in git.
+/backups/
+
+# Host-check UART captures from `monitor --output`. Names are the
+# static examples in AGENTS.md. Do not commit them.
+/idle-embassy.log
+/idle-simple.log
+
+# NOTE(canardleteer): Flash images and device dumps: these contain per-unit
+# NVS, Wi-Fi RF calibration, MAC, and serial number. Never commit them. See
+# docs/SAFETY.md.
+*.bin
+*.elf
+!**/partitions.csv
+
+# NOTE(canardleteer): I don't really want to deal with managing
+# all the licensing surrounding spec sheets. Local vendor
+# datasheet PDFs and extracted markdown.
+#
+# Catalog is stored in:
+# .agents/skills/m5stack-papermono-hardware/resources/datasheets.md
+.agents/skills/m5stack-papermono-hardware/resources/datasheets/pdf/
+.agents/skills/m5stack-papermono-hardware/resources/datasheets/md/

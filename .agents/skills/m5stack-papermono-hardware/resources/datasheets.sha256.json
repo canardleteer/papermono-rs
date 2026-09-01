@@ -1,0 +1,198 @@
+{
+  "algorithm": "sha256",
+  "ipfs_note": "CIDv1 can be derived later from these SHA-256 digests (typically raw codec 0x55 + sha2-256).",
+  "files": [
+    {
+      "id": "ssd1677",
+      "path": "datasheets/pdf/ssd1677.pdf",
+      "sha256": "daf8b726f822f6907529386b8af6fbea6ec5e8ecc7b7af361340be911d632544",
+      "bytes": 3602487
+    },
+    {
+      "id": "ssd1677",
+      "path": "datasheets/md/ssd1677.md",
+      "sha256": "0fc97c16dd5463f8484f68d183d4852f7f4e3974858161c4dc13f771fead667b",
+      "bytes": 165583
+    },
+    {
+      "id": "epd-module",
+      "path": "datasheets/pdf/epd-module.pdf",
+      "sha256": "6b65f56d5d549a132e5c807eef329fb3e997feab04ac06e8a107f01591618130",
+      "bytes": 8666208
+    },
+    {
+      "id": "epd-module",
+      "path": "datasheets/md/epd-module.md",
+      "sha256": "45bb5c918ef4f63a8b5c204f89c672309c789b757ad2fe08ca41a2cc8a04abcf",
+      "bytes": 350
+    },
+    {
+      "id": "m5pm1",
+      "path": "datasheets/pdf/m5pm1.pdf",
+      "sha256": "c6daffd0ab89d8de50c0a19f35f94321bc6c9511ad017dd242a3e765d88a96b6",
+      "bytes": 814731
+    },
+    {
+      "id": "m5pm1",
+      "path": "datasheets/md/m5pm1.md",
+      "sha256": "3fdc9098ecb9fb42a1597542f31319f238ee1ea61d5b6c3a3b0275bc6ba86d10",
+      "bytes": 99109
+    },
+    {
+      "id": "m5ioe1",
+      "path": "datasheets/pdf/m5ioe1.pdf",
+      "sha256": "9204d99cb2e03395ffc905e05fbeddf7f9f25de5698a31a65fa439dee700d8d2",
+      "bytes": 398463
+    },
+    {
+      "id": "m5ioe1",
+      "path": "datasheets/md/m5ioe1.md",
+      "sha256": "061840f73428570db6203e473d7144210531a20c425178547f3f9ecaf52ccb00",
+      "bytes": 29657
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/pdf/papermono-schematic.pdf",
+      "sha256": "b5abecac97cb043a6d1af7a673f2111d40d9254b0b5108635cb924d9b37ad6fa",
+      "bytes": 1462039
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/md/papermono-schematic.md",
+      "sha256": "417dce7557c96bd1cd638f20cecdbfa5e0bd9f75501d7ce83eb007d843785464",
+      "bytes": 566724
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/pdf/papermono-lite-schematic.pdf",
+      "sha256": "e27b138e9104d3550531c9a9757ddc3d14941a546acc698ba7df4f40cd37095e",
+      "bytes": 1409590
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/md/papermono-lite-schematic.md",
+      "sha256": "b726fb2459f39379e2d98b8b9c67b9752eaa22d318e3ab973da1acb57ccaf7f8",
+      "bytes": 500671
+    },
+    {
+      "id": "papermono-product",
+      "path": "datasheets/pdf/papermono-product.pdf",
+      "sha256": "1f40d77fe525c8619f17ce8a9bb590b381e133160496e4d4702fcc4b8f717865",
+      "bytes": 15293568
+    },
+    {
+      "id": "papermono-product",
+      "path": "datasheets/md/papermono-product.md",
+      "sha256": "01026c09678f14800d4d50176e762834cb7a750457a8f3e7713d19f262d0d19b",
+      "bytes": 18520
+    },
+    {
+      "id": "papermono-lite-product",
+      "path": "datasheets/pdf/papermono-lite-product.pdf",
+      "sha256": "e541d8977eb5613fb4eb1140f870e509c7b11fcacae5ffadcace041e59a3ac3a",
+      "bytes": 14578435
+    },
+    {
+      "id": "papermono-lite-product",
+      "path": "datasheets/md/papermono-lite-product.md",
+      "sha256": "19e592c6c0a7909830c468f744788d882d351781236c27ed6eb9b66aa29c2bd6",
+      "bytes": 16951
+    },
+    {
+      "id": "ft6336g",
+      "path": "datasheets/pdf/ft6336g.pdf",
+      "sha256": "f7091da373e3c23d2ae734b73aa82ff5d40cbac4da4592bb83723c9edbf902b5",
+      "bytes": 473748
+    },
+    {
+      "id": "ft6336g",
+      "path": "datasheets/md/ft6336g.md",
+      "sha256": "7b4540e6835db42441a788b3530b7e582799c1b9b27982668dfe60f23808977d",
+      "bytes": 30208
+    },
+    {
+      "id": "bmi270",
+      "path": "datasheets/pdf/bmi270.pdf",
+      "sha256": "f68ce3c74f011a80bbe4b0279c4abe9609a71a5dcda75a951381d77112e005fb",
+      "bytes": 2636042
+    },
+    {
+      "id": "bmi270",
+      "path": "datasheets/md/bmi270.md",
+      "sha256": "9fbd334e265d8a8036aa0df3b89ea10648fcdbf07e575b5d6488d51090f82224",
+      "bytes": 500840
+    },
+    {
+      "id": "rx8130ce",
+      "path": "datasheets/pdf/rx8130ce.pdf",
+      "sha256": "db027a5fa2dd17b333da81e95063764eb5536d2878c63b64949348d2ec4b8a22",
+      "bytes": 2008845
+    },
+    {
+      "id": "rx8130ce",
+      "path": "datasheets/md/rx8130ce.md",
+      "sha256": "ad2427e780b0bb577b14e5a026de901f2afbbd394837cfe17aeb2fa806576151",
+      "bytes": 225513
+    },
+    {
+      "id": "ip2315",
+      "path": "datasheets/pdf/ip2315.pdf",
+      "sha256": "e6fd50db74f33c01aa6e743feabb209a13249de1a1d56f953633f74c988350fd",
+      "bytes": 4152348
+    },
+    {
+      "id": "ip2315",
+      "path": "datasheets/md/ip2315.md",
+      "sha256": "d858400ab5b108d3956ab8c27287df20766bf2e1ad69a89d7e6a488964dbe1d0",
+      "bytes": 55558
+    },
+    {
+      "id": "st25r3916",
+      "path": "datasheets/pdf/st25r3916.pdf",
+      "sha256": "1170f4d74ff501917262ae42bf81c60c38c11d121e2ea2af6b1e845433befef1",
+      "bytes": 2241765
+    },
+    {
+      "id": "st25r3916",
+      "path": "datasheets/md/st25r3916.md",
+      "sha256": "24152beef85fc857b77c80916568a7e4e7da0c04a42a148d1efc104de6c5a3c7",
+      "bytes": 503403
+    },
+    {
+      "id": "sx1262",
+      "path": "datasheets/pdf/sx1262.pdf",
+      "sha256": "6d783125dbef567954ce53095ad068d0950b2a8de52f95bb2cfde4146c4306c2",
+      "bytes": 4459535
+    },
+    {
+      "id": "sx1262",
+      "path": "datasheets/md/sx1262.md",
+      "sha256": "97baf90ddd43c0dbcaf4ef6be2620e5a6d1f8d39a7bdffc1bc986918fdc4d865",
+      "bytes": 369733
+    },
+    {
+      "id": "esp32-s3-datasheet",
+      "path": "datasheets/pdf/esp32-s3-datasheet.pdf",
+      "sha256": "2d5a7cb7fd559d8d972bd88db32669c0196d23f22d7afaafb0f63d099b589a3f",
+      "bytes": 1098115
+    },
+    {
+      "id": "esp32-s3-datasheet",
+      "path": "datasheets/md/esp32-s3-datasheet.md",
+      "sha256": "ebe43a2898ebae7c0d29feb9ed4d6646f9b497f6efc1b6be11aa06d6eff9ec04",
+      "bytes": 277001
+    },
+    {
+      "id": "esp32-s3-trm",
+      "path": "datasheets/pdf/esp32-s3-trm.pdf",
+      "sha256": "4484bf8a69035ec42a731c58c64ada6fbd1f1618c5559409f134d9ea083f444f",
+      "bytes": 15215232
+    },
+    {
+      "id": "esp32-s3-trm",
+      "path": "datasheets/md/esp32-s3-trm.md",
+      "sha256": "63a6bed2b2448cc690e90c894b1f93ce3a044c5fb84748177913c1516139139b",
+      "bytes": 7687808
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+../.agents/skills/m5stack-papermono-hardware/references/safety.md

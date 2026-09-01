@@ -1,0 +1,52 @@
+# rumdl: author-owned Markdown only. Do not lint vendor PDF extracts.
+
+[global]
+line-length = 80
+respect-gitignore = true
+
+# Owned docs and authored skill pages.
+include = [
+    "README.md",
+    "AGENTS.md",
+    "docs/*.md",
+    ".agents/skills/m5stack-papermono-hardware/SKILL.md",
+    ".agents/skills/m5stack-papermono-hardware/references/*.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/datasheets.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/datasheets/README.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/external.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/enclosure/SOURCE.md",
+]
+
+exclude = [
+    ".git",
+    ".github",
+    "node_modules",
+    "vendor",
+    "dist",
+    "build",
+    "CHANGELOG.md",
+    "LICENSE.md",
+    # Symlinks into the hardware skill; lint the real files once.
+    "docs/DATASHEETS.md",
+    "docs/SAFETY.md",
+    # Vendor PDFs and pdftotext extracts (also gitignored).
+    ".agents/skills/m5stack-papermono-hardware/resources/datasheets/md/**",
+    ".agents/skills/m5stack-papermono-hardware/resources/datasheets/pdf/**",
+]
+
+# MD004 would restyle every `-` list to `*` (first-pass noise).
+# MD059 would rename link labels. MD034 would rewrite autolinks.
+# MD033: GitHub Flavored Markdown has no center syntax; READMEs use HTML.
+disable = ["MD004", "MD059", "MD034", "MD033"]
+
+[MD010]
+spaces-per-tab = 2
+
+[MD013]
+code-blocks = false
+tables = false
+headings = true
+
+[MD004]
+style = "asterisk"
