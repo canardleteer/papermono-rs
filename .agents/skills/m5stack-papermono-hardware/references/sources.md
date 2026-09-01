@@ -9,7 +9,7 @@ Full wording: [SKILL.md](../SKILL.md#authority).
 1. **Skill user** — they weigh the facts.
 2. **Observed hardware** on this product (batch variation
    allowed). Lite USB in [flashing.md](flashing.md#usb-measured);
-   otherwise still thin ([measure.md](measure.md)).
+   Lite size and stock table in [measure.md](measure.md).
 3. **Official** board docs, vendor SDKs, schematics, and chip
    datasheets for parts named on this model. Registers and
    timings when they have **not been measured**. Official
@@ -34,7 +34,7 @@ External: [external.md](../resources/external.md). Vendor C++:
 
 | Source | Layer | Use |
 | --- | --- | --- |
-| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash. JEDEC, PSRAM, ACK list, `C153` still empty |
+| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash; stock table matches UserDemo CSV. JEDEC, PSRAM, ACK list, `C153` still empty |
 | [PaperMono docs](https://docs.m5stack.com/en/core/PaperMono) | Official | Pin map, specs, e-paper notes, SKU compare |
 | [PaperMono-Lite docs](https://docs.m5stack.com/en/core/PaperMono-Lite) | Official | Lite pin map (no NFC/LoRa sections) |
 | Schematic PDFs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md)) | Official | Nets. Walk PDF pages |
@@ -65,7 +65,7 @@ the rest of this table is not. Name `C153` vs `C153-Lite`.
 | microSD | DAT0–DAT3 in the pin table. UserDemo `slot_config.width = 4` | FreeInk “native 1-bit SDMMC” |
 | Size / weight | HTML: 62.0 × 101.0 × 8.0 mm; 74.7 g / Lite 72.4 g | Older product PDF: 61 mm / “work in progress” |
 | USB debug | Lite run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Sticky skill: CH343 `1a86:55d3` (wrong product). `C153` not measured |
-| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`). UserDemo CSV: nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`; PIO `default_16MB.csv` is a different table | Sticky: 32 MB (wrong product). Live dump: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`) and UserDemo-matching table at `0x8000`. PIO `default_16MB.csv` is a different table | Sticky: 32 MB (wrong product). `C153` table: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
 | Power / wake | M5PM1 button. Arduino: IMU/RTC wake via PM1 G4/G0 then `shutdown()`. UserDemo adds ESP `ext0` GPIO4 touch deep sleep | Sticky GPIO45/46 latch (wrong product; those pins are PDM here) |
 | LoRa SPI host | Pin table / schematic name those GPIOs SPI1 | UserDemo `hal_lora.cpp` uses ESP-IDF `SPI3_HOST` (SPI0/1 are flash). 868.0 MHz RadioLib begin vs product 868–923 MHz |
 | Bring-up | Arduino: M5PM1 then M5IOE1 then peripherals | UserDemo: 500 ms, `M5.begin`, then PM1/IOE1, then NFC identity probe for SKU |

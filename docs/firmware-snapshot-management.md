@@ -28,10 +28,9 @@ factory-reset image you can share.
 - Dump length is the **measured** flash size (official 16 MB →
   `0x1000000`). Refuse `flash-32mb.bin` unless that length
   matches.
-- UserDemo `partitions.csv` is eval **intent**, not this unit’s
-  table at `0x8000`. Diff a dump against that CSV and PIO
-  `default_16MB.csv`; they are not the same
-  ([user-demo.md](../.agents/skills/m5stack-papermono-hardware/references/user-demo.md)).
+- UserDemo `partitions.csv` matches **Lite stock** at `0x8000`.
+  PIO `default_16MB.csv` is still a different table. `C153` is
+  [nyc-partition-table](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-partition-table).
 
 ## Two snapshot kinds
 
@@ -75,13 +74,15 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Implemented, not live-tested | — | Human ask while in download (or re-enter via red blink). Dump 16 MiB |
-| `confirm-factory-firmware` | Implemented, not live-tested | — | After a Lite snapshot exists |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes. Capture (uncertain stock). Baud warning at 921600; dump finished. Do not commit dumps. Next: `confirm-factory-firmware` |
+| `confirm-factory-firmware` | Implemented, not live-tested | — | Lite capture exists. Human ask |
 | `restore-factory-firmware` | Implemented, not live-tested | — | Snapshot + human write ask |
 | `monitor` | Implemented, not live-tested | — | Human ask; read-only |
 | `vet-idle-log` | Stub | — | Firmware grammar |
 | `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After live table + snapshot |
 
-`--probe` is **Live tested** on Lite and flash size is 16 MB in
-the hardware skill. Next dump still needs a human ask. A Lite
-result does not confirm `C153`.
+`--probe` and `backup-factory-firmware` are **Live tested** on
+Lite. Flash size is 16 MB; the live table matches UserDemo
+`partitions.csv`. Confirm / restore / `monitor` still need a
+human ask. A Lite result does not confirm `C153`. Do not
+commit `developer-data/` or print dump SHA / unit-id / MAC.

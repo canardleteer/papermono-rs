@@ -127,6 +127,7 @@ See
 [Authority](.agents/skills/m5stack-papermono-hardware/SKILL.md#authority).
 PaperMono (`C153`) has not been measured. PaperMono-Lite
 (`C153-Lite`) has run- and download-mode USB IDs
-(`303a:1001`) and a 16 MB flash size in the hardware skill
+(`303a:1001`), a 16 MB flash size, and a UserDemo-matching
+partition table in the hardware skill
 ([flashing.md](.agents/skills/m5stack-papermono-hardware/references/flashing.md#usb-measured),
 [measure.md](.agents/skills/m5stack-papermono-hardware/references/measure.md)).

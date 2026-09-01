@@ -48,8 +48,10 @@ product’s pinout. Pins still come from M5Unified + this skill.
 - Factory / eval:
   [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
   (MIT). HAL under `main/hal/`. Pin the commit and sequences
-  in [user-demo.md](user-demo.md). `partitions.csv` is intent
-  ([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
+  in [user-demo.md](user-demo.md). Lite stock table matches
+  that CSV
+  ([measure.md](measure.md)); `C153` still
+  [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
 - OTP:
   [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)
   (MIT). Direct SSD1677 + OTP; names

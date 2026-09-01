@@ -98,8 +98,9 @@ it does not silently pick a winner against the user.
    on-unit partition facts
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
-   not confirm the other. Lite USB, chip rev, and 16 MB flash
-   size are observed; JEDEC/PSRAM/ACK lists stay open.
+   not confirm the other. Lite USB, chip rev, 16 MB flash
+   size, and the stock partition table are observed;
+   JEDEC/PSRAM/ACK lists stay open.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -125,10 +126,11 @@ ask the user to populate it rather than guessing.
 
 ## Product snapshot
 
-Official docs, **not measured**. Confirm JEDEC or USB IDs on a
-physical unit (`C153` and/or `C153-Lite`) via
+Official docs except where [measure.md](references/measure.md)
+has a Lite row. Confirm JEDEC on a physical unit (`C153`
+and/or `C153-Lite`) via
 [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
-before treating them as confirmed.
+before treating manufacturer bytes as confirmed.
 
 | Item | PaperMono (`C153`) | PaperMono-Lite (`C153-Lite`) |
 | --- | --- | --- |
@@ -289,15 +291,13 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 | Measurement backlog | [resources/not-yet-confirmed.md](resources/not-yet-confirmed.md) |
 | FreeInk PaperMono profile | [resources/external.md](resources/external.md) |
 
-## Silicon defaults (official, not measured)
+## Silicon defaults
 
 - **PSRAM:** 8 MB octal in the product table. Close
   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id).
-- **Flash:** 16 MB. PlatformIO uses `qio_opi` and
-  `default_16MB.csv`. UserDemo `partitions.csv` uses a 15 MB
-  factory app at `0x10000` — different table, still intent
-  ([user-demo.md](references/user-demo.md)). Runtime DIO vs QIO
-  is
+- **Flash:** 16 MB. Lite measured 16 MB and a UserDemo-matching
+  table at `0x8000`. PlatformIO still uses `qio_opi` and
+  `default_16MB.csv` (different table). Runtime DIO vs QIO is
   [nyc-cpu-flash-runtime](resources/not-yet-confirmed.md#nyc-cpu-flash-runtime).
 - **Canvas:** official 480×800. FreeInk uses 800×480. Conflict:
   [nyc-canvas-orient](resources/not-yet-confirmed.md#nyc-canvas-orient).

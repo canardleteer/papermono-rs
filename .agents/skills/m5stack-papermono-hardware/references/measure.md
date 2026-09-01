@@ -72,16 +72,23 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | USB download mode | `C153-Lite` | Same VID:PID and product string as run mode. `lsusb` `303a:1001` Espressif USB JTAG/serial debug unit. Serial omitted |
 | Chip | `C153-Lite` | ESP32-S3 revision v0.2; crystal 40 MHz; features Wi-Fi, BLE, embedded flash. MAC omitted |
 | Flash size | `C153-Lite` | 16 MB (`0x1000000`) from flasher `board-info`. JEDEC bytes not printed |
+| Partition table | `C153-Lite` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv`. No `otadata`. PIO `default_16MB.csv` still different. `C153` open |
 | Secure boot / flash encryption | `C153-Lite` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
 
-## Factory image (intent only)
+## Factory image (Lite stock, measured table)
 
-[M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
-is published ESP-IDF source for hardware evaluation. Sequences
-and the CSV live in
-[user-demo.md](user-demo.md). `partitions.csv` is **vendor
-intent**, not a live dump of a shipping unit
-([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
+A `C153-Lite` full-chip capture (`backup-factory-firmware
+--name stock-lite`, 2026-09-01) parsed the table at `0x8000`.
+Offsets match UserDemo `partitions.csv`
+([user-demo.md](user-demo.md)). The factory app descriptor
+names project **PaperMono-UserDemo**, IDF **v5.5.1**, version
+`c78f6c5-dirty`, compile date **Aug 6 2026**. That is older
+than the GitHub V1.2 pin (`c109910`, 2026-08-10). Do not
+treat shipping stock as that later commit.
+
+`C153` table still
+[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+Do not commit dumps, NVS, PHY, or image SHA.
 
 OTP path:
 [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)

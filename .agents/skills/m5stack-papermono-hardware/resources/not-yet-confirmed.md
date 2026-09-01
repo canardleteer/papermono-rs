@@ -7,10 +7,10 @@ not grow a confirmed-history section here.
 **No PaperMono (`C153`) has been measured for this skill.**
 PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
 IDs in [flashing.md](../references/flashing.md#usb-measured)
-and a chip / 16 MB flash row in
+and chip / 16 MB flash / partition-table rows in
 [measure.md](../references/measure.md). Official docs,
-UserDemo, OTP-Demo, and FreeInk do not close a row.
-Firmware evidence is intent.
+UserDemo, OTP-Demo, and FreeInk do not close a row by
+themselves. Firmware evidence is intent until a dump is parsed.
 
 **Name the SKU.** Confirm on a physical unit of that variant.
 A result on PaperMono does not confirm PaperMono-Lite, and the
@@ -41,7 +41,7 @@ A human must ask before any command opens a port.
 | [nyc-usb-vid](#nyc-usb-vid) | Download IDs; `C153`; `probe-rs`; extra CDC | [flashing.md](../references/flashing.md) |
 | [nyc-download-mode](#nyc-download-mode) | Hold-until-red-blink enters ROM download | [flashing.md](../references/flashing.md) |
 | [nyc-cpu-flash-runtime](#nyc-cpu-flash-runtime) | Runtime CPU MHz and DIO vs QIO | [measure.md](../references/measure.md) |
-| [nyc-partition-table](#nyc-partition-table) | Live 16 MB table vs UserDemo CSV | [flashing.md](../references/flashing.md) |
+| [nyc-partition-table](#nyc-partition-table) | Live table vs UserDemo CSV (`C153` still) | [flashing.md](../references/flashing.md) |
 | [nyc-nvs-phy](#nyc-nvs-phy) | Per-unit PHY cal vs M5 restore image | [safety.md](../references/safety.md) |
 | [nyc-gpio0-strap](#nyc-gpio0-strap) | `BOOT_OUT` during reset vs download | [pin-map.md](../references/pin-map.md) |
 | [nyc-sleep-current](#nyc-sleep-current) | L0 / L1 / L2 / L3 currents | [power-and-sleep.md](../references/power-and-sleep.md) |
@@ -119,13 +119,12 @@ flash mode (DIO/QIO). UserDemo `sdkconfig.defaults` asks for
 
 ### nyc-partition-table
 
-Read the table at `0x8000` from **that unit**. Diff against
-UserDemo `partitions.csv` (nvs `0x9000`/`0x6000`, phy
-`0xf000`/`0x1000`, factory `0x10000`/`0xF00000`) and PIO
-`default_16MB.csv`. Those two vendor tables are not the same.
+**Lite partial:** table at `0x8000` matches UserDemo
+`partitions.csv` (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`,
+factory `0x10000`/`0xF00000`). Written in
+[measure.md](../references/measure.md) /
+[flashing.md](../references/flashing.md). Still need **`C153`**.
 Do not commit the dump.
-[flashing.md](../references/flashing.md),
-[user-demo.md](../references/user-demo.md).
 
 ### nyc-nvs-phy
 

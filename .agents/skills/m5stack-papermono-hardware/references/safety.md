@@ -74,8 +74,9 @@ CDC, not Sticky’s 32 MB + CH343. M5Stack publishes factory-reset
 firmware. ESP32-S3 PHY calibration still typically lives in NVS.
 
 Until [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)
-and [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)
-close:
+closes (Lite table geometry is already in
+[measure.md](measure.md); `C153` still
+[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)):
 
 1. Prefer a full-chip snapshot of **your** unit before the first
    custom write. Keep it gitignored under `developer-data/`.

@@ -65,9 +65,10 @@ Rules for advancing a row:
 
 1. Do not run a live command unless a human asked in that message.
 2. Do not skip a precondition that is still
-   **Implemented, not live-tested**. `--probe` is **Live tested**
-   on Lite and flash size is 16 MB; dump still needs a human
-   ask. A Lite result does not confirm `C153`.
+   **Implemented, not live-tested**. `--probe` and
+   `backup-factory-firmware` are **Live tested** on Lite
+   (16 MB dump). Confirm / restore / `monitor` still need a
+   human ask. A Lite result does not confirm `C153`.
 3. A result on `C153-Lite` does not confirm `C153`.
 4. Silicon facts go to the hardware skill. This table is **tool**
    status.
@@ -80,9 +81,9 @@ The same rows are in
 | `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download inventory: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Implemented, not live-tested | — | Human ask while in download (or re-enter via red blink). Dump 16 MiB |
-| `confirm-factory-firmware` | Implemented, not live-tested | — | After a Lite snapshot exists |
-| `restore-factory-firmware` | Implemented, not live-tested | — | Do not run until a matching snapshot exists **and** a human wants a write |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes (`0x1000000`). Capture under `developer-data/backups/captures/` (uncertain stock). espflash warns above 115200 (`ESPFLASH_BAUD` 921600); dump finished (~10.6 s/MiB). Do not commit the tree. Next: `confirm-factory-firmware` |
+| `confirm-factory-firmware` | Implemented, not live-tested | — | Lite capture exists. Human ask. Does not rewrite the snapshot |
+| `restore-factory-firmware` | Implemented, not live-tested | — | Do not run until a human wants a write of **that unit’s** image |
 | `monitor` | Implemented, not live-tested | — | Human ask; record silent vs printed |
 | `vet-idle-log` | Stub | — | Leave until firmware grammar exists |
 | `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After a 16 MB-aware table is read from this unit and a snapshot exists |
@@ -100,3 +101,7 @@ only; never a full-chip erase, never `espflash flash`.
 
 Never commit a MAC address, serial number, USB serial string, NVS
 blob, or flash image. `developer-data/` is gitignored on purpose.
+Persist fills `MANIFEST.app0_desc` only when a partition is
+labeled `app0`. Lite stock uses `factory` (no `otadata`); that
+field stays empty even though the factory slice has an ESP-IDF
+app descriptor.

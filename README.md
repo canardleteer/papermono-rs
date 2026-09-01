@@ -28,7 +28,8 @@ before treating a command as working on a unit. Operator how-to:
 - Open measurements:
   [not-yet-confirmed.md](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
   Lite run and download USB is measured (`303a:1001`); Lite
-  flash size is 16 MB. Official docs are **not measured**
+  flash size is 16 MB; Lite stock partition table matches
+  UserDemo `partitions.csv`. Official docs are **not measured**
   unless a `nyc-*` recipe closed. Name PaperMono (`C153`) vs
   PaperMono-Lite (`C153-Lite`).
 - Other docs live in [`docs/`](./docs).

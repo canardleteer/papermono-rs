@@ -171,15 +171,21 @@ G3 PWM into AW9967).
 
 ## Flash geometry (`partitions.csv`, `sdkconfig.defaults`)
 
-Intent only
-([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
-Live table is at `0x8000` on **that unit**.
+UserDemo CSV (intent in source; **Lite stock matches**):
 
 | Name | Type | Offset | Size |
 | --- | --- | ---: | ---: |
 | nvs | data/nvs | `0x9000` | `0x6000` |
 | phy_init | data/phy | `0xf000` | `0x1000` |
 | factory | app/factory | `0x10000` | `0xF00000` |
+
+Lite capture 2026-09-01 parsed that table at `0x8000`
+([measure.md](measure.md)). `C153` still
+[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+
+Lite factory app descriptor: project `PaperMono-UserDemo`,
+IDF `v5.5.1`, version `c78f6c5-dirty`, date Aug 6 2026 —
+not the GitHub V1.2 pin (`c109910`).
 
 `sdkconfig.defaults`: octal SPIRAM, CPU 240 MHz
 (`CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240`),
@@ -189,8 +195,7 @@ FATFS LFN/UTF-8. Runtime MHz / DIO vs QIO on a unit:
 
 PlatformIO product-page env still points at
 `default_16MB.csv`. That is a **different** table than this
-CSV. Diff both against a live dump; do not copy Sticky
-`0x90000` / 32 MB.
+CSV. Do not copy Sticky `0x90000` / 32 MB.
 
 ## NFC app (Pro only)
 

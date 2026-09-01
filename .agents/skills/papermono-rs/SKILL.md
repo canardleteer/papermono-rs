@@ -55,11 +55,13 @@ Implemented is not proven. Read the
 before assuming a command works on silicon.
 
 **Lite (`C153-Lite`) live so far:** `detect-connected` (run and
-download) and `--probe` (`NoReset`). Same USB IDs
-(`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash. Silicon
-rows: hardware
+download), `--probe` (`NoReset`), and
+`backup-factory-firmware --name stock-lite`. Same USB IDs
+(`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash.
+Capture is this unit only (uncertain stock). Silicon rows:
+hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-Backup / confirm / restore / `monitor` are not live-tested.
+Confirm / restore / `monitor` are not live-tested.
 `C153` has not been measured.
 
 A device may be attached for unrelated reasons; ignore it.
