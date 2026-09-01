@@ -1,0 +1,22 @@
+[package]
+name = "ssd1677-otp"
+version = "0.1.0"
+description = "SSD1677 panel-OTP sequences (PaperMono OTP-Demo). No MCU LUT."
+readme = "README.md"
+publish = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+embedded-hal.workspace = true
+
+[dev-dependencies]
+embedded-hal-mock.workspace = true
+
+[lints]
+workspace = true

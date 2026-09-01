@@ -28,6 +28,9 @@ factory-reset image you can share.
 - Dump length is the **measured** flash size (official 16 MB →
   `0x1000000`). Refuse `flash-32mb.bin` unless that length
   matches.
+- UserDemo `partitions.csv` matches **Lite stock** at `0x8000`.
+  PIO `default_16MB.csv` is still a different table. `C153` is
+  [nyc-partition-table](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-partition-table).
 
 ## Two snapshot kinds
 
@@ -36,9 +39,11 @@ factory-reset image you can share.
 | Original | `developer-data/backups/original/<unit-id>/` | You passed `--as-original` on uncertain stock. Write-once |
 | Capture | `developer-data/backups/captures/<unit-id>/<slug>/` | `--name SLUG`. Named “what is on the chip now” |
 
-`unit-id` is `lite-<last4>` of the USB iSerial when known, else
-`id-<8 hex>` of a bind hash. Bind confirm / restore by those
-hashes, not by the directory name.
+`unit-id` on disk is `id-<8 hex>` of a bind hash (persist does
+not pass the raw iSerial into the directory name). `unit_id()`
+can still emit `lite-<last4>` if a caller supplies the serial;
+colon-bearing MAC-shaped iSerials fail `validate_unit_id`. Bind
+confirm / restore by the hashes, not by the directory name.
 
 There is **no** in-repo factory catalog. Treat stock as uncertain.
 
@@ -55,6 +60,36 @@ Each snapshot directory has:
 
 The dest tree is sealed read-only after persist.
 
+Confirm writes JSON under
+`developer-data/confirm-records/<unit-id>/divergence-<unix>.json`
+on every run, including a match. That file has unit-id and
+region SHA-256. Do not commit it or paste it.
+
+## Operator steps
+
+Hold red ~2 s until blink (download), then:
+
+```shell
+cargo xtask backup-factory-firmware --name SLUG
+cargo xtask confirm-factory-firmware --capture SLUG
+# cargo xtask restore-factory-firmware --yes --capture SLUG
+```
+
+Use `--capture SLUG` for a `--name` dump. Without it the tool
+looks under `original/` (still untested). Confirm does not
+rewrite the snapshot. Stdout names a unit-id; do not paste it.
+
+Run-mode listen (needs
+[usbfs udev](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor)):
+
+```shell
+cargo xtask monitor --for 20 --output idle-simple.log
+```
+
+Stock UserDemo is silent. Custom images print `simple-debug:`
+lines. After `flash-app`, short-press red. Do not use
+`monitor --reset` to recapture on Lite.
+
 ## Tool verification ledger
 
 Implemented is not proven. Agents: read the same table in
@@ -64,18 +99,23 @@ before a live command.
 Status vocabulary: **Host-only tested**, **Live tested**,
 **Implemented, not live-tested**, **Stub**, **Not ported**.
 
-| Command | Status | SKU / date | Next safe step |
+| Command | Status | SKU / date | Note |
 | --- | --- | --- | --- |
-| `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
-| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
-| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Implemented, not live-tested | — | Human ask while in download (or re-enter via red blink). Dump 16 MiB |
-| `confirm-factory-firmware` | Implemented, not live-tested | — | After a Lite snapshot exists |
-| `restore-factory-firmware` | Implemented, not live-tested | — | Snapshot + human write ask |
-| `monitor` | Implemented, not live-tested | — | Human ask; read-only |
-| `vet-idle-log` | Stub | — | Firmware grammar |
-| `flash-app` / `learn-uart` / `build-fw` | Not ported | — | After live table + snapshot |
+| `ci` | Host-only tested | host / 2026-08-31 | fmt, clippy, test, rumdl, machete, audit |
+| `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run and download: `303a:1001` |
+| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | ESP32-S3 v0.2, 40 MHz, 16 MB |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite`. Do not commit dumps |
+| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched |
+| `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:` |
+| `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
+| `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
+| `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
+| `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
-`--probe` is **Live tested** on Lite and flash size is 16 MB in
-the hardware skill. Next dump still needs a human ask. A Lite
-result does not confirm `C153`.
+`--probe`, `backup-factory-firmware`, confirm `--capture`,
+`monitor`, restore `--capture`, and `flash-app` are **Live
+tested** on Lite. `build-fw` is host-only. Flash size is 16 MB;
+the live table matches UserDemo `partitions.csv`. A Lite result
+does not confirm `C153`. Do not commit `developer-data/` or
+print dump SHA / unit-id / MAC.

@@ -22,8 +22,14 @@ const SET_CONTROL_LINE_STATE: u8 = 0x22;
 const CDC_COMM: u8 = 0x02;
 const CDC_ACM: u8 = 0x02;
 const CDC_DATA: u8 = 0x0A;
+/// CDC ACM `SET_CONTROL_LINE_STATE` bit 0.
+const DTR: u16 = 1;
+/// CDC ACM `SET_CONTROL_LINE_STATE` bit 1.
+const RTS: u16 = 2;
 
 const USB_TIMEOUT: Duration = Duration::from_millis(250);
+/// Hold between USB-Serial/JTAG DTR/RTS steps (`espflash` `UsbJtagSerialReset`).
+const USB_JTAG_RESET_HOLD: Duration = Duration::from_millis(100);
 
 static INTERRUPT: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_HANDLER: OnceLock<()> = OnceLock::new();
@@ -113,6 +119,33 @@ impl CdcListen {
             data_num: layout.data,
         })
     }
+
+    /// Pulse USB-Serial/JTAG DTR/RTS (`espflash` `UsbJtagSerialReset`).
+    ///
+    /// This is a **core** reset (`USB_UART_CHIP_RESET`). It does not
+    /// re-sample GPIO0 / leave ROM download. It is not a CH343 EN
+    /// pulse and not `--after watchdog-reset`. Default listen leaves
+    /// the lines deasserted.
+    ///
+    /// Lite live (2026-09-01): after this pulse, 25 s CDC listen got
+    /// 0 bytes; `303a:1001` stayed enumerated; ACM did not reappear.
+    /// Do not use it to recapture `t=0`. Short-press red instead.
+    pub fn usb_jtag_serial_reset(&self) -> Result<(), Error> {
+        let comm = self.comm.as_ref().ok_or_else(|| {
+            Error::Device("CDC comm interface closed before USB-JTAG reset".into())
+        })?;
+        log::info!("USB-Serial/JTAG core reset (DTR/RTS); not download, not watchdog");
+        set_line_state(comm, self.comm_num, false, false)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, true, false)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, false, true)?;
+        // Windows only propagates DTR when RTS is written (`espflash`).
+        set_line_state(comm, self.comm_num, false, true)?;
+        thread::sleep(USB_JTAG_RESET_HOLD);
+        set_line_state(comm, self.comm_num, false, false)?;
+        Ok(())
+    }
 }
 
 impl Read for CdcListen {
@@ -165,6 +198,12 @@ struct CdcLayout {
     bulk_in: u8,
 }
 
+/// CDC ACM comm + data bulk-in only.
+///
+/// ESP32-S3 USB-Serial/JTAG also has a vendor JTAG interface with
+/// its own bulk-in (`0x83`) after CDC data (`0x81`). Taking the last
+/// bulk-in on the device then opening it on the data interface fails
+/// with "specified endpoint does not exist on this interface".
 fn find_cdc_layout(
     config: &nusb::descriptors::ConfigurationDescriptor<'_>,
 ) -> Result<CdcLayout, Error> {
@@ -177,16 +216,15 @@ fn find_cdc_layout(
         }
         if alt.class() == CDC_COMM && alt.subclass() == CDC_ACM {
             comm = Some(alt.interface_number());
+            continue;
         }
-        if alt.class() == CDC_DATA {
-            data = Some(alt.interface_number());
+        if alt.class() != CDC_DATA {
+            continue;
         }
+        data = Some(alt.interface_number());
         for ep in alt.endpoints() {
             if ep.transfer_type() == TransferType::Bulk && ep.direction() == Direction::In {
                 bulk_in = Some(ep.address());
-                if data.is_none() {
-                    data = Some(alt.interface_number());
-                }
             }
         }
     }
@@ -221,12 +259,21 @@ fn set_listen_coding(comm: &nusb::Interface, comm_num: u8) -> Result<(), Error> 
     )
     .wait()
     .map_err(|error| Error::Device(format!("SET_LINE_CODING: {error}")))?;
+    set_line_state(comm, comm_num, false, false)?;
+    Ok(())
+}
+
+fn control_line_state(dtr: bool, rts: bool) -> u16 {
+    (u16::from(dtr) * DTR) | (u16::from(rts) * RTS)
+}
+
+fn set_line_state(comm: &nusb::Interface, comm_num: u8, dtr: bool, rts: bool) -> Result<(), Error> {
     comm.control_out(
         ControlOut {
             control_type: ControlType::Class,
             recipient: Recipient::Interface,
             request: SET_CONTROL_LINE_STATE,
-            value: 0,
+            value: control_line_state(dtr, rts),
             index: u16::from(comm_num),
             data: &[],
         },
@@ -246,10 +293,13 @@ fn map_usb_open(error: nusb::Error) -> Error {
         || text.contains("Access denied")
     {
         return Error::Device(format!(
-            "{text}. Claim the Espressif USB-Serial/JTAG over usbfs so monitor does not open the ACM TTY \
-             (cdc-acm can assert DTR). Add a udev rule and replug: \
-             SUBSYSTEM==\"usb\", ATTR{{idVendor}}==\"303a\", ATTR{{idProduct}}==\"1001\", \
-             MODE=\"0660\", GROUP=\"dialout\"."
+            "{text}. `monitor` claims usbfs so it does not open the ACM TTY \
+             (cdc-acm can assert DTR). Copy \
+             host/papermono-host/udev/99-papermono-usb.rules to \
+             /etc/udev/rules.d/, run `sudo udevadm control --reload-rules` \
+             and `sudo udevadm trigger`, then unplug and replug. \
+             Check `ls -l /dev/bus/usb/BBB/DDD` from `lsusb` Bus/Device \
+             (zero-pad to 3 digits); expect GROUP dialout MODE 0660."
         ));
     }
     Error::Device(format!("USB open failed: {text}"))
@@ -267,14 +317,42 @@ mod tests {
         ]
     }
 
+    /// ESP32-S3 USB-Serial/JTAG: CDC plus a later vendor JTAG bulk-in.
+    fn esp32s3_jtag_serial_config() -> Vec<u8> {
+        vec![
+            9, 2, 71, 0, 3, 1, 0, 0x80, 50, 9, 4, 0, 0, 1, 0x02, 0x02, 0x01, 0, 7, 5, 0x82, 0x03,
+            8, 0, 10, 9, 4, 1, 0, 2, 0x0A, 0x00, 0x00, 0, 7, 5, 0x01, 0x02, 64, 0, 0, 7, 5, 0x81,
+            0x02, 64, 0, 0, 9, 4, 2, 0, 2, 0xFF, 0xFF, 0x00, 0, 7, 5, 0x02, 0x02, 64, 0, 0, 7, 5,
+            0x83, 0x02, 64, 0, 0,
+        ]
+    }
+
     #[test]
     fn interrupt_starts_clear() {
         assert!(!super::interrupt_requested());
     }
 
     #[test]
+    fn control_line_state_is_dtr_bit0_rts_bit1() {
+        assert_eq!(super::control_line_state(false, false), 0);
+        assert_eq!(super::control_line_state(true, false), 1);
+        assert_eq!(super::control_line_state(false, true), 2);
+        assert_eq!(super::control_line_state(true, true), 3);
+    }
+
+    #[test]
     fn layout_finds_acm_and_bulk_in() {
         let bytes = tiny_cdc_config();
+        let config = ConfigurationDescriptor::new(&bytes).expect("config");
+        let layout = find_cdc_layout(&config).expect("cdc");
+        assert_eq!(layout.comm, 0);
+        assert_eq!(layout.data, 1);
+        assert_eq!(layout.bulk_in, 0x81);
+    }
+
+    #[test]
+    fn layout_ignores_vendor_jtag_bulk_in() {
+        let bytes = esp32s3_jtag_serial_config();
         let config = ConfigurationDescriptor::new(&bytes).expect("config");
         let layout = find_cdc_layout(&config).expect("cdc");
         assert_eq!(layout.comm, 0);

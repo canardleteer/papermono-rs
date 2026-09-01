@@ -1,10 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["host/*", "xtask"]
-# Firmware members (Xtensa) are not here yet. When they land, keep them
-# out of default-members so host `cargo test` / `cargo clippy` never
-# pull that target. Do not pass `--workspace` on the host rustc then.
-default-members = ["host/*", "xtask"]
+members = ["crates/*", "host/*", "xtask", "firmware/simple-debug", "firmware/embassy-debug"]
+# Firmware members target xtensa-esp32s3-none-elf. They are in the
+# workspace (one lockfile) but not default-members, so host
+# `cargo test` / `cargo clippy` never pull that target. Do not pass
+# `--workspace` on the host rustc.
+default-members = ["crates/*", "host/*", "xtask"]
 
 [workspace.package]
 edition = "2021"
@@ -15,9 +16,26 @@ authors = ["canardleteer"]
 keywords = ["embedded", "esp32s3", "papermono"]
 categories = ["embedded", "hardware-support"]
 
+[workspace.dependencies]
+embedded-hal = "1.0.0"
+# Dev-only. `eh1` is embedded-hal 1.0. Default features pull 0.2 shims.
+embedded-hal-mock = { version = "0.11.1", default-features = false, features = [
+  "eh1",
+] }
+
 [workspace.lints.rust]
 missing_docs = "warn"
 unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "warn"
+
+# Firmware size/debug settings. Cargo forbids `lto` on
+# `[profile.release.package.*]`, and a workspace `[profile.release]`
+# would fat-LTO host tools. `cargo xtask build-fw` uses this profile.
+[profile.release-fw]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+debug = 2

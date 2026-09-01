@@ -1,0 +1,40 @@
+[package]
+name = "simple-debug-fw"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "PaperMono-Lite proof-of-life image. Flash only via cargo xtask flash-app after a matching snapshot exists."
+license = "MIT"
+
+# Workspace member, not a default-member: host `cargo test` skips this
+# package. Build with `cargo xtask build-fw simple-debug` (or
+# `cargo +esp build -p simple-debug-fw --profile release-fw --target
+# xtensa-esp32s3-none-elf -Zbuild-std=core,alloc`). Host-tested log
+# lines live in crates/papermono-log.
+# Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
+
+[dependencies]
+# Same git tag as a later embassy-debug-fw. One lockfile cannot hold
+# crates.io `esp-println` and the tag's `links` crate at once.
+esp-hal = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+  "esp32s3",
+  "unstable",
+] }
+esp-println = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", default-features = false, features = [
+  "esp32s3",
+  "jtag-serial",
+  "critical-section",
+] }
+esp-backtrace = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+  "esp32s3",
+  "panic-handler",
+  "println",
+] }
+esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+  "esp32s3",
+] }
+
+m5stack-papermono-lite = { path = "../../crates/m5stack-papermono-lite" }
+papermono-log = { path = "../../crates/papermono-log" }
+
+embedded-hal = "1.0.0"

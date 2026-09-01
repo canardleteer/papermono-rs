@@ -21,6 +21,12 @@ pub struct MonitorOptions {
     pub output: Option<PathBuf>,
     /// Write [`Self::output`] only; do not print to stdout.
     pub quiet: bool,
+    /// After open, pulse USB-Serial/JTAG DTR/RTS (core reset).
+    ///
+    /// Lite live (2026-09-01): 0 CDC bytes; USB stayed enumerated;
+    /// ACM gone; follow-up listen silent until short-press red. Not
+    /// a recapture path. Off by default.
+    pub reset: bool,
 }
 
 /// Copy the USB serial interface to stdout until interrupted or a budget ends.
@@ -30,7 +36,14 @@ pub struct MonitorOptions {
 pub fn monitor(port: &str, options: &MonitorOptions) -> Result<(), Error> {
     crate::detect::require_papermono_usb(port)?;
     {
-        let mut reader: Box<dyn Read> = Box::new(crate::cdc_listen::CdcListen::open(port)?);
+        let listen = crate::cdc_listen::CdcListen::open(port)?;
+        if options.reset {
+            log::warn!(
+                "monitor --reset: Lite live test left CDC silent; short-press red to recover"
+            );
+            listen.usb_jtag_serial_reset()?;
+        }
+        let mut reader: Box<dyn Read> = Box::new(listen);
         let mut file = match &options.output {
             Some(path) => Some(File::create(path).map_err(|error| {
                 Error::Device(format!("monitor --output {}: {error}", path.display()))

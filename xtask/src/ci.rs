@@ -1,20 +1,56 @@
 //! Host-only CI gate. No USB, no [`papermono_host::Layout`].
 //!
 //! One workspace, one lockfile. Never `--workspace` on the host rustc
-//! once firmware members exist (that would pull Xtensa). There are no
-//! firmware packages yet; do not add `cargo +esp` until one lands.
+//! (that pulls Xtensa members). Firmware jobs use `cargo +esp -p` only.
 
 use std::env;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use papermono_host::Error;
+
+const ESP_TARGET: &str = "xtensa-esp32s3-none-elf";
+
+/// Same hint as `build-fw`: source the script `espup` printed.
+const ESP_TOOLCHAIN_HINT: &str = "\
+need the esp toolchain (source the script `espup` printed, often \
+`$HOME/export-esp.sh`)";
 
 /// Run the full gate from the repository root. First failure wins.
 pub fn run(repo_root: &Path) -> Result<(), Error> {
     step(repo_root, "cargo", &["fmt", "--check", "--all"])?;
     host_clippy_test(repo_root, &[])?;
     host_clippy_test(repo_root, &["--all-features"])?;
+
+    require_cargo_esp()?;
+    fw_clippy(repo_root, "simple-debug-fw", &[])?;
+    fw_clippy(repo_root, "embassy-debug-fw", &[])?;
+    fw_clippy(repo_root, "embassy-debug-fw", &["--no-default-features"])?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "touch"],
+    )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "mic"],
+    )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "panel"],
+    )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "touch,radio"],
+    )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "touch,sleep"],
+    )?;
 
     require_on_path("rumdl", "cargo install rumdl")?;
     step(repo_root, "rumdl", &["check"])?;
@@ -37,6 +73,40 @@ fn host_clippy_test(repo_root: &Path, extra: &[&str]) -> Result<(), Error> {
     let mut test = vec!["test", "--locked"];
     test.extend_from_slice(extra);
     step(repo_root, "cargo", &test)
+}
+
+fn fw_clippy(repo_root: &Path, package: &str, extra: &[&str]) -> Result<(), Error> {
+    // Bins only. `--all-targets` compiles the implicit test harness, which
+    // needs crate `test`; `-Zbuild-std=core,alloc` does not provide it.
+    let mut args = vec![
+        "+esp",
+        "clippy",
+        "--locked",
+        "--bins",
+        "-p",
+        package,
+        "--target",
+        ESP_TARGET,
+        "-Zbuild-std=core,alloc",
+    ];
+    args.extend_from_slice(extra);
+    args.extend_from_slice(&["--", "-D", "warnings"]);
+    step(repo_root, "cargo", &args)
+}
+
+fn require_cargo_esp() -> Result<(), Error> {
+    let status = Command::new("cargo")
+        .args(["+esp", "--version"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    match status {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => Err(Error::Device(ESP_TOOLCHAIN_HINT.into())),
+        Err(error) => Err(Error::Device(format!(
+            "failed to spawn cargo +esp: {error}; {ESP_TOOLCHAIN_HINT}"
+        ))),
+    }
 }
 
 fn require_on_path(bin: &str, install: &str) -> Result<(), Error> {

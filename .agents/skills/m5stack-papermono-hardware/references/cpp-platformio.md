@@ -47,16 +47,39 @@ product’s pinout. Pins still come from M5Unified + this skill.
 
 - Factory / eval:
   [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)
-  (MIT). HAL under `main/hal/`. `partitions.csv` is intent
-  ([nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)).
+  (MIT). HAL under `main/hal/`. Pin the commit and sequences
+  in [user-demo.md](user-demo.md). Lite stock table matches
+  that CSV
+  ([measure.md](measure.md)); `C153` still
+  [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
 - OTP:
   [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)
   (MIT). Direct SSD1677 + OTP; names
-  `DEPG0397BBS770F3HP-XM`.
+  `DEPG0397BBS770F3HP-XM`. Direct IDF dep is
+  [M5Unified](https://github.com/m5stack/M5Unified); lock
+  pulls [M5GFX](https://github.com/m5stack/M5GFX) `0.2.27`
+  as a private transitive. The panel sequences are
+  `components/EDP_OTP_LUT_demo`, not
+  `Panel_SSD1677_4Gray`.
+
+## M5GFX
+
+[m5stack/M5GFX](https://github.com/m5stack/M5GFX). Official
+Arduino / IDF component. UserDemo and M5Unified `begin` use
+`Panel_SSD1677_4Gray` for this product (`board_M5PaperMono`
+in `M5GFX.cpp`). Four `epd_*` titles and MCU LUTs
+(`0x32`) live there. Product page still prefers OTP-Demo
+for panel life. Autodetect `freq_write` is 40 MHz; OTP-Demo
+and the SSD1677 write cap are 20 MHz
+([sources.md](sources.md)).
 
 Include order (ESP-IDF): `M5Unified.h` before `M5PM1.h` /
 `M5IOE1.h` unless `CONFIG_I2C_BUS_BACKWARD_CONFIG` (upstream
-README).
+README). UserDemo `Hal::init` still calls `M5.begin` first.
+`main/idf_component.yml` pins `m5stack/m5pm1` ^1.0.7,
+`m5stack/m5ioe1` ^1.0.9, `espressif/arduino-esp32` ^3.3.10
+at the V1.2 commit. M5IOE1 `begin` wake/retry/REV `'W'` at
+`0x4F`: [user-demo.md](user-demo.md).
 
 ## Arduino / UiFlow2
 

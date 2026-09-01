@@ -1,0 +1,22 @@
+# Allow `cargo xtask monitor` to claim Espressif USB-Serial/JTAG
+# (303a:1001) over usbfs without opening the ACM TTY. Linux cdc-acm
+# can assert DTR on that TTY and reset the ESP32-S3.
+#
+# Install (from the papermono-rs repo root):
+#   sudo cp host/papermono-host/udev/99-papermono-usb.rules \
+#     /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+# Then unplug and replug the board. The host user must be in
+# `dialout` (re-login if you just added the group).
+#
+# Check (substitute Bus and Device from lsusb; zero-pad to 3 digits):
+#   lsusb | grep 303a:1001
+#   # Bus 003 Device 013 → /dev/bus/usb/003/013
+#   ls -l /dev/bus/usb/003/013
+# Expect: crw-rw---- 1 root dialout
+#
+# Backup / confirm / restore use the ACM node (`dialout` is enough).
+# Only monitor needs this usbfs rule.
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="303a", ATTR{idProduct}=="1001", MODE="0660", GROUP="dialout"

@@ -1,0 +1,21 @@
+[package]
+name = "m5stack-papermono-lite"
+version = "0.1.0"
+description = "Board support for M5Stack PaperMono-Lite (C153-Lite): shared pin map for both SKUs"
+readme = "README.md"
+publish = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+m5pm1 = { path = "../m5pm1" }
+m5ioe1 = { path = "../m5ioe1" }
+ssd1677-otp = { path = "../ssd1677-otp" }
+
+[lints]
+workspace = true
