@@ -24,12 +24,16 @@ keep them out of `default-members`.
 - Device I/O lives in `papermono-host` via the
   [`espflash`](https://crates.io/crates/espflash) **library**
   (`default-features = false`, `serialport`). Do not enable
-  espflash's `cli` feature. `papermono-host` and xtask require rustc
-  1.88 (espflash 4.5).
+  espflash's `cli` feature. **MSRV is split on purpose:**
+  workspace `package.rust-version` is **1.85** (future
+  host-agnostic crates). `papermono-host` and `xtask` set
+  **1.88** because espflash 4.5 requires it.
 - Live `papermono-host` methods take
   [`uart_lock::try_acquire`](xtask.md#usb-session-lock). New
   USB-touching in-repo tools reuse that same lock.
 - Accept Espressif `303a:1001`. Refuse QinHeng `1a86:55d3`.
+  DevKits often use the same VID:PID; pass `--port` when more
+  than one Espressif USB-Serial/JTAG is plugged in.
 - Dump length comes from live `board-info` / JEDEC. Lite measured
   16 MB (`0x1000000`). Do not hardcode 32 MB.
 - Verify with `cargo test --locked`,

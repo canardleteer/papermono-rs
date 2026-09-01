@@ -67,6 +67,12 @@ needs `dialout` (or equivalent). On Lite, udev by-id embeds the
 USB iSerial (MAC-shaped). Host `detect-connected` redacts that
 token; do not commit a by-id path.
 
+`303a:1001` is also the usual ESP32-S3 DevKit USB-Serial/JTAG
+id. Inventory cannot tell a DevKit from PaperMono. If more than
+one such device is plugged in, pass `--port`. Host `classify()`
+will treat any `303a:*` as this product when PID is missing from
+sysfs.
+
 ## PSRAM
 
 Octal 8 MB in the product table. 80 MHz is a firmware config,

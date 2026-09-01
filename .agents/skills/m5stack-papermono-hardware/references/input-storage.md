@@ -33,12 +33,13 @@ clock.
 ## USB-C
 
 5 V sink. Schematic: USB-C CC1/CC2 **5.1 kΩ Rd** to GND; no
-PD controller in the extract. **Lite run mode:** `303a:1001`
-Espressif USB JTAG/serial debug unit
+PD controller in the extract. **Lite run and download:**
+`303a:1001` Espressif USB JTAG/serial debug unit
 ([flashing.md](flashing.md#usb-measured)). Vendor Arduino CDC
-on boot is still intent. Download, `C153`, `probe-rs`, UART0:
+on boot is still intent. `C153`, `probe-rs`, extra CDC:
 [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid).
-Not QinHeng `1a86:55d3`.
+Not QinHeng `1a86:55d3`. Same VID:PID as many ESP32-S3
+DevKits; pass `--port` if more than one is plugged in.
 
 ## NFC and LoRa (full SKU)
 

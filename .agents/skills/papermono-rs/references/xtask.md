@@ -8,8 +8,11 @@ in the same change as any CLI change.
 
 Live commands take `--port` or `ESPFLASH_PORT`; if unset they
 require exactly one Espressif `303a:1001` and refuse QinHeng
-`1a86:55d3` **before** opening a port. Live commands that connect
-or listen take the [USB session lock](#usb-session-lock).
+`1a86:55d3` **before** opening a port. `303a:1001` is also the
+stock ESP32-S3 USB-Serial/JTAG id on DevKits: two boards on
+one host need `--port`. `classify()` treats any `303a:*` as
+this product if sysfs PID is missing. Live commands that
+connect or listen take the [USB session lock](#usb-session-lock).
 
 Do not open a port unless a human asked. Silicon facts live in
 [m5stack-papermono-hardware measure.md](../../m5stack-papermono-hardware/references/measure.md).
@@ -28,7 +31,7 @@ assuming a command works on a unit.
 | `restore-factory-firmware` | yes | `write_bin` of **that unit's** original, or `--capture SLUG`. Requires `--yes`. Full image at `0x0`, or `--part LABEL`. Never a full-chip erase |
 | `vet-idle-log` | no | Stub. Exits “no image grammar” |
 | `ci` | no | Host-only: fmt, clippy, test, rumdl, machete, audit |
-| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`) |
+| `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). **Not live-tested.** Opening the kernel ACM node can still reset; this path claims usbfs instead |
 
 ```shell
 cargo xtask detect-connected
@@ -76,7 +79,7 @@ The same rows are in
 | --- | --- | --- | --- |
 | `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download inventory: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
-| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. JEDEC/PSRAM still `nyc-flash-id` |
+| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
 | `backup-factory-firmware` | Implemented, not live-tested | — | Human ask while in download (or re-enter via red blink). Dump 16 MiB |
 | `confirm-factory-firmware` | Implemented, not live-tested | — | After a Lite snapshot exists |
 | `restore-factory-firmware` | Implemented, not live-tested | — | Do not run until a matching snapshot exists **and** a human wants a write |

@@ -30,7 +30,7 @@ physical unit point at an `nyc-*` id. Name `C153` vs
 | GPIO45 / GPIO46 | PDM CLK/DAT. Also ESP32-S3 strapping (WPD) | Using them as a power latch |
 | Lite SKU | Do not init ST25R3916 or SX1262 | Assuming NFC/LoRa GPIOs are free GPIO ([nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads), [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)) |
 | Flash images | 16 MB-aware table. Snapshot that unit first if you care about PHY cal ([nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)) | Sticky `0x90000` / 32 MB geometry; flashing one unit’s NVS onto another; assuming M5 factory-restore regenerates that unit’s PHY without checking |
-| USB debug | Lite run mode: Espressif `303a:1001` USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Not CH343 | Treating USB-C as QinHeng `1a86:55d3`; assuming `probe-rs` until [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
+| USB debug | Lite run **and** download: Espressif `303a:1001` USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Not CH343 | Treating USB-C as QinHeng `1a86:55d3`; assuming `probe-rs` until [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
 
 ## Why the panel rule comes first
 

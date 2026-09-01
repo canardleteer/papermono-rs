@@ -36,9 +36,11 @@ factory-reset image you can share.
 | Original | `developer-data/backups/original/<unit-id>/` | You passed `--as-original` on uncertain stock. Write-once |
 | Capture | `developer-data/backups/captures/<unit-id>/<slug>/` | `--name SLUG`. Named “what is on the chip now” |
 
-`unit-id` is `lite-<last4>` of the USB iSerial when known, else
-`id-<8 hex>` of a bind hash. Bind confirm / restore by those
-hashes, not by the directory name.
+`unit-id` on disk is `id-<8 hex>` of a bind hash (persist does
+not pass the raw iSerial into the directory name). `unit_id()`
+can still emit `lite-<last4>` if a caller supplies the serial;
+colon-bearing MAC-shaped iSerials fail `validate_unit_id`. Bind
+confirm / restore by the hashes, not by the directory name.
 
 There is **no** in-repo factory catalog. Treat stock as uncertain.
 
@@ -68,7 +70,7 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | --- | --- | --- | --- |
 | `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
-| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. JEDEC/PSRAM still `nyc-flash-id` |
+| `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
 | `backup-factory-firmware` | Implemented, not live-tested | — | Human ask while in download (or re-enter via red blink). Dump 16 MiB |
 | `confirm-factory-firmware` | Implemented, not live-tested | — | After a Lite snapshot exists |
 | `restore-factory-firmware` | Implemented, not live-tested | — | Snapshot + human write ask |

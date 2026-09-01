@@ -53,8 +53,8 @@ product facts.
 ## Conflicts
 
 State both columns when a page or issue touches a row. The skill
-user weighs them. None of these are confirmed on a physical
-unit. Name `C153` vs `C153-Lite` when one is measured.
+user weighs them. Lite USB IDs and flash **size** are measured;
+the rest of this table is not. Name `C153` vs `C153-Lite`.
 
 | Topic | Official / named | Other sources |
 | --- | --- | --- |
@@ -64,8 +64,8 @@ unit. Name `C153` vs `C153-Lite` when one is measured.
 | M5IOE1 address | Schematic / pin map `0x4F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7 at power-on |
 | microSD | DAT0–DAT3 in the pin table | FreeInk “native 1-bit SDMMC” |
 | Size / weight | HTML: 62.0 × 101.0 × 8.0 mm; 74.7 g / Lite 72.4 g | Older product PDF: 61 mm / “work in progress” |
-| USB debug | Lite run mode: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Sticky skill: CH343 `1a86:55d3` (wrong product). `C153` / download not measured |
-| Flash | 16 MB | Sticky: 32 MB (wrong product) |
+| USB debug | Lite run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Sticky skill: CH343 `1a86:55d3` (wrong product). `C153` not measured |
+| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`) | Sticky: 32 MB (wrong product). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
 | Power | M5PM1 button | Sticky GPIO45/46 latch (wrong product; those pins are PDM here) |
 
 ## Gaps
