@@ -9,7 +9,9 @@ Full wording: [SKILL.md](../SKILL.md#authority).
 1. **Skill user** — they weigh the facts.
 2. **Observed hardware** on this product (batch variation
    allowed). Lite USB in [flashing.md](flashing.md#usb-measured);
-   Lite size and stock table in [measure.md](measure.md).
+   Lite size and stock table in [measure.md](measure.md). Lab
+   EPD refresh times on **both** SKUs in
+   [display.md](display.md).
 3. **Official** board docs, vendor SDKs, schematics, and chip
    datasheets for parts named on this model. Registers and
    timings when they have **not been measured**. Official
@@ -34,10 +36,11 @@ External: [external.md](../resources/external.md). Vendor C++:
 
 | Source | Layer | Use |
 | --- | --- | --- |
-| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash; stock table matches UserDemo CSV. JEDEC, PSRAM, ACK list, `C153` still empty |
-| [PaperMono docs](https://docs.m5stack.com/en/core/PaperMono) | Official | Pin map, specs, e-paper notes, SKU compare |
-| [PaperMono-Lite docs](https://docs.m5stack.com/en/core/PaperMono-Lite) | Official | Lite pin map (no NFC/LoRa sections) |
-| Schematic PDFs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md)) | Official | Nets. Walk PDF pages |
+| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured), [display.md](display.md)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash; stock table matches UserDemo CSV. Lab EPD `epd_*` times on **both** SKUs. JEDEC, PSRAM, ACK list, `C153` USB/table still empty |
+| [PaperMono docs](https://docs.m5stack.com/en/core/PaperMono) | Official | Living **PinMap**, specs, e-paper notes, SKU compare, M5GFX refresh-mode times. Re-read when nets look stale |
+| [PaperMono-Lite docs](https://docs.m5stack.com/en/core/PaperMono-Lite) | Official | Living **PinMap** (no RFID/LoRa headings). Same `epd_*` time table |
+| Lab EPD refresh (`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`) | Observed | Both SKUs; same numbers as the official HTML table. [display.md](display.md), [measure.md](measure.md) |
+| Schematic PDFs + gallery PNGs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md), [catalog.md](catalog.md)) | Official | Dated OSS snapshot from those HTML pages. Walk PDF/PNGs. Nets. HTML may ship a newer set |
 | [M5PM1 & M5IOE1 Arduino](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Official (intent) | L0–L3B, expander pin names, wake examples |
 | [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official (intent) | OTP path; panel PN `DEPG0397BBS770F3HP-XM` |
 | [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo) | Official (intent) | Eval HAL: SKU probe, rails, SDMMC 4-bit, LoRa `SPI3_HOST`, sleep paths, `partitions.csv`. See [user-demo.md](user-demo.md) (`c109910`, V1.2) |
@@ -53,12 +56,13 @@ product facts.
 ## Conflicts
 
 State both columns when a page or issue touches a row. The skill
-user weighs them. Lite USB IDs and flash **size** are measured;
-the rest of this table is not. Name `C153` vs `C153-Lite`.
+user weighs them. Lite USB IDs, flash **size**, and lab EPD
+refresh times (both SKUs) are measured; the rest of this table
+is not. Name `C153` vs `C153-Lite`.
 
 | Topic | Official / named | Other sources |
 | --- | --- | --- |
-| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo. UserDemo uses M5GFX `epd_*` modes plus analog-off `0x22`/`0x03` then `0x20` ([user-demo.md](user-demo.md)) | FreeInk host-authored LUTs, “3-level grayscale”. Sticky analog-off result is the wrong product |
+| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo. UserDemo uses M5GFX `epd_*` modes plus analog-off `0x22`/`0x03` then `0x20` ([user-demo.md](user-demo.md)). Lab `epd_*` times match the official HTML table (both SKUs, [display.md](display.md)) | FreeInk host-authored LUTs, “3-level grayscale”. Sticky analog-off result is the wrong product |
 | Canvas | 480×800. UserDemo `setRotation(0)` | FreeInk 800×480 |
 | Frontlight | Official HTML: M5PM1 G3 PWM `BL_FB`. Schematic V0.6.2: AW9967DNR on `EINK_BL` (PWM drives the IC). UserDemo `display.setBrightness` | FreeInk README AW9967 (schematic-true) |
 | M5IOE1 address | Schematic / pin map `0x4F`. UserDemo `IO_EXPANDER_ADDR = 0x4F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7 at power-on |
@@ -69,6 +73,7 @@ the rest of this table is not. Name `C153` vs `C153-Lite`.
 | Power / wake | M5PM1 button. Arduino: IMU/RTC wake via PM1 G4/G0 then `shutdown()`. UserDemo adds ESP `ext0` GPIO4 touch deep sleep | Sticky GPIO45/46 latch (wrong product; those pins are PDM here) |
 | LoRa SPI host | Pin table / schematic name those GPIOs SPI1 | UserDemo `hal_lora.cpp` uses ESP-IDF `SPI3_HOST` (SPI0/1 are flash). 868.0 MHz RadioLib begin vs product 868–923 MHz |
 | Bring-up | Arduino: M5PM1 then M5IOE1 then peripherals | UserDemo: 500 ms, `M5.begin`, then PM1/IOE1, then NFC identity probe for SKU |
+| Lite NFC/LoRa | HTML **PinMap** and SKU compare: modules absent | Lite schematic V0.6.2 gallery page 05 / PDF still draws Stamp LoRa-1262 and RFID/`PYB_NFC_EN`. Do not flatten |
 
 ## Gaps
 

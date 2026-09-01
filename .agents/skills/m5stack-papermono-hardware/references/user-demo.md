@@ -99,7 +99,9 @@ row. After a non-quality refresh it waits 500 ms, then:
 
 Quality/text refreshes leave power-down to M5GFX. Fastest
 refreshes: ten local updates then one `epd_fast`; five fast
-then one `epd_quality`. Snapshot cache uses four gray
+then one `epd_quality`. Those four labels are the firmware
+enum titles; lab times (both SKUs) are in
+[display.md](display.md). Snapshot cache uses four gray
 representatives `{0, 96, 160, 255}`. Do not copy Sticky’s
 analog-off result onto this panel.
 

@@ -55,7 +55,9 @@ the field off except while scanning
 uses `SPI3_HOST` at 8 MHz, RadioLib begin at 868.0 MHz (EU
 demo vs product 868–923). Mux GPIO39–41 off JTAG before SPI.
 Reset/ant via expander, enable M5PM1 G2.
-Lite: do not init; leftover pads
+Lite HTML **PinMap** omits RFID/LoRa; the Lite schematic still
+draws those blocks (gallery page 05). Do not init; leftover
+pads
 [nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads)
 /
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads).

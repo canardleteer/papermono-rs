@@ -61,12 +61,20 @@ and analog-on as `0xC0` ([user-demo.md](user-demo.md)). That
 is eval intent. Do not copy Sticky’s “`0xC0` did not drop
 BUSY” result onto this module.
 
-## M5GFX refresh times (lab, official)
+## Refresh modes (lab, both SKUs)
 
-Reference only, PaperMono, M5GFX modes:
+M5GFX mode labels. Use these as firmware `enum` titles
+(`epd_quality`, `epd_text`, `epd_fast`, `epd_fastest` — in
+Rust, variants such as `EpdQuality` documented under those
+titles). Do not pass a raw M5GFX integer or an ad-hoc delay
+at the call site. Times are **lab wall-clock for a single
+refresh**, measured on PaperMono (`C153`) **and**
+PaperMono-Lite (`C153-Lite`). Official HTML product pages
+list the same numbers; name both layers
+([sources.md](sources.md), [measure.md](measure.md)).
 
-| Mode | Time per refresh |
-| --- | --- |
+| Enum title | Single refresh |
+| --- | ---: |
 | `epd_quality` | 4.71 s |
 | `epd_text` | 0.45 s |
 | `epd_fast` | 0.34 s |

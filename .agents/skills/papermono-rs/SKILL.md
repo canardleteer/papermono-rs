@@ -55,14 +55,17 @@ Implemented is not proven. Read the
 before assuming a command works on silicon.
 
 **Lite (`C153-Lite`) live so far:** `detect-connected` (run and
-download), `--probe` (`NoReset`), and
-`backup-factory-firmware --name stock-lite`. Same USB IDs
+download), `--probe` (`NoReset`),
+`backup-factory-firmware --name stock-lite`, and
+`confirm-factory-firmware --capture stock-lite`. Same USB IDs
 (`303a:1001`). Chip ESP32-S3 v0.2, 40 MHz, 16 MB flash.
 Capture is this unit only (uncertain stock). Silicon rows:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-Confirm / restore / `monitor` are not live-tested.
-`C153` has not been measured.
+Restore / `monitor` are not live-tested.
+`C153` USB / JEDEC / partition table have not been measured.
+Lab EPD refresh times are on both SKUs
+([display.md](../m5stack-papermono-hardware/references/display.md)).
 
 A device may be attached for unrelated reasons; ignore it.
 
@@ -72,12 +75,14 @@ A device may be attached for unrelated reasons; ignore it.
 | --- | --- |
 | `host/papermono-host/` | Host library. Live methods take the USB lock |
 | `xtask/` | Clap front-end (`cargo xtask`, `publish = false`) |
-| `developer-data/` | Gitignored. Sealed snapshots under `backups/` |
-| `firmware/` | Not present yet. Not workspace members |
+| `developer-data/` | Gitignored. Sealed snapshots under `backups/`; confirm JSON under `confirm-records/` |
+| `firmware/` | Not members yet. [firmware/AGENTS.md](../../../firmware/AGENTS.md) |
 
-Never commit a MAC, serial number, USB serial string, NVS blob, or
-flash image. Never add a Cargo `runner`. Never `erase-flash`. Never
-`espflash flash`. Do not invent Sticky `0x90000` / 32 MB geometry.
+Never commit a MAC, serial number, USB serial string, NVS blob,
+flash image, dump SHA, or unit-id. `developer-data/` is
+gitignored on purpose. Never add a Cargo `runner`. Never
+`erase-flash`. Never `espflash flash`. Do not invent Sticky
+`0x90000` / 32 MB geometry.
 Do not init NFC or LoRa on PaperMono-Lite. Official eval
 firmware is
 [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)

@@ -7,13 +7,15 @@
 | `host/` | Default-members. Host libraries (not `xtask`) |
 | `host/papermono-host/` | Host library. Detect, backup / confirm / restore, monitor |
 | `xtask/` | Clap front-end (`cargo xtask`) |
-| `developer-data/` | Gitignored. Snapshots under `backups/` |
+| `developer-data/` | Gitignored. Snapshots under `backups/`; confirm JSON under `confirm-records/` |
 | `docs/` | [SAFETY.md](../../../../docs/SAFETY.md) (symlink), [firmware-snapshot-management.md](../../../../docs/firmware-snapshot-management.md), [DATASHEETS.md](../../../../docs/DATASHEETS.md) (symlink) |
+| `firmware/` | Not members yet. [firmware/AGENTS.md](../../../../firmware/AGENTS.md) |
 | `.agents/skills/m5stack-papermono-hardware/` | Board contract |
 | `.agents/skills/papermono-rs/` | This skill |
 
 Firmware packages are not workspace members yet. When they land,
-keep them out of `default-members`.
+keep them out of `default-members`. Nearest rules:
+[firmware/AGENTS.md](../../../../firmware/AGENTS.md).
 
 ## Working rules (this repository)
 
@@ -42,4 +44,9 @@ keep them out of `default-members`.
   Do not advertise `cargo test --workspace` once firmware members
   exist. Owned Markdown is `rumdl check`.
 - One workspace lockfile is committed. Pass `--locked`.
+- Named `enum` / `const` values, not magic bytes. Comments
+  state meaning and source (datasheet Id + section number and
+  title; HTML **PinMap** for nets). Markdown prefers those
+  titles. Refresh modes:
+  [display.md](../../m5stack-papermono-hardware/references/display.md).
 - Use [Conventional Commits](https://www.conventionalcommits.org/).

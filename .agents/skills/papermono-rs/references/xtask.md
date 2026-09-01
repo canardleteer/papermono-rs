@@ -39,7 +39,7 @@ cargo xtask detect-connected
 # cargo xtask detect-connected --probe
 # cargo xtask backup-factory-firmware --name stock-lite
 # cargo xtask backup-factory-firmware --as-original
-# cargo xtask confirm-factory-firmware
+# cargo xtask confirm-factory-firmware --capture stock-lite
 # cargo xtask restore-factory-firmware --yes
 # cargo xtask ci
 # cargo xtask monitor --for 20 --output idle.log
@@ -65,10 +65,10 @@ Rules for advancing a row:
 
 1. Do not run a live command unless a human asked in that message.
 2. Do not skip a precondition that is still
-   **Implemented, not live-tested**. `--probe` and
-   `backup-factory-firmware` are **Live tested** on Lite
-   (16 MB dump). Confirm / restore / `monitor` still need a
-   human ask. A Lite result does not confirm `C153`.
+   **Implemented, not live-tested**. `--probe`, backup, and
+   confirm `--capture` are **Live tested** on Lite (16 MB).
+   Restore / `monitor` still need a human ask. A Lite result
+   does not confirm `C153`.
 3. A result on `C153-Lite` does not confirm `C153`.
 4. Silicon facts go to the hardware skill. This table is **tool**
    status.
@@ -81,8 +81,8 @@ The same rows are in
 | `ci` | Host-only tested | host / 2026-08-31 | Keep in the gate (`fmt`, clippy, test, rumdl, machete, audit) |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run **and** download inventory: same `303a:1001`, product “USB JTAG/serial debug unit”, by-id present (iSerial redacted), kernel `ttyACM*` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | After red-blink download, `NoReset` board-info: ESP32-S3 v0.2, 40 MHz, 16 MB flash. MAC redacted. `security_info` Display is printed; do not paste unique fields. JEDEC/PSRAM still `nyc-flash-id` |
-| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes (`0x1000000`). Capture under `developer-data/backups/captures/` (uncertain stock). espflash warns above 115200 (`ESPFLASH_BAUD` 921600); dump finished (~10.6 s/MiB). Do not commit the tree. Next: `confirm-factory-firmware` |
-| `confirm-factory-firmware` | Implemented, not live-tested | — | Lite capture exists. Human ask. Does not rewrite the snapshot |
+| `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` after red-blink download: `NoReset`, flash stub, 16×1 MiB windows, 16777216 bytes (`0x1000000`). Capture under `developer-data/backups/captures/` (uncertain stock). espflash warns above 115200 (`ESPFLASH_BAUD` 921600); dump finished (~10.6 s/MiB). Do not commit the tree. Confirm `--capture stock-lite` matched later the same day |
+| `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` after red-blink download: same `NoReset` / flash stub / 16×1 MiB windows as backup. Two flasher connects (board-info, then dump); baud warning both times. `elapsed=` is cumulative at **window start** (1/16 ≈ 0). ~10.6 s/MiB, ~3 min for 16 MB. Match stdout is `confirm: <unit-id> matches original` even for a capture; do not paste the id. Writes gitignored `confirm-records/` JSON even on match (region SHA; do not paste). Does not rewrite the snapshot. Default (no `--capture`, `original/`) untested. Next: restore / `monitor` |
 | `restore-factory-firmware` | Implemented, not live-tested | — | Do not run until a human wants a write of **that unit’s** image |
 | `monitor` | Implemented, not live-tested | — | Human ask; record silent vs printed |
 | `vet-idle-log` | Stub | — | Leave until firmware grammar exists |
@@ -100,8 +100,9 @@ source. xtask may use the `espflash` library for region read/write
 only; never a full-chip erase, never `espflash flash`.
 
 Never commit a MAC address, serial number, USB serial string, NVS
-blob, or flash image. `developer-data/` is gitignored on purpose.
-Persist fills `MANIFEST.app0_desc` only when a partition is
-labeled `app0`. Lite stock uses `factory` (no `otadata`); that
-field stays empty even though the factory slice has an ESP-IDF
-app descriptor.
+blob, flash image, dump SHA, or unit-id. `developer-data/` is
+gitignored on purpose (`backups/` and `confirm-records/`).
+Confirm stdout prints a unit-id; do not paste it. Persist fills
+`MANIFEST.app0_desc` only when a partition is labeled `app0`.
+Lite stock uses `factory` (no `otadata`); that field stays empty
+even though the factory slice has an ESP-IDF app descriptor.

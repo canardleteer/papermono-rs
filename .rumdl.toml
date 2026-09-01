@@ -8,6 +8,7 @@ respect-gitignore = true
 include = [
     "README.md",
     "AGENTS.md",
+    "firmware/AGENTS.md",
     "docs/*.md",
     ".agents/skills/papermono-rs/SKILL.md",
     ".agents/skills/papermono-rs/references/*.md",
@@ -32,9 +33,11 @@ exclude = [
     # Symlinks into the hardware skill; lint the real files once.
     "docs/DATASHEETS.md",
     "docs/SAFETY.md",
-    # Vendor PDFs and pdftotext extracts (also gitignored).
+    # Vendor PDFs, pdftotext extracts, schematic gallery PNGs
+    # (also gitignored).
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets/md/**",
     ".agents/skills/m5stack-papermono-hardware/resources/datasheets/pdf/**",
+    ".agents/skills/m5stack-papermono-hardware/resources/datasheets/png/**",
 ]
 
 # MD004 would restyle every `-` list to `*` (first-pass noise).

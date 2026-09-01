@@ -29,10 +29,64 @@ weighs them.
 Schematic PDFs are cache ids `papermono-schematic` and
 `papermono-lite-schematic` in
 [datasheets.md](../resources/datasheets.md) (**V0.6.2,
-2026-05-22**). Walk the PDF pages, not only the extract
-(wires drop). Nets absorbed there and in
-[pin-map.md](pin-map.md). Gallery PNGs exist next to those
-PDFs on OSS; prefer the PDF.
+2026-05-22**). Walk the PDF pages (or the gallery PNGs), not
+only the extract (wires drop). Nets absorbed there and in
+[pin-map.md](pin-map.md).
+
+## Pin maps (HTML, living)
+
+Official pin tables live under the **PinMap** heading on the
+same product pages. This skill’s [pin-map.md](pin-map.md) is
+absorbed from those tables plus the schematic. Re-read the
+HTML when a net or SKU row looks stale.
+
+| SKU | Page | PinMap notes |
+| --- | --- | --- |
+| `C153` | https://docs.m5stack.com/en/core/PaperMono | E-Paper, Touch, microSD, HMI, KEY, Audio, M5PM1, M5IOE1, **RFID**, **LoRa** |
+| `C153-Lite` | https://docs.m5stack.com/en/core/PaperMono-Lite | Same headings **without** RFID and LoRa; still has IP2315 / M5IOE1 notes |
+
+Product PDFs (`papermono-product` /
+`papermono-lite-product`) also carry pin tables and can lag
+the HTML.
+
+## Schematics (dated OSS)
+
+Linked from those HTML **Schematics** carousels. Filenames are
+dated **V0.6.2 / 2026-05-22**. The HTML pages are the living
+index: a later board rev may ship a new PDF/PNG set without
+this skill noticing until someone re-checks the docs.
+
+**PaperMono (`C153`)** — six pages (HTML carousel 1/6):
+
+| Page | URL |
+| ---: | --- |
+| PDF | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf |
+| 1 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_01.png |
+| 2 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_02.png |
+| 3 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_03.png |
+| 4 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_04.png |
+| 5 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_05.png |
+| 6 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_06.png |
+
+**PaperMono-Lite (`C153-Lite`)** — five OSS PNGs (HTML
+carousel may show 1/4; do not assume the carousel count is
+the file count):
+
+| Page | URL |
+| ---: | --- |
+| PDF | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522.pdf |
+| 1 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_01.png |
+| 2 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_02.png |
+| 3 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_03.png |
+| 4 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_04.png |
+| 5 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_05.png |
+
+Page 1 on Lite is a revision-history title block (V0.6.2;
+title-block date `26/5/21` vs filename `20260522`). Page 5
+still draws Stamp LoRa-1262 and RFID/NFC even though the
+Lite HTML PinMap omits those modules. Prefer the PDF for
+nets; use the PNGs when the extract drops wires. Cache:
+`png/` next to the PDFs ([datasheets.md](../resources/datasheets.md)).
 
 ## Firmware you can actually run
 

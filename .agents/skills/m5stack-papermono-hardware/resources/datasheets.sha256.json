@@ -63,6 +63,42 @@
       "bytes": 566724
     },
     {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-01.png",
+      "sha256": "d60bc2217ff36b152ed179c527b5aabd3a8484cc2a74b68069d39dcb68005037",
+      "bytes": 2002888
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-02.png",
+      "sha256": "52af03768fafce8555187def932925b674513bc266a2c5be839f1a82d787f240",
+      "bytes": 1353606
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-03.png",
+      "sha256": "f547ea1ebc4507cebe53cfcfc940f6d37138931dab077b2f20d658aa8d666231",
+      "bytes": 985447
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-04.png",
+      "sha256": "88b42aecfd86fecc6580f11ea29fb876322ff1aa451c6e4d5b62c53dc8e14e73",
+      "bytes": 1192874
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-05.png",
+      "sha256": "920bd393c29979622128e6900db23dd6ea1c6bfa8d86f34a2badc3e44411349d",
+      "bytes": 438327
+    },
+    {
+      "id": "papermono-schematic",
+      "path": "datasheets/png/papermono-schematic-page-06.png",
+      "sha256": "41848ade172b00ccafceb123b1b9b7a585fb65fcfd87cd7ac0d4a215cc9c0714",
+      "bytes": 1154286
+    },
+    {
       "id": "papermono-lite-schematic",
       "path": "datasheets/pdf/papermono-lite-schematic.pdf",
       "sha256": "e27b138e9104d3550531c9a9757ddc3d14941a546acc698ba7df4f40cd37095e",
@@ -73,6 +109,36 @@
       "path": "datasheets/md/papermono-lite-schematic.md",
       "sha256": "b726fb2459f39379e2d98b8b9c67b9752eaa22d318e3ab973da1acb57ccaf7f8",
       "bytes": 500671
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/png/papermono-lite-schematic-page-01.png",
+      "sha256": "abcbf879ce9efaefdea43aef0fe2c7a605a3d27bba4b7593efa5ec9ff1fb88a9",
+      "bytes": 256189
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/png/papermono-lite-schematic-page-02.png",
+      "sha256": "fcf5a820e5f2fb3b691c13d1f9e7d9f6a41c741aa5e8ba4f0d07b7d0e975f40b",
+      "bytes": 2433266
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/png/papermono-lite-schematic-page-03.png",
+      "sha256": "431347b4c4addf9ac195282f0817c9b03094773983f5d470d7a512957cb3265f",
+      "bytes": 1697035
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/png/papermono-lite-schematic-page-04.png",
+      "sha256": "ae396bd191420610ba9943a9018c0013b16bc29de1b3d63bb7bfd562dd0c6174",
+      "bytes": 1152424
+    },
+    {
+      "id": "papermono-lite-schematic",
+      "path": "datasheets/png/papermono-lite-schematic-page-05.png",
+      "sha256": "0cdf2ccee1a8167dc74f050961f3ca34f00229b03790eea52a2dc65fe52982c1",
+      "bytes": 1613112
     },
     {
       "id": "papermono-product",

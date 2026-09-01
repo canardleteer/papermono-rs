@@ -19,9 +19,11 @@ open a port unless a human asked.
 Vendor C++ trees are wiring evidence in
 [cpp-platformio.md](cpp-platformio.md).
 
-**PaperMono (`C153`) has not been measured.** PaperMono-Lite
-(`C153-Lite`) has run- and download-mode USB IDs in
-[flashing.md](flashing.md#usb-measured) and a `--probe`
+**PaperMono (`C153`) USB, JEDEC, and partition table have not
+been measured.** Lab EPD refresh times in
+[display.md](display.md) were taken on **both** SKUs.
+PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
+IDs in [flashing.md](flashing.md#usb-measured) and a `--probe`
 board-info row below. Remaining recipes:
 [not-yet-confirmed.md](../resources/not-yet-confirmed.md).
 
@@ -74,6 +76,10 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | Flash size | `C153-Lite` | 16 MB (`0x1000000`) from flasher `board-info`. JEDEC bytes not printed |
 | Partition table | `C153-Lite` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv`. No `otadata`. PIO `default_16MB.csv` still different. `C153` open |
 | Secure boot / flash encryption | `C153-Lite` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
+| EPD refresh (`epd_quality`) | both | Lab 4.71 s single refresh. Enum title `epd_quality`. [display.md](display.md) |
+| EPD refresh (`epd_text`) | both | Lab 0.45 s. Enum title `epd_text` |
+| EPD refresh (`epd_fast`) | both | Lab 0.34 s. Enum title `epd_fast` |
+| EPD refresh (`epd_fastest`) | both | Lab 0.07 s. Enum title `epd_fastest` |
 
 ## Factory image (Lite stock, measured table)
 
@@ -86,9 +92,13 @@ names project **PaperMono-UserDemo**, IDF **v5.5.1**, version
 than the GitHub V1.2 pin (`c109910`, 2026-08-10). Do not
 treat shipping stock as that later commit.
 
+The same day, `confirm-factory-firmware --capture stock-lite`
+re-read the chip; live flash matched that capture (full
+dump). Confirm does not rewrite the snapshot. Do not commit
+dumps, NVS, PHY, image SHA, or the confirm-records JSON.
+
 `C153` table still
 [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
-Do not commit dumps, NVS, PHY, or image SHA.
 
 OTP path:
 [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)

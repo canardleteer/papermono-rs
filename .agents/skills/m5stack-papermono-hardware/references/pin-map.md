@@ -2,6 +2,11 @@
 
 GPIO numbers are ESP32-S3 package pins. Levels and expander
 polarity below are **official pin tables**, not measured.
+Primary table source: the **PinMap** heading on
+[PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
+[PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite)
+([catalog.md](catalog.md)). Those HTML pages can change; re-read
+them when a net disagrees with this file.
 [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
 SKU column: both, full (`C153`) only, or Lite-absent.
 
@@ -127,10 +132,13 @@ sink, no PD controller in the extract.
 
 ## Lite leftover pads
 
-Official comparison: Lite has no NFC and no LoRa modules. The
-Lite V0.6.2 extract still names SX1262, ST25R3916,
-`PYB_NFC_EN`, and LoRa SPI nets. That is not a DNP close.
-Do not drive those nets as extra GPIO until
+Official HTML **PinMap** and product comparison: Lite has no
+NFC and no LoRa modules (those headings exist only on the
+full-SKU page). The Lite V0.6.2 schematic still **draws**
+Stamp LoRa-1262 and RFID/NFC blocks (gallery page 05 / PDF).
+The extract names SX1262, ST25R3916, `PYB_NFC_EN`, and LoRa
+SPI nets. That is not a DNP close. Do not drive those nets as
+extra GPIO until
 [nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads)
 /
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)

@@ -269,16 +269,18 @@ not an unread register map). Do not leave RF on.
 
 ### nyc-lite-nfc-pads
 
-Lite V0.6.2 extract still names ST25R3916 and `PYB_NFC_EN`.
-That is not DNP. Confirm GPIO6 / PYG4 NC vs routed vs
-unpopulated on a unit or a PDF-page callout that the extract
-dropped. [pin-map.md](../references/pin-map.md).
+Lite HTML **PinMap** and SKU compare omit NFC. Lite V0.6.2
+gallery **page 05** / PDF still **draws** ST25R3916 and
+`PYB_NFC_EN`. That is not DNP. Confirm GPIO6 / PYG4 NC vs
+routed vs unpopulated on a unit or a PDF-page callout that
+the extract dropped. [pin-map.md](../references/pin-map.md).
 
 ### nyc-lite-lora-pads
 
-Lite V0.6.2 extract still names Stamp-LoRa-1262 and SPI1
-nets. Confirm GPIO5/21/39–41, PYG2/10, M5PM1 G2 NC vs routed
-vs unpopulated. [pin-map.md](../references/pin-map.md).
+Lite HTML **PinMap** and SKU compare omit LoRa. Lite V0.6.2
+gallery **page 05** / PDF still **draws** Stamp-LoRa-1262 and
+SPI1 nets. Confirm GPIO5/21/39–41, PYG2/10, M5PM1 G2 NC vs
+routed vs unpopulated. [pin-map.md](../references/pin-map.md).
 
 ### nyc-rgb-led
 

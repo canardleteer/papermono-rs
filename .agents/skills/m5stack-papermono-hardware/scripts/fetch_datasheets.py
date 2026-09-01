@@ -7,7 +7,8 @@ resources/datasheets.sha256 (committed) so an IPFS CIDv1 can be derived later.
 
 This is a machine-local cache, not a vendored documentation corpus.
 Agents must not run `fetch` unless a human asked. `status` is local-only.
-PaperMono / PaperMono-Lite parts only.
+PaperMono / PaperMono-Lite parts only. Schematic ids also cache the
+dated OSS gallery PNGs next to the PDF.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ RESOURCES_DIR = SKILL_DIR / "resources"
 CACHE_DIR = RESOURCES_DIR / "datasheets"
 PDF_DIR = CACHE_DIR / "pdf"
 MD_DIR = CACHE_DIR / "md"
+PNG_DIR = CACHE_DIR / "png"
 SHA256_PATH = RESOURCES_DIR / "datasheets.sha256"
 SHA256_JSON_PATH = RESOURCES_DIR / "datasheets.sha256.json"
 
@@ -75,12 +77,29 @@ DOCUMENTS: tuple[dict[str, object], ...] = (
         "urls": (
             "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf",
         ),
+        "source_page": "https://docs.m5stack.com/en/core/PaperMono",
+        "gallery": (
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_01.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_02.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_03.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_04.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_05.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522_page_06.png",
+        ),
     },
     {
         "id": "papermono-lite-schematic",
         "title": "M5Stack PaperMono-Lite schematic V0.6.2",
         "urls": (
             "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522.pdf",
+        ),
+        "source_page": "https://docs.m5stack.com/en/core/PaperMono-Lite",
+        "gallery": (
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_01.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_02.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_03.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_04.png",
+            "https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522_page_05.png",
         ),
     },
     {
@@ -170,6 +189,31 @@ def md_path(doc_id: str) -> Path:
     return MD_DIR / f"{doc_id}.md"
 
 
+def gallery_paths(doc: dict[str, object]) -> list[tuple[str, Path]]:
+    """(url, dest) for optional schematic page PNGs."""
+    urls = doc.get("gallery")
+    if not urls:
+        return []
+    doc_id = str(doc["id"])
+    out: list[tuple[str, Path]] = []
+    for url in urls:  # type: ignore[union-attr]
+        name = Path(urllib.parse.urlparse(str(url)).path).name
+        if "_page_" in name:
+            page = name.rsplit("_page_", 1)[-1]
+            dest_name = f"{doc_id}-page-{page}"
+        else:
+            dest_name = f"{doc_id}-{name}"
+        out.append((str(url), PNG_DIR / dest_name))
+    return out
+
+
+def cache_files(doc: dict[str, object]) -> list[Path]:
+    doc_id = str(doc["id"])
+    paths = [pdf_path(doc_id), md_path(doc_id)]
+    paths.extend(dest for _, dest in gallery_paths(doc))
+    return paths
+
+
 def cache_rel(path: Path) -> str:
     return str(path.relative_to(RESOURCES_DIR))
 
@@ -212,7 +256,7 @@ def write_hashes() -> None:
     lines: list[str] = []
     for doc in DOCUMENTS:
         doc_id = str(doc["id"])
-        for path in (pdf_path(doc_id), md_path(doc_id)):
+        for path in cache_files(doc):
             rel = cache_rel(path)
             if path.is_file():
                 digest = sha256_file(path)
@@ -283,6 +327,20 @@ def cmd_status(doc_id: str | None) -> int:
                 missing.append(f"{doc_id_s}:{kind}:hash")
             else:
                 flags.append(f"{kind}=yes")
+        gallery = gallery_paths(doc)
+        if gallery:
+            png_ok = 0
+            for url, path in gallery:
+                if not path.is_file():
+                    missing.append(f"{doc_id_s}:png:{path.name}")
+                    continue
+                digest = sha256_file(path)
+                want = expected.get(cache_rel(path))
+                if want and want != digest:
+                    missing.append(f"{doc_id_s}:png:{path.name}:hash")
+                    continue
+                png_ok += 1
+            flags.append(f"png={png_ok}/{len(gallery)}")
         print(f"{doc_id_s:22} {' '.join(flags)}")
     if missing:
         print()
@@ -308,6 +366,25 @@ def download_url(url: str) -> bytes:
             return response.read()
     except TimeoutError as error:
         raise urllib.error.URLError(f"timeout: {error}") from error
+
+
+def download_png(url: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    body = download_url(url)
+    if not body.startswith(b"\x89PNG"):
+        raise RuntimeError(f"{url}: not a PNG")
+    if len(body) < 8_000:
+        raise RuntimeError(f"{url}: too small ({len(body)} bytes)")
+    dest.write_bytes(body)
+    print(f"wrote {dest.relative_to(SKILL_DIR)} ({len(body)} bytes) from {url}")
+
+
+def fetch_gallery(doc: dict[str, object], force: bool) -> None:
+    for url, dest in gallery_paths(doc):
+        if dest.is_file() and not force:
+            print(f"{doc['id']}: {dest.name} already present")
+            continue
+        download_png(url, dest)
 
 
 def download(doc: dict[str, object]) -> str:
@@ -388,6 +465,11 @@ def cmd_fetch(doc_id: str | None, force: bool) -> int:
         try:
             convert_one(doc, source_url)
         except RuntimeError as error:
+            print(error, file=sys.stderr)
+            failed += 1
+        try:
+            fetch_gallery(doc, force)
+        except (RuntimeError, urllib.error.URLError) as error:
             print(error, file=sys.stderr)
             failed += 1
     write_hashes()

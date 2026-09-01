@@ -8,7 +8,9 @@
 This repository is a peer of
 [`sticky-rs`](https://github.com/canardleteer/sticky-rs).
 The board contract and a safety-first host CLI (`cargo xtask`)
-are here. Firmware packages are not.
+are here. Firmware packages are not workspace members yet.
+[firmware/AGENTS.md](firmware/AGENTS.md) is in place for when
+they land.
 
 Host tools (clap + `papermono-host`): detect, snapshot
 backup / confirm / restore, and a no-reset monitor. **Implemented
@@ -29,9 +31,13 @@ before treating a command as working on a unit. Operator how-to:
   [not-yet-confirmed.md](.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
   Lite run and download USB is measured (`303a:1001`); Lite
   flash size is 16 MB; Lite stock partition table matches
-  UserDemo `partitions.csv`. Official docs are **not measured**
-  unless a `nyc-*` recipe closed. Name PaperMono (`C153`) vs
-  PaperMono-Lite (`C153-Lite`).
+  UserDemo `partitions.csv`. Lab EPD refresh times
+  (`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`)
+  are measured on **both** SKUs
+  ([display.md](.agents/skills/m5stack-papermono-hardware/references/display.md)).
+  Official docs are **not measured** unless a `nyc-*` recipe
+  closed or a Confirmed-live row exists. Name PaperMono
+  (`C153`) vs PaperMono-Lite (`C153-Lite`).
 - Other docs live in [`docs/`](./docs).
   `docs/SAFETY.md` and `docs/DATASHEETS.md` are symlinks into the
   hardware skill.

@@ -6,13 +6,16 @@ description: >-
   800x480/480x800 SSD1677 e-paper, FT6336G, M5PM1, M5IOE1, native USB,
   including GPIO and expander maps, power-rail bring-up, display/touch/
   IMU/battery wiring, SDMMC, NFC/LoRa on the full SKU, deep sleep,
-  flashing, destroy-the-board hazards, or when sources disagree about
-  this board. Vendor datasheet citations use the skill catalog and a
-  gitignored local PDF/markdown cache; populate that cache when the
-  work is registers, opcodes, or timings. Also use when the user
-  mentions PaperMono, PaperMono-Lite, C153, M5PM1, M5IOE1, or vendor
-  Arduino / ESP-IDF / FreeInk firmware as evidence of how this board
-  is wired.
+  flashing, destroy-the-board hazards, named constants vs magic
+  opcodes, datasheet section citations, M5GFX refresh modes
+  (`epd_quality`, `epd_text`, `epd_fast`, `epd_fastest`), or when
+  sources disagree about this board. Vendor datasheet citations
+  use the skill catalog and a gitignored local PDF/markdown
+  cache; populate that cache when the work is registers, opcodes,
+  or timings. Also use when the user mentions PaperMono,
+  PaperMono-Lite, C153, M5PM1, M5IOE1, or vendor Arduino /
+  ESP-IDF / FreeInk firmware as evidence of how this board is
+  wired.
 ---
 
 # M5Stack PaperMono Hardware
@@ -56,9 +59,11 @@ Open nets live in
    [references/enclosure.md](references/enclosure.md). Where keys,
    USB-C, and the SD slot sit. Vendored product photos:
    [resources/enclosure/](resources/enclosure/SOURCE.md).
-5. **Pin map and rails** — remaining hardware pages (official pin
-   tables until [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
-   and friends close).
+5. **Pin map and rails** — remaining hardware pages (official
+   HTML **PinMap** tables until
+   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
+   and friends close). Living tables:
+   [catalog.md](references/catalog.md).
 6. **Official docs and firmware catalog** —
    [references/catalog.md](references/catalog.md).
 7. **Vendor datasheets** —
@@ -99,8 +104,9 @@ it does not silently pick a winner against the user.
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
    not confirm the other. Lite USB, chip rev, 16 MB flash
-   size, and the stock partition table are observed;
-   JEDEC/PSRAM/ACK lists stay open.
+   size, the stock partition table, and lab EPD refresh times
+   on **both** SKUs are observed; JEDEC/PSRAM/ACK lists stay
+   open.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -124,11 +130,39 @@ Do not invent GPIOs. Do not use a generic ESP32-S3 DevKit pinout.
 Do not invent registers. If the local datasheet cache is missing,
 ask the user to populate it rather than guessing.
 
+## Named constants and datasheet citations
+
+Firmware and host code: grouped `enum` / `const` values, never
+a bare opcode, GPIO number, or refresh delay at the call site.
+Comments on each definition state **meaning** and **provenance**.
+Markdown (including rustdoc) prefers those **titles**, not the
+raw encoding.
+
+This skill **may** print hex and GPIO numbers so the mapping is
+searchable. Keep the map next to the name: what the value does,
+and where it came from (catalog id, datasheet section number
+and title, HTML **PinMap**, UserDemo constant name).
+
+Cite a datasheet by catalog **Id**, **section number** (when
+the sheet has one), and **section title**. Do not cite page
+numbers; M5 copies and translations shift them. Catalog:
+[datasheets.md](resources/datasheets.md).
+
+Board pin tables: living HTML **PinMap** on the product pages
+([catalog.md](references/catalog.md)), absorbed in
+[pin-map.md](references/pin-map.md).
+
+EPD refresh enum titles (lab times, both SKUs): `epd_quality`,
+`epd_text`, `epd_fast`, `epd_fastest`
+([display.md](references/display.md)). Rust under `firmware/`
+also reads [firmware/AGENTS.md](../../../firmware/AGENTS.md).
+
 ## Product snapshot
 
 Official docs except where [measure.md](references/measure.md)
-has a Lite row. Confirm JEDEC on a physical unit (`C153`
-and/or `C153-Lite`) via
+has a silicon row. Lab EPD refresh times are on **both** SKUs.
+Confirm JEDEC on a physical unit (`C153` and/or `C153-Lite`)
+via
 [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
 before treating manufacturer bytes as confirmed.
 
@@ -137,7 +171,7 @@ before treating manufacturer bytes as confirmed.
 | MCU | ESP32-S3R8, Xtensa LX7 dual-core, up to 240 MHz | Same |
 | RAM | 8 MB in-package octal PSRAM | Same |
 | Flash | 16 MB | Same |
-| Display | 3.97" 480×800, 4-gray, SSD1677 SPI | Same |
+| Display | 3.97" 480×800, 4-gray, SSD1677 SPI; lab `epd_*` times in [display.md](references/display.md) | Same |
 | Touch | FT6336G `0x38`; active area 5–475 / 5–795 | Same |
 | Frontlight | M5PM1 G3 PWM → AW9967 (`EINK_BL`) | Same |
 | USB debug | Native pads; Arduino CDC flags (intent) | Run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit |
@@ -204,9 +238,9 @@ flash size is 16 MB
 ## Vendor datasheets (local cache)
 
 Catalog: [resources/datasheets.md](resources/datasheets.md).
-Cached PDFs and extracted markdown live in
-[resources/datasheets/](resources/datasheets/README.md)
-(`pdf/`, `md/`; gitignored).
+Cached PDFs, extracted markdown, and schematic gallery PNGs
+live in [resources/datasheets/](resources/datasheets/README.md)
+(`pdf/`, `md/`, `png/`; gitignored).
 
 **Vendor that cache** when the work is registers, opcodes,
 timings, strapping/I2C/SPI limits, SSD1677 command tables, or a
@@ -222,11 +256,14 @@ second datasheet pipeline.
 
 When citing a register, opcode, or timing:
 
-1. Read the catalog (gaps live there).
+1. Read the catalog (gaps live there). Cite **Id** + section
+   number + title, not a page number.
 2. If `resources/datasheets/md/<id>.md` exists, search that file.
 3. If the markdown (or PDF) is missing, **ask the user to
    populate the cache** before inventing a constant. Do not
    download vendor files unless they asked.
+4. Put the encoding in a named `enum` / `const` in code; keep
+   the mapping on the skill page.
 
 ```shell
 # from this skill directory
@@ -277,7 +314,7 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 | Where keys, USB-C, and the SD slot sit | [references/enclosure.md](references/enclosure.md) |
 | GPIO, expander pins, I2C, SPI, part numbers | [references/pin-map.md](references/pin-map.md) |
 | M5PM1 rails, charger, sleep | [references/power-and-sleep.md](references/power-and-sleep.md) |
-| Panel, orientation, OTP vs LUT | [references/display.md](references/display.md) |
+| Panel, orientation, OTP vs LUT, lab refresh modes | [references/display.md](references/display.md) |
 | FT6336G address and active area | [references/touch.md](references/touch.md) |
 | IMU, RTC, mic, RGB | [references/sensors.md](references/sensors.md) |
 | Buttons, buzzer, SD, USB-C | [references/input-storage.md](references/input-storage.md) |
