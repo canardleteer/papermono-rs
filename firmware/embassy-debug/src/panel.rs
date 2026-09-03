@@ -74,11 +74,9 @@ const YIELD_EVERY_ROWS: u16 = 16;
 /// next mono path is [`display::OtpRefresh::MonoFull`].
 /// `0` never promotes.
 ///
-/// Same idea as FreeInkUI `setTransitionFullEvery` (default
-/// 6) used by CrossPoint Reader chrome. The reader's own
-/// page-count knob (`refreshFrequency`, default 15) is a
-/// different setting. Official HTML: after about ten.
-/// Board-crate catalog is 7.
+/// Follows the official PaperMono display safety rule: uninterrupted
+/// partial refreshes can damage the panel. Official documentation
+/// mandates a full refresh after roughly ten partial refreshes.
 const PARTIALS_BEFORE_FULL: u8 = 6;
 
 /// Last OTP stamp. Reprinted on 10 s `hello`. `busy_rose=0` means the

@@ -3,8 +3,8 @@
 Driver for the Solomon Systech SSD1677 active matrix e-paper display
 controller using panel OTP waveforms.
 
-Datasheet: [Solomon Systech SSD1677 Datasheet Rev 1.0](https://files.waveshare.com/upload/2/2a/SSD1677_1.0.pdf)
-([M5Stack copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/SSD1677.pdf)).
+Datasheet:
+[Solomon Systech SSD1677 Datasheet Rev 1.0 (M5Stack copy)](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/SSD1677.pdf).
 
 The crate is `#![no_std]` and depends exclusively on `embedded-hal` 1.0,
 avoiding any microcontroller-specific dependencies or assumptions about host

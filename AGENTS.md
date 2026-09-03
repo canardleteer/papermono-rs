@@ -147,6 +147,11 @@ Skills:
   commented.
 - Do not copy foreign pin maps, latch sequences, CH343 VID, 32 MB
   flash rules, or GT911 dances onto this product.
+- **Official datasheets and documentation outrank secondary references.**
+  In all cases where a statement in crates, firmware, documentation, or
+  skills can be matched to an official datasheet section or vendor
+  documentation, do so directly instead of citing third-party, community,
+  or secondary sources.
 - Use [Conventional Commits](https://www.conventionalcommits.org/).
 - Measurement-backlog items in the hardware skill stay open until
   someone confirms them on a physical PaperMono (`C153`) or
@@ -154,9 +159,12 @@ Skills:
   variant does not confirm the other. Firmware evidence proves
   intent and sequencing, never electrical fact. Do not write a
   “Confirmed live” row without a board in hand.
-- Owned Markdown is checked with `rumdl check` (config
-  [`.rumdl.toml`](.rumdl.toml)). Do not run rumdl on vendor PDF
-  extracts under the hardware skill `resources/datasheets/md/`.
+- **All human-facing Markdown must be linted by rumdl.** Every file meant
+  to be read by humans across the workspace—including the root `README.md`,
+  `docs/*.md`, and all crate, host, and firmware `README.md` files—must be
+  included in [`.rumdl.toml`](.rumdl.toml) and pass `rumdl check`. Vendor
+  PDF extracts under the hardware skill `resources/datasheets/md/` remain
+  excluded.
 - Operator how-to (firmware README recipes, getting-started
   command blocks, the root firmware-examples list) is for a
   person at the desk. Numbered steps with human titles; what

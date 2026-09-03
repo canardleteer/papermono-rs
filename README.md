@@ -1,5 +1,11 @@
 # `papermono-rs`
 
+> [!NOTE]
+> We have not yet explored using a **PaperMono**, only a **PaperMono-Lite**.
+> We have one on hand, but early bring-up is running on easier-to-replace
+> hardware that is far less tragic to turn into a paperweight. LoRa and NFC
+> are up next.
+
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
 [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite).
