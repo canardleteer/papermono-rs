@@ -13,8 +13,8 @@ Same CDC prefix as Path A (`simple-debug:`). Identity is
 `hello image=embassy-debug`. Host-tested lines live in
 `crates/papermono-log`.
 
-Landing image: **`touch` + `panel`** (Ferris, cards, lamp).
-`mic` / `radio` / `sleep` are opt-in. `simple-debug-fw` stays
+Landing image: **`touch` + `panel` + `sleep`** (Ferris, cards, lamp, sleep).
+`mic` / `radio` are opt-in. `simple-debug-fw` stays
 featureless.
 
 | Feature | Default | Role |
@@ -24,9 +24,9 @@ featureless.
 | `panel` | on | Five-card OTP walk + PWM0 lamp |
 | `mic` | **off** | PDM energy + hold-A PCM dump |
 | `radio` | off | `wifi n=` / `ble n=` only. No MAC/BSSID/IRK. No NVS |
-| `sleep` | off | RTC/PM1 trial. Parked; not a proven 10 s wake |
+| `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
 
-`mic` and `panel` depend on `touch` (expander).
+`mic` and `panel` depend on `touch` (expander). `sleep` depends on `panel`.
 
 ```shell
 cargo xtask build-fw embassy-debug
@@ -36,8 +36,6 @@ cargo xtask build-fw embassy-debug --no-default-features \
 cargo xtask build-fw embassy-debug --features mic
 cargo xtask build-fw embassy-debug --features radio
 ```
-
-Do not flash `--features sleep` unless they ask.
 
 Panel call site is `display::OtpRefresh` only:
 
@@ -57,8 +55,9 @@ Do not start a new waveform while BUSY is high.
 Five cards: splash Ferris + `papermono-rs`, shapes, legend
 (A / B / red power / right lamp), four-gray tones, target
 walk. Short A previous, short B next, wrap. Right-edge
-contact sets PWM0 from Y (top bright). Hold A ~1 s dumps
-PCM only when `mic` is on. GPIO42 chirp stays parked.
+contact sets PWM0 from Y (top bright). Hold A 2 s triggers
+sleep notice and light sleep; hold A or B 1 s wakes. Hold A
+~1 s dumps PCM only when `mic` is on. GPIO42 chirp stays parked.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png).

@@ -11,16 +11,15 @@ license = "MIT"
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
-default = ["touch", "panel"]
+default = ["touch", "panel", "sleep"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
 touch = []
 # PDM audio: PDM GPIO45/46 + PYG12. Needs expander.
 mic = ["touch"]
 # Display: OTP 4-gray panel. Needs expander.
 panel = ["touch"]
-# Factory demo ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) RTC 10 s → PM1 G0 falling → `shutdown`. Default off.
-# Lite 2026-09-02: parked; not a proven 10 s wake.
-sleep = ["touch"]
+# Interactive button sleep & wake: Button A hold 2 s to sleep, 1 s A/B hold to wake.
+sleep = ["touch", "panel"]
 # Scan counts only (`wifi n=` / `ble n=`). Default off.
 radio = [
   "dep:esp-alloc",

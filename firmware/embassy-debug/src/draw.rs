@@ -49,6 +49,35 @@ pub fn render(scene: Scene, bw: &mut [u8], red: &mut [u8]) {
     }
 }
 
+/// Renders the sleep screen notice before the device enters low-power light sleep.
+#[cfg(feature = "sleep")]
+pub fn draw_sleeping(bw: &mut [u8], red: &mut [u8]) {
+    const LINE_GAP: i32 = 12;
+    const GLYPH_H: i32 = 20;
+
+    clear(bw, red, display::GRAY_WHITE);
+    let cx = i32::from(display::WIDTH) / 2;
+    let cy = i32::from(display::HEIGHT) / 2;
+    let line1_y = cy - (LINE_GAP / 2);
+    let line2_y = cy + (LINE_GAP / 2) + GLYPH_H;
+
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+    let _ = Text::with_alignment(
+        "sleeping,",
+        Point::new(cx, line1_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut GrayInk::new(bw, red));
+    let _ = Text::with_alignment(
+        "press A or B for 1 second to restart",
+        Point::new(cx, line2_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut GrayInk::new(bw, red));
+}
+
 /// Renders Card 1: Ferris mascot splash screen and user navigation guide.
 fn draw_splash(bw: &mut [u8], red: &mut [u8]) {
     const TITLE_GAP: i32 = 28;

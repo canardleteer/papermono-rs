@@ -15,12 +15,14 @@ On the unit:
 - BUTTON A previous card, BUTTON B next. The walk is splash →
   shapes → legend → four-gray tones → touch targets.
 - Slide the right edge for the lamp (top bright, USB-C dim).
+- Hold BUTTON A about 2 s to enter low-power sleep; hold BUTTON A
+  or B about 1 s to wake up.
 - Hold BUTTON A about 1 s for a PCM dump when the image
   was built `--features mic` (default image leaves mic off).
 - The GPIO42 buzzer chirp is parked.
 
-Default features are `touch` and `panel`. The `mic`, `radio`,
-and `sleep` features are opt-in. First SKU is Lite.
+Default features are `touch`, `panel`, and `sleep`. The `mic` and
+`radio` features are opt-in. First SKU is Lite.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
@@ -88,5 +90,12 @@ way. CDC prints `scene=`.
 
 On any card, slide a finger along the right edge. Top of the
 glass is brighter; USB-C is dimmer. CDC prints `lamp=`.
+
+### Step 6: Sleep and wake
+
+On any card, hold BUTTON A about 2 s. The frontlight turns off and
+the glass displays "sleeping, press A or B for 1 second to restart".
+Hold BUTTON A or B about 1 s to wake up; the lamp turns back on and
+the prior card is restored.
 
 Agent flash contract: [AGENTS.md](AGENTS.md).

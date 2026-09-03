@@ -177,8 +177,6 @@ pub async fn run(pins: Inputs, hello: Hello) {
             if let Some(duty) = crate::touch_bus::last_lamp() {
                 cdc::lamp(duty);
             }
-            #[cfg(feature = "sleep")]
-            crate::sleep_wake::reprint();
             #[cfg(feature = "mic")]
             if let Some(sample) = crate::mic::last() {
                 cdc::mic(&sample);

@@ -59,43 +59,12 @@ pub fn read_at(i2c: &mut SysI2c, addr: u8, reg: u8) -> Option<u8> {
     write_then_read(i2c, addr, reg).ok()
 }
 
-/// Reads a 16-bit little-endian register pair (used for RX8130 RTC timer counters).
-#[cfg(feature = "sleep")]
-pub fn read_le16(i2c: &mut SysI2c, addr: u8, reg: u8) -> Option<u16> {
-    let mut buf = [0u8; 2];
-    i2c.write_read(addr, &[reg], &mut buf).ok()?;
-    Some(u16::from_le_bytes(buf))
-}
-
 /// Performs a burst read from the specified starting register into `buf`.
 ///
 /// Used by touch scanning to fetch FT6336G coordinate registers in a single transaction.
 #[cfg(feature = "panel")]
 pub fn read_burst(i2c: &mut SysI2c, addr: u8, reg: u8, buf: &mut [u8]) -> bool {
     i2c.write_read(addr, &[reg], buf).is_ok()
-}
-
-/// Writes an 8-bit value to a specified peripheral register.
-#[cfg(feature = "sleep")]
-pub fn write_at(
-    i2c: &mut SysI2c,
-    addr: u8,
-    reg: u8,
-    val: u8,
-) -> Result<(), esp_hal::i2c::master::Error> {
-    i2c.write(addr, &[reg, val])
-}
-
-/// Writes a 16-bit little-endian value across two consecutive register addresses.
-#[cfg(feature = "sleep")]
-pub fn write_pair(
-    i2c: &mut SysI2c,
-    addr: u8,
-    reg: u8,
-    lo: u8,
-    hi: u8,
-) -> Result<(), esp_hal::i2c::master::Error> {
-    i2c.write(addr, &[reg, lo, hi])
 }
 
 /// Internal helper: writes a 1-byte register address followed immediately by a 1-byte read.

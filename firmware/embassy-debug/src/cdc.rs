@@ -161,33 +161,6 @@ pub fn leftover(sample: &papermono_log::LeftoverSample) {
     }
 }
 
-/// Emits RTC wake timer configuration announcement.
-#[cfg(feature = "sleep")]
-pub fn sleep_rtc(secs: u8) {
-    let mut buf = [0u8; papermono_log::SLEEP_CAPACITY];
-    if let Ok(line) = papermono_log::format_sleep_rtc(secs, &mut buf) {
-        emit(line);
-    }
-}
-
-/// Emits sleep abort announcement when external 5VIN prevents safe shutdown.
-#[cfg(feature = "sleep")]
-pub fn sleep_abort() {
-    let mut buf = [0u8; papermono_log::SLEEP_CAPACITY];
-    if let Ok(line) = papermono_log::format_sleep_abort(&mut buf) {
-        emit(line);
-    }
-}
-
-/// Emits wake source event reported by the PMIC.
-#[cfg(feature = "sleep")]
-pub fn wake(src: u8) {
-    let mut buf = [0u8; papermono_log::WAKE_CAPACITY];
-    if let Ok(line) = papermono_log::format_wake(src, &mut buf) {
-        emit(line);
-    }
-}
-
 /// Emits battery charging status and IP2315 registers.
 #[cfg(feature = "touch")]
 pub fn charge(sample: &papermono_log::ChargeSample) {

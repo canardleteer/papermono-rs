@@ -55,8 +55,6 @@ mod panel;
 mod radio;
 #[cfg(feature = "panel")]
 mod share;
-#[cfg(feature = "sleep")]
-mod sleep_wake;
 #[cfg(feature = "panel")]
 mod targets;
 #[cfg(feature = "touch")]
@@ -213,10 +211,6 @@ async fn main(spawner: Spawner) -> ! {
         // Bring up system expander rails and configure touch digitizer.
         let _ = touch_bus::bring_up(&mut i2c).await;
 
-        // If sleep feature is enabled, evaluate RTC wake status.
-        #[cfg(feature = "sleep")]
-        crate::sleep_wake::maybe_rtc_10s(&mut i2c).await;
-
         // Optional PDM microphone sampling task.
         #[cfg(feature = "mic")]
         {
@@ -255,8 +249,10 @@ async fn main(spawner: Spawner) -> ! {
             share::TP.store(tp.is_high(), core::sync::atomic::Ordering::Relaxed);
             share::BUSY.store(busy.is_high(), core::sync::atomic::Ordering::Relaxed);
 
+            let lpwr = esp_hal::rtc_cntl::sleep::LowPower::new(peripherals.LPWR);
+
             // Spawn the interactive UI card navigator task.
-            spawner.spawn(ui::run(i2c, panel, btn_a, btn_b, tp, busy).unwrap());
+            spawner.spawn(ui::run(i2c, panel, btn_a, btn_b, tp, busy, lpwr).unwrap());
 
             // Spawn the background heartbeat and telemetry reporter task.
             spawner.spawn(

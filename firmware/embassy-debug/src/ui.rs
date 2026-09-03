@@ -18,6 +18,11 @@
 
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::gpio::Input;
+#[cfg(feature = "sleep")]
+use esp_hal::gpio::{Event, WakeupConfig};
+use esp_hal::rtc_cntl::sleep::LowPower;
+#[cfg(feature = "sleep")]
+use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
 use m5stack_papermono_lite::display;
 use papermono_log::{Edge, Scene, BUTTON_HOLD_PCM_MS};
 use static_cell::ConstStaticCell;
@@ -48,21 +53,32 @@ enum Nav {
     Prev,
     /// Navigate to next card.
     Next,
+    /// Enter low-power sleep mode.
+    #[cfg(feature = "sleep")]
+    Sleep,
 }
 
 /// Button and touch polling interval (10 ms) for high-responsiveness gesture tracking.
 const NAV_POLL_MS: u32 = 10;
+
+/// Button A hold duration (2 seconds) to trigger sleep.
+#[cfg(feature = "sleep")]
+const BUTTON_HOLD_SLEEP_MS: u32 = 2_000;
 
 /// Main asynchronous UI worker task driving card transitions and user interaction.
 #[embassy_executor::task]
 pub async fn run(
     mut i2c: SysI2c,
     mut panel: Panel,
-    btn_a: Input<'static>,
-    btn_b: Input<'static>,
+    #[allow(unused_mut)] mut btn_a: Input<'static>,
+    #[allow(unused_mut)] mut btn_b: Input<'static>,
     tp: Input<'static>,
     busy: Input<'static>,
+    mut lpwr: LowPower<'static>,
 ) {
+    #[cfg(not(feature = "sleep"))]
+    let _ = &mut lpwr;
+
     let planes = PLANES.take();
     let mut scene = Scene::Splash;
     let mut lamp = LampSlide::new();
@@ -73,14 +89,35 @@ pub async fn run(
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
                     if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp).await {
-                        scene = apply(scene, nav);
+                        match nav {
+                            Nav::Prev => scene = scene.prev(),
+                            Nav::Next => scene = scene.next(),
+                            #[cfg(feature = "sleep")]
+                            Nav::Sleep => {
+                                enter_sleep(
+                                    &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b,
+                                    &mut lpwr,
+                                )
+                                .await;
+                            }
+                        }
                     }
                 }
                 WalkEnd::AbortPrev => scene = scene.prev(),
                 WalkEnd::AbortNext => scene = scene.next(),
             }
         } else if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp).await {
-            scene = apply(scene, nav);
+            match nav {
+                Nav::Prev => scene = scene.prev(),
+                Nav::Next => scene = scene.next(),
+                #[cfg(feature = "sleep")]
+                Nav::Sleep => {
+                    enter_sleep(
+                        &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b, &mut lpwr,
+                    )
+                    .await;
+                }
+            }
         }
     }
 }
@@ -105,14 +142,6 @@ async fn paint(
         panel
             .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
             .await;
-    }
-}
-
-/// Advances or retreats the current scene based on navigation intent.
-fn apply(scene: Scene, nav: Nav) -> Scene {
-    match nav {
-        Nav::Prev => scene.prev(),
-        Nav::Next => scene.next(),
     }
 }
 
@@ -144,20 +173,23 @@ async fn wait_nav(
             });
         }
 
-        // Detect BUTTON A long press for audio test.
+        // Detect BUTTON A long press for audio test or sleep.
         if prev_a && !now_a {
             a_down = Some(Instant::now());
             a_held = false;
         }
         if let Some(start) = a_down {
-            if !now_a
-                && !a_held
-                && Instant::now().duration_since(start)
-                    >= Duration::from_millis(BUTTON_HOLD_PCM_MS.into())
-            {
-                #[cfg(feature = "mic")]
-                crate::mic::ask_tone();
-                a_held = true;
+            if !now_a {
+                let duration = Instant::now().duration_since(start);
+                #[cfg(feature = "sleep")]
+                if duration >= Duration::from_millis(BUTTON_HOLD_SLEEP_MS.into()) {
+                    return Some(Nav::Sleep);
+                }
+                if !a_held && duration >= Duration::from_millis(BUTTON_HOLD_PCM_MS.into()) {
+                    #[cfg(feature = "mic")]
+                    crate::mic::ask_tone();
+                    a_held = true;
+                }
             }
         }
         if !prev_a && now_a {
@@ -189,4 +221,87 @@ async fn wait_nav(
         t_ms = t_ms.saturating_add(NAV_POLL_MS);
         Timer::after(Duration::from_millis(NAV_POLL_MS.into())).await;
     }
+}
+
+/// Transitions the system into light sleep after drawing the sleep screen, and waits for a 1-second hold on Button A or B to wake.
+#[cfg(feature = "sleep")]
+async fn enter_sleep(
+    i2c: &mut SysI2c,
+    panel: &mut Panel,
+    busy: &Input<'static>,
+    planes: &mut Planes,
+    btn_a: &mut Input<'static>,
+    btn_b: &mut Input<'static>,
+    lpwr: &mut LowPower<'static>,
+) {
+    // 1. Draw and paint the sleep notice to the e-paper panel.
+    draw::draw_sleeping(&mut planes.bw, &mut planes.red);
+    panel
+        .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
+        .await;
+
+    // 2. Wait until Button A (and Button B) are fully released before arming sleep.
+    while btn_a.is_low() || btn_b.is_low() {
+        Timer::after(Duration::from_millis(10)).await;
+    }
+    Timer::after(Duration::from_millis(50)).await;
+
+    // 3. Save active frontlight duty and turn off frontlight.
+    let saved_duty =
+        touch_bus::last_lamp().unwrap_or(m5stack_papermono_lite::pmic::FRONTLIGHT_DUTY);
+    touch_bus::apply_lamp(i2c, 0);
+
+    // 4. Configure low-power wake paths on Button A (GPIO2) and Button B (GPIO3).
+    let config = WakeupConfig::default().with_low_power_path(true);
+    let _ = btn_a.apply_wakeup_config(&config);
+    let _ = btn_b.apply_wakeup_config(&config);
+
+    // 5. Sleep loop: sleep until low level on Button A or B, then qualify with 1-second hold.
+    const WAKE_HOLD_MS: u32 = 1_000;
+    const POLL_MS: u32 = 10;
+    loop {
+        btn_a.listen(Event::LowLevel);
+        btn_b.listen(Event::LowLevel);
+
+        lpwr.sleep_light(RtcSleepConfig::default());
+
+        btn_a.unlisten();
+        btn_b.unlisten();
+        btn_a.clear_interrupt();
+        btn_b.clear_interrupt();
+
+        // Evaluate hold duration: must stay low for at least WAKE_HOLD_MS.
+        let mut held_ms = 0_u32;
+        let mut confirmed = false;
+        while btn_a.is_low() || btn_b.is_low() {
+            Timer::after(Duration::from_millis(POLL_MS.into())).await;
+            held_ms = held_ms.saturating_add(POLL_MS);
+            if held_ms >= WAKE_HOLD_MS {
+                confirmed = true;
+                break;
+            }
+        }
+
+        if confirmed {
+            break;
+        }
+
+        // Accidental tap / short release (<1s): wait until buttons are idle high before sleeping again.
+        while btn_a.is_low() || btn_b.is_low() {
+            Timer::after(Duration::from_millis(10)).await;
+        }
+        Timer::after(Duration::from_millis(50)).await;
+    }
+
+    // 6. Confirmed wake-up: wait for button release so it doesn't trigger card navigation.
+    while btn_a.is_low() || btn_b.is_low() {
+        Timer::after(Duration::from_millis(10)).await;
+    }
+    Timer::after(Duration::from_millis(50)).await;
+
+    share::BTN_A.store(true, core::sync::atomic::Ordering::Relaxed);
+    share::BTN_B.store(true, core::sync::atomic::Ordering::Relaxed);
+
+    // 7. Restore frontlight duty.
+    touch_bus::apply_lamp(i2c, saved_duty);
 }

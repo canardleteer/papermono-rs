@@ -135,9 +135,9 @@ message structure are covered in
 ### Path B — with Embassy (`embassy-debug`)
 
 `embassy-debug` activates async board drivers. Standard builds enable touch
-interaction and panel rendering, presenting a Ferris splash on boot and
-allowing navigation across test cards with hardware buttons. The frontlight
-brightness adjusts via edge swipes.
+interaction, panel rendering, and button sleep/wake, presenting a Ferris splash
+on boot and allowing navigation across test cards with hardware buttons. The
+frontlight brightness adjusts via edge swipes.
 
 ```shell
 . $HOME/export-esp.sh
