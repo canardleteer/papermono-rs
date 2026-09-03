@@ -1,6 +1,21 @@
-//! UserDemo `enterRtc10sWakeShutdown`: RX8130 timer → PM1 G0
-//! falling → `SYS_CMD` shutdown. ESP power drops; next boot
-//! reprints `wake src=`.
+//! RX8130CE RTC countdown wake timer and M5PM1 deep shutdown controller.
+//!
+//! # Architecture & Shutdown Sequence
+//! This module coordinates ultra-low-power sleep and RTC timed wakeups:
+//!
+//! - **Hardware Interconnect**:
+//!   - The RX8130CE RTC `/IRQ` output is wired to M5PM1 PMIC `GPIO0`.
+//!   - M5PM1 `GPIO0` can be configured as a falling-edge wake trigger.
+//!   - When the PMIC executes `SYS_CMD_SHUTDOWN` (`0x01` to `SYS_CMD` `0x00`),
+//!     it cuts power to all system regulators, powering off the ESP32-S3 completely.
+//! - **10-Second RTC Countdown Timer**:
+//!   - When enabled via the `sleep` feature, the RX8130 countdown timer is loaded
+//!     with 10 seconds worth of ticks (64 Hz clock source, count = 640).
+//!   - When the timer reaches zero, `/IRQ` pulls low, asserting M5PM1 `GPIO0`.
+//!   - The PMIC restores power rails, and the ESP32-S3 boots fresh from the bootloader.
+//! - **USB Power Interlock (Safety)**:
+//!   - If external 5V power (`VIN` / USB-C) is plugged in, shutdown is held off or aborted.
+//!     This prevents unexpected reboot cycling or USB power disconnection while debugging.
 
 use core::sync::atomic::{AtomicU8, Ordering};
 
@@ -13,19 +28,22 @@ use crate::cdc;
 use crate::ioe::{self, SysI2c};
 use crate::touch_bus;
 
-/// `0xFF` = no `wake` line yet.
+/// Sentinel indicating that no wake source event has been decoded yet.
 static LAST_WAKE: AtomicU8 = AtomicU8::new(0xFF);
-/// 0 = none, 1 = `sleep rtc=10`, 2 = `sleep abort`.
+
+/// Status of the most recent sleep attempt: 0 = none, 1 = armed, 2 = aborted.
 static LAST_SLEEP: AtomicU8 = AtomicU8::new(0);
 const SLEEP_RTC: u8 = 1;
 const SLEEP_ABORT: u8 = 2;
 
-/// Show the lamp before we start watching VIN.
+/// Delay before starting VIN presence evaluation.
 const ANNOUNCE_MS: u64 = 2000;
-/// Sheet: 5VIN present is a power-on recovery. Wait for unplug.
+
+/// Maximum duration to wait for USB-C 5VIN to disconnect before aborting shutdown.
 const VIN_WAIT_MS: u64 = 60_000;
 const VIN_POLL_MS: u64 = 100;
-/// If `SYS_CMD` did not drop the ESP, stay running.
+
+/// Grace period allowing PMIC to drop power before declaring shutdown failure.
 const ALIVE_AFTER_OFF_MS: u64 = 2000;
 
 fn rmw(i2c: &mut SysI2c, reg: u8, clear: u8, set: u8) -> bool {
@@ -153,7 +171,7 @@ fn abort(i2c: &mut SysI2c) {
     cdc::sleep_abort();
 }
 
-/// Reprint `wake` / `sleep` on the 10 s `hello` period.
+/// Reprints the wake source and sleep status during periodic 10-second banners.
 pub fn reprint() {
     let src = LAST_WAKE.load(Ordering::Relaxed);
     if src != 0xFF {
@@ -166,8 +184,7 @@ pub fn reprint() {
     }
 }
 
-/// Print `wake src=`. If this boot is not a clean GPIO wake,
-/// arm the 10 s RTC path. Lamp stays on until 5VIN is gone.
+/// Evaluates wake source from PMIC, arms the 10-second RTC timer, and triggers PMIC shutdown.
 pub async fn maybe_rtc_10s(i2c: &mut SysI2c) {
     let src = ioe::read_at(i2c, addresses::M5PM1, pmic::WAKE_SRC).unwrap_or(0);
     LAST_WAKE.store(src, Ordering::Relaxed);

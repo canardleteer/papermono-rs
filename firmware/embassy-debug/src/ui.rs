@@ -1,4 +1,20 @@
-//! Five-card walk: A prev, B next, right-edge lamp, hold-A PCM.
+//! Five-card interactive UI state machine and navigation controller.
+//!
+//! # Architecture & Navigation Model
+//! This module coordinates the high-level interactive user experience:
+//!
+//! - **Five-Card Finite State Machine**: Cycles sequentially through the UI scenes:
+//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Tones` ↔ `Targets`.
+//! - **Physical Button Controls**:
+//!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>1.2 s)
+//!     triggers an audio recording / tone test when the `mic` feature is enabled.
+//!   - `BUTTON B` (`GPIO3`): Short press advances to the next card.
+//! - **Touch Gutter Gesture**:
+//!   - Swiping along the far-right edge of the screen dynamically adjusts the display
+//!     frontlight LED brightness via PWM without advancing cards.
+//! - **Zero Heap Allocation**: Framebuffers are statically allocated using
+//!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
+//!   framebuffers in BSS memory.
 
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::gpio::Input;
@@ -14,25 +30,30 @@ use crate::share;
 use crate::targets::{self, WalkEnd};
 use crate::touch_bus::{self, LampSlide};
 
+/// Framebuffer container holding dual 1bpp planes for 4-gray rendering.
 struct Planes {
     bw: [u8; display::PLANE_BYTES],
     red: [u8; display::PLANE_BYTES],
 }
 
+/// Statically allocated framebuffers in BSS.
 static PLANES: ConstStaticCell<Planes> = ConstStaticCell::new(Planes {
     bw: [0u8; display::PLANE_BYTES],
     red: [0u8; display::PLANE_BYTES],
 });
 
+/// Navigation intent decoded from button presses.
 enum Nav {
+    /// Navigate to previous card.
     Prev,
+    /// Navigate to next card.
     Next,
 }
 
-/// Faster than the 50 ms heartbeat poll so a gutter stroke is
-/// not missed between `/INT` high blips.
+/// Button and touch polling interval (10 ms) for high-responsiveness gesture tracking.
 const NAV_POLL_MS: u32 = 10;
 
+/// Main asynchronous UI worker task driving card transitions and user interaction.
 #[embassy_executor::task]
 pub async fn run(
     mut i2c: SysI2c,
@@ -64,6 +85,7 @@ pub async fn run(
     }
 }
 
+/// Renders a card into framebuffers and triggers an e-paper refresh waveform.
 async fn paint(
     i2c: &mut SysI2c,
     panel: &mut Panel,
@@ -86,6 +108,7 @@ async fn paint(
     }
 }
 
+/// Advances or retreats the current scene based on navigation intent.
 fn apply(scene: Scene, nav: Nav) -> Scene {
     match nav {
         Nav::Prev => scene.prev(),
@@ -93,6 +116,7 @@ fn apply(scene: Scene, nav: Nav) -> Scene {
     }
 }
 
+/// Waits for tactile button presses or right-edge touch slider gestures.
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
@@ -120,6 +144,7 @@ async fn wait_nav(
             });
         }
 
+        // Detect BUTTON A long press for audio test.
         if prev_a && !now_a {
             a_down = Some(Instant::now());
             a_held = false;
@@ -147,11 +172,13 @@ async fn wait_nav(
             prev_a = now_a;
         }
 
+        // BUTTON B short press: next card.
         if prev_b && !now_b {
             return Some(Nav::Next);
         }
         prev_b = now_b;
 
+        // Poll touch digitizer for right-gutter frontlight brightness slider.
         let int_high = tp.is_high();
         let sample = touch_bus::read_points(i2c, int_high, true);
         if sample.n >= 1 {

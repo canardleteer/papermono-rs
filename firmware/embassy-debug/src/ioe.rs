@@ -1,4 +1,18 @@
-//! M5IOE1 RMW helpers and read-only I2C probes. Catalog id `m5ioe1`.
+//! M5IOE1 I2C I/O expander driver helpers and bus probing utilities.
+//!
+//! # Architecture & Hardware Provenance
+//! The M5IOE1 is an I2C-controlled custom microcontroller acting as an I/O
+//! expander on the PaperMono system bus (`GPIO47` SDA / `GPIO48` SCL).
+//!
+//! Key design considerations:
+//! - **Addresses**: Primary address is `0x4F` (factory demo), with a library
+//!   fallback of `0x6F`.
+//! - **Wake Protocol**: The expander MCU enters low-power sleep; before register
+//!   accesses, an address transaction ("wake signal") must be transmitted, followed
+//!   by a short settling delay (~10 ms).
+//! - **Push-Pull vs Open-Drain**: Power control gates (`EPD_VDD_ENABLE`, `TOUCH_VDD_ENABLE`,
+//!   `PDM_VDD_ENABLE`) are configured in push-pull mode (`M=1`, `DRV=0`) to ensure
+//!   crisp digital transitions on external MOSFET gates.
 
 use core::sync::atomic::{AtomicU8, Ordering};
 
@@ -8,42 +22,44 @@ use esp_hal::time::Rate;
 use m5stack_papermono_lite::addresses;
 use m5stack_papermono_lite::ioe1;
 
+/// Type alias for the synchronous blocking I2C driver on the system bus.
 pub type SysI2c = I2c<'static, esp_hal::Blocking>;
 
+/// Active runtime address discovered for the M5IOE1 expander (`0x4F` or `0x6F`).
 static IOE_ADDR: AtomicU8 = AtomicU8::new(addresses::M5IOE1);
 
-/// UserDemo `app_main` wait after power (“M5IOE1 and board I2C
-/// peripherals … stable after power-up”).
+/// Settling delay following power rail application before polling I2C peripherals.
 pub const POWER_SETTLE_MS: u64 = 500;
-/// Official `M5IOE1::sendWakeSignal` then `_initDevice`.
+
+/// Settling delay after sending the M5IOE1 wake signal before attempting register reads.
 const WAKE_SETTLE_MS: u64 = 10;
-/// Official `_tryInitAtAddress` wait between 100 kHz tries.
+
+/// Retry interval between 100 kHz bus speed initialization attempts.
 const INIT_RETRY_MS: u64 = 800;
 
-/// Set the register pointer, STOP, then read. ACK of that read is
-/// presence.
+/// Probes a register by writing its pointer and reading back one byte.
 ///
-/// Do not `write(addr, &[0])` as a data poke: M5IOE1 UID (`0x00`)
-/// is read-only.
+/// An `Ok` result indicates that an ACK was received on both the address and data phases.
 pub fn probe_read(i2c: &mut SysI2c, addr: u8, reg: u8) -> bool {
     write_then_read(i2c, addr, reg).is_ok()
 }
 
-/// Address ACK only. Discards one current-address byte.
+/// Probes an I2C device address for ACK by reading a single dummy byte.
 ///
-/// FT6336G (no public map) and parked IP2315 (expect NAK). Do not
-/// interpret the payload.
+/// Used for devices that do not expose a readable register pointer table (e.g., FT6336G).
 pub fn probe_addr(i2c: &mut SysI2c, addr: u8) -> bool {
     let mut val = [0u8];
     i2c.read(addr, &mut val).is_ok()
 }
 
-/// Named-register read. `None` is NAK / bus error, not a zero payload.
+/// Reads a single 8-bit register from a target device.
+///
+/// Returns `None` on NAK or bus error.
 pub fn read_at(i2c: &mut SysI2c, addr: u8, reg: u8) -> Option<u8> {
     write_then_read(i2c, addr, reg).ok()
 }
 
-/// Two-byte little-endian read (RX8130 timer counts).
+/// Reads a 16-bit little-endian register pair (used for RX8130 RTC timer counters).
 #[cfg(feature = "sleep")]
 pub fn read_le16(i2c: &mut SysI2c, addr: u8, reg: u8) -> Option<u16> {
     let mut buf = [0u8; 2];
@@ -51,14 +67,15 @@ pub fn read_le16(i2c: &mut SysI2c, addr: u8, reg: u8) -> Option<u16> {
     Some(u16::from_le_bytes(buf))
 }
 
-/// Write register pointer, then read `buf`. M5GFX `getTouchRaw`
-/// starts at [`m5stack_papermono_lite::touch::M5GFX_STATUS_REG`].
+/// Performs a burst read from the specified starting register into `buf`.
+///
+/// Used by touch scanning to fetch FT6336G coordinate registers in a single transaction.
 #[cfg(feature = "panel")]
 pub fn read_burst(i2c: &mut SysI2c, addr: u8, reg: u8, buf: &mut [u8]) -> bool {
     i2c.write_read(addr, &[reg], buf).is_ok()
 }
 
-/// Named-register write.
+/// Writes an 8-bit value to a specified peripheral register.
 #[cfg(feature = "sleep")]
 pub fn write_at(
     i2c: &mut SysI2c,
@@ -69,7 +86,7 @@ pub fn write_at(
     i2c.write(addr, &[reg, val])
 }
 
-/// Two data bytes after `reg` (RX8130 timer).
+/// Writes a 16-bit little-endian value across two consecutive register addresses.
 #[cfg(feature = "sleep")]
 pub fn write_pair(
     i2c: &mut SysI2c,
@@ -81,6 +98,7 @@ pub fn write_pair(
     i2c.write(addr, &[reg, lo, hi])
 }
 
+/// Internal helper: writes a 1-byte register address followed immediately by a 1-byte read.
 fn write_then_read(i2c: &mut SysI2c, addr: u8, reg: u8) -> Result<u8, esp_hal::i2c::master::Error> {
     i2c.write(addr, &[reg])?;
     let mut val = [0u8];
@@ -88,6 +106,7 @@ fn write_then_read(i2c: &mut SysI2c, addr: u8, reg: u8) -> Result<u8, esp_hal::i
     Ok(val[0])
 }
 
+/// Validates the presence of an M5IOE1 expander by reading its unique identifier registers.
 fn ident(i2c: &mut SysI2c, addr: u8) -> bool {
     let mut uid = [0u8; 2];
     if i2c.write(addr, &[ioe1::UID_L]).is_err() {
@@ -99,13 +118,12 @@ fn ident(i2c: &mut SysI2c, addr: u8) -> bool {
     write_then_read(i2c, addr, ioe1::REV).is_ok()
 }
 
-/// Official wake is START+ADDR+W+STOP with no data. `esp-hal`
-/// rejects a zero-length `write`; the IDF legacy helper is an
-/// ignored UID pointer access. ACK during wake may timeout.
+/// Transmits a wake-up transaction to the expander MCU.
 fn wake(i2c: &mut SysI2c, addr: u8) {
     let _ = i2c.write(addr, &[ioe1::UID_L]);
 }
 
+/// Attempts to initialize the M5IOE1 at the given address, trying 100 kHz and 400 kHz clock rates.
 async fn try_init_at(i2c: &mut SysI2c, addr: u8) -> bool {
     let hz100 = Config::default();
     let hz400 = Config::default().with_frequency(Rate::from_khz(400));
@@ -132,8 +150,7 @@ async fn try_init_at(i2c: &mut SysI2c, addr: u8) -> bool {
     ok
 }
 
-/// UserDemo `begin(0x4F)` then library fallback `0x6F`. Not a
-/// `0x70`–`0x76` walk.
+/// Discovers and initializes the M5IOE1 expander across supported I2C addresses (`0x4F`, `0x6F`).
 pub async fn begin_ioe(i2c: &mut SysI2c) -> Option<u8> {
     for &addr in &[addresses::M5IOE1, addresses::M5IOE1_UM] {
         if try_init_at(i2c, addr).await {
@@ -144,7 +161,7 @@ pub async fn begin_ioe(i2c: &mut SysI2c) -> Option<u8> {
     None
 }
 
-/// Drive `pyg` as push-pull output (DRV=0, M=1).
+/// Configures an expander pin as a push-pull digital output and sets its logic level.
 pub fn set_push_pull_output(
     i2c: &mut SysI2c,
     pyg: u8,
@@ -158,12 +175,12 @@ pub fn set_push_pull_output(
     )
 }
 
-/// `M=0` input. Catalog id `m5ioe1`, GPIO control.
+/// Configures an expander pin as a digital input.
 pub fn set_input(i2c: &mut SysI2c, pyg: u8) -> Result<(), esp_hal::i2c::master::Error> {
     m5stack_papermono_lite::m5ioe1::set_input(i2c, IOE_ADDR.load(Ordering::Relaxed), pyg)
 }
 
-/// `GPIO_I_*` level. `true` is high.
+/// Reads the instantaneous digital logic level of an expander input pin.
 pub fn read_input(i2c: &mut SysI2c, pyg: u8) -> Result<bool, esp_hal::i2c::master::Error> {
     m5stack_papermono_lite::m5ioe1::read_input(i2c, IOE_ADDR.load(Ordering::Relaxed), pyg)
 }

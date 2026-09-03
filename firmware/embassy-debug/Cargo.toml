@@ -3,7 +3,7 @@ name = "embassy-debug-fw"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "PaperMono-Lite Embassy staged image. Flash only via cargo xtask flash-app after a matching snapshot exists."
+description = "PaperMono-Lite Embassy debug image. Flash only via cargo xtask flash-app after a matching snapshot exists."
 license = "MIT"
 
 # Workspace member, not a default-member: host `cargo test` skips this
@@ -12,13 +12,13 @@ license = "MIT"
 
 [features]
 default = ["touch", "panel"]
-# Stage B: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. Lite NFC NAK.
+# System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
 touch = []
-# Stage C: PDM GPIO45/46 + PYG12. Needs expander.
+# PDM audio: PDM GPIO45/46 + PYG12. Needs expander.
 mic = ["touch"]
-# Stage D: OTP 4-gray panel. Needs expander.
+# Display: OTP 4-gray panel. Needs expander.
 panel = ["touch"]
-# UserDemo RTC 10 s → PM1 G0 falling → `shutdown`. Default off.
+# Factory demo ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) RTC 10 s → PM1 G0 falling → `shutdown`. Default off.
 # Lite 2026-09-02: parked; not a proven 10 s wake.
 sleep = ["touch"]
 # Scan counts only (`wifi n=` / `ble n=`). Default off.

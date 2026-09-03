@@ -1,5 +1,16 @@
-//! USB-Serial/JTAG line emit. Firmware owns pins; crate `papermono-log`
-//! owns the strings.
+//! Asynchronous USB-Serial/JTAG line-oriented telemetry emitter.
+//!
+//! # Architecture & Protocol Separation
+//! This module coordinates transmission of ASCII telemetry lines over the
+//! ESP32-S3 native USB-Serial/JTAG peripheral FIFO (`esp_println::print!`).
+//!
+//! To preserve separation of concerns and maintain zero-allocation guarantees:
+//! - **Firmware Ownership**: This module owns the hardware execution context,
+//!   per-call fixed stack buffers (`[u8; N]`), and serial print invocation.
+//! - **Crate Ownership**: The [`papermono_log`] crate owns message schemas,
+//!   formatting logic, maximum byte capacities, and grammar compliance.
+//! - **Zero Dynamic Allocation**: No formatting operation invokes the global
+//!   allocator; lines are formatted directly into fixed-size stack arrays.
 
 use esp_println::print;
 use papermono_log::{
@@ -11,10 +22,12 @@ use papermono_log::{format_lamp, LAMP_CAPACITY};
 #[cfg(feature = "panel")]
 use papermono_log::{format_scene, Scene, SCENE_CAPACITY};
 
+/// Writes a raw string slice followed by CRLF (`\r\n`) to the native USB FIFO.
 pub fn emit(line: &str) {
     print!("{line}\r\n");
 }
 
+/// Emits the periodic or boot device identification banner (`Hello`).
 pub fn hello(hello: &Hello) {
     let mut buf = [0u8; HELLO_CAPACITY];
     if let Ok(line) = format_hello(hello, &mut buf) {
@@ -22,6 +35,7 @@ pub fn hello(hello: &Hello) {
     }
 }
 
+/// Emits compile-time git version and repository clean/dirty status.
 pub fn git() {
     let mut buf = [0u8; GIT_CAPACITY];
     if let Ok(line) = format_git(
@@ -33,6 +47,7 @@ pub fn git() {
     }
 }
 
+/// Emits instantaneous logic levels of monitored board nets.
 pub fn gpio(sample: &GpioSample) {
     let mut buf = [0u8; GPIO_CAPACITY];
     if let Ok(line) = format_gpio(sample, &mut buf) {
@@ -40,6 +55,7 @@ pub fn gpio(sample: &GpioSample) {
     }
 }
 
+/// Emits periodic 1 Hz liveness heartbeat and tactile button states.
 pub fn heartbeat(snapshot: &Snapshot) {
     let mut buf = [0u8; HEARTBEAT_CAPACITY];
     if let Ok(line) = format_heartbeat(snapshot, &mut buf) {
@@ -47,6 +63,7 @@ pub fn heartbeat(snapshot: &Snapshot) {
     }
 }
 
+/// Emits instantaneous button press or release transition events.
 pub fn edge(edge: &Edge) {
     let mut buf = [0u8; EDGE_CAPACITY];
     if let Ok(line) = format_edge(edge, &mut buf) {
@@ -54,6 +71,7 @@ pub fn edge(edge: &Edge) {
     }
 }
 
+/// Emits system I2C bus detection roster (`I2cSample`).
 #[cfg(feature = "touch")]
 pub fn i2c(sample: &papermono_log::I2cSample) {
     let mut buf = [0u8; papermono_log::I2C_CAPACITY];
@@ -62,6 +80,7 @@ pub fn i2c(sample: &papermono_log::I2cSample) {
     }
 }
 
+/// Emits touch coordinate readings from the FT6336G capacitive digitizer.
 #[cfg(feature = "touch")]
 pub fn touch(sample: &papermono_log::TouchSample) {
     let mut buf = [0u8; papermono_log::TOUCH_CAPACITY];
@@ -70,6 +89,7 @@ pub fn touch(sample: &papermono_log::TouchSample) {
     }
 }
 
+/// Emits calibration target rendering announcements during the touch walk.
 #[cfg(feature = "panel")]
 pub fn touch_target(id: u8, kind: &str, x: u16, y: u16, r: u16) {
     let mut buf = [0u8; papermono_log::TOUCH_CAPACITY];
@@ -78,6 +98,7 @@ pub fn touch_target(id: u8, kind: &str, x: u16, y: u16, r: u16) {
     }
 }
 
+/// Emits touch samples registered while targeting a specific calibration point.
 #[cfg(feature = "panel")]
 pub fn touch_at(id: u8, sample: &papermono_log::TouchSample, tx: u16, ty: u16) {
     let mut buf = [0u8; papermono_log::TOUCH_CAPACITY];
@@ -86,6 +107,7 @@ pub fn touch_at(id: u8, sample: &papermono_log::TouchSample, tx: u16, ty: u16) {
     }
 }
 
+/// Emits final hit/miss/abort verdict and Euclidean error for a calibration target.
 #[cfg(feature = "panel")]
 pub fn touch_verdict(id: u8, verdict: &str, x: u16, y: u16, tx: u16, ty: u16, d: u16) {
     let mut buf = [0u8; papermono_log::TOUCH_CAPACITY];
@@ -94,6 +116,7 @@ pub fn touch_verdict(id: u8, verdict: &str, x: u16, y: u16, tx: u16, ty: u16, d:
     }
 }
 
+/// Emits periodic PDM microphone energy metrics (RMS and peak values).
 #[cfg(feature = "mic")]
 pub fn mic(sample: &papermono_log::MicSample) {
     let mut buf = [0u8; papermono_log::MIC_CAPACITY];
@@ -102,6 +125,7 @@ pub fn mic(sample: &papermono_log::MicSample) {
     }
 }
 
+/// Emits streaming audio sample dumps formatted in rows of fixed width.
 #[cfg(feature = "mic")]
 pub fn mic_pcm(hz: u32, samples: &[i16]) {
     let mut header = [0u8; papermono_log::PCM_HEADER_CAPACITY];
@@ -120,6 +144,7 @@ pub fn mic_pcm(hz: u32, samples: &[i16]) {
     }
 }
 
+/// Emits interactive UI card transition events (`Scene`).
 #[cfg(feature = "panel")]
 pub fn scene(scene: Scene) {
     let mut buf = [0u8; SCENE_CAPACITY];
@@ -128,6 +153,7 @@ pub fn scene(scene: Scene) {
     }
 }
 
+/// Emits logic levels of unassigned radio pins on Lite hardware.
 pub fn leftover(sample: &papermono_log::LeftoverSample) {
     let mut buf = [0u8; papermono_log::LEFTOVER_CAPACITY];
     if let Ok(line) = papermono_log::format_leftover(sample, &mut buf) {
@@ -135,6 +161,7 @@ pub fn leftover(sample: &papermono_log::LeftoverSample) {
     }
 }
 
+/// Emits RTC wake timer configuration announcement.
 #[cfg(feature = "sleep")]
 pub fn sleep_rtc(secs: u8) {
     let mut buf = [0u8; papermono_log::SLEEP_CAPACITY];
@@ -143,6 +170,7 @@ pub fn sleep_rtc(secs: u8) {
     }
 }
 
+/// Emits sleep abort announcement when external 5VIN prevents safe shutdown.
 #[cfg(feature = "sleep")]
 pub fn sleep_abort() {
     let mut buf = [0u8; papermono_log::SLEEP_CAPACITY];
@@ -151,6 +179,7 @@ pub fn sleep_abort() {
     }
 }
 
+/// Emits wake source event reported by the PMIC.
 #[cfg(feature = "sleep")]
 pub fn wake(src: u8) {
     let mut buf = [0u8; papermono_log::WAKE_CAPACITY];
@@ -159,6 +188,7 @@ pub fn wake(src: u8) {
     }
 }
 
+/// Emits battery charging status and IP2315 registers.
 #[cfg(feature = "touch")]
 pub fn charge(sample: &papermono_log::ChargeSample) {
     let mut buf = [0u8; papermono_log::CHARGE_CAPACITY];
@@ -167,6 +197,7 @@ pub fn charge(sample: &papermono_log::ChargeSample) {
     }
 }
 
+/// Emits count of unique Wi-Fi access points observed during passive scan.
 #[cfg(feature = "radio")]
 pub fn wifi(n: u16) {
     let mut buf = [0u8; papermono_log::WIFI_CAPACITY];
@@ -175,6 +206,7 @@ pub fn wifi(n: u16) {
     }
 }
 
+/// Emits count of BLE advertisement packets received during passive scan.
 #[cfg(feature = "radio")]
 pub fn ble(n: u16) {
     let mut buf = [0u8; papermono_log::BLE_CAPACITY];
@@ -183,6 +215,7 @@ pub fn ble(n: u16) {
     }
 }
 
+/// Emits frontlight LED PWM duty cycle level.
 #[cfg(feature = "touch")]
 pub fn lamp(duty: u16) {
     let mut buf = [0u8; LAMP_CAPACITY];
@@ -191,6 +224,7 @@ pub fn lamp(duty: u16) {
     }
 }
 
+/// Emits display refresh completion telemetry (`PanelStamp`).
 #[cfg(feature = "panel")]
 pub fn panel(stamp: &papermono_log::PanelStamp) {
     let mut buf = [0u8; papermono_log::PANEL_CAPACITY];
