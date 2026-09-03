@@ -12,7 +12,7 @@ markdown** snapshot (2026-09-01):
 [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
 SKU column: both, full (`C153`) only, or Lite-absent.
 
-Do not copy Sticky GPIO numbers onto this product.
+Do not copy GPIO numbers from other products onto this board.
 
 ## ESP32-S3 GPIO table
 

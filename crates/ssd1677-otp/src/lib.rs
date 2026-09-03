@@ -3,7 +3,7 @@
 //! Catalog id `ssd1677`, Rev 1.0 Table 7-1 Command Table and
 //! section 8 windowing. No MCU look-up table (`0x32`). Do not
 //! map official HTML `epd_*` titles onto [`OtpRefresh`] `0x22`
-//! bytes. Not sticky-rs `ssd1677-gray4`.
+//! bytes.
 
 #![no_std]
 #![forbid(unsafe_code)]

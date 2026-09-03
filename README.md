@@ -1,12 +1,9 @@
 # `papermono-rs`
 
-> Embedded Rust tooling and crates for the
-> [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono)
-> and
-> [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite).
+Embedded Rust tooling and crates for the
+[M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
+[PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite).
 
-This repository is a peer of
-[`sticky-rs`](https://github.com/canardleteer/sticky-rs).
 The board contract and a safety-first host CLI (`cargo xtask`)
 are here. Board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
@@ -36,14 +33,13 @@ not default-members.
   `docs/not-yet-confirmed.md` are symlinks into the hardware
   skill.
 
-> [!IMPORTANT]
->
-> Anything we have not measured on a PaperMono or PaperMono-Lite
-> in hand is still official-docs intent. The backlog is
-> [`nyc-*`](docs/not-yet-confirmed.md).
-> **Implemented is not proven.** See the
-> [tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
-> before treating a command as working on a unit.
+## Hardware Verification
+
+Hardware features not yet measured on physical devices remain
+documented vendor intent. The open measurement list is tracked
+in [`nyc-*`](docs/not-yet-confirmed.md). Consult the
+[tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
+before treating a command as verified on target hardware.
 
 ## Firmware Examples
 
@@ -95,7 +91,6 @@ SSD1677 4-gray, FT6336G, frontlight, M5PM1, M5IOE1, 1150 mAh.
 Sources in this repository are licensed under the MIT license. See
 [LICENSE](LICENSE).
 
-M5Stack, PaperMono, Espressif, and other product or company names
-are trademarks of their respective owners. This project does not
-claim those marks or their copyrights, and is not affiliated with
-or endorsed by those owners.
+Product and company names referenced herein belong to their respective
+trademark holders. This project maintains no official affiliation with
+M5Stack or Espressif.

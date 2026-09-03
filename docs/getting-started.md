@@ -1,14 +1,12 @@
 # Getting started
 
-Fresh-start how-to for this repository: host verify, the Xtensa
-toolchain, a snapshot of **your** unit, then either firmware
-path.
+Fresh-start guide for this repository: verifying host tooling, configuring
+the Xtensa toolchain, creating a device snapshot, and running firmware images.
 
-Read [SAFETY.md](SAFETY.md) before flashing or probing. Snapshot
-how-to:
-[firmware-snapshot-management.md](firmware-snapshot-management.md).
-What each image does lives in the firmware READMEs — do not treat
-this page as a substitute.
+Read [SAFETY.md](SAFETY.md) before flashing or probing. Snapshot instructions
+appear in [firmware-snapshot-management.md](firmware-snapshot-management.md).
+Detailed operational contracts for each firmware image reside in their
+respective directories.
 
 ```mermaid
 flowchart TD
@@ -31,31 +29,27 @@ flowchart TD
 
 In the order you are most likely to regret breaking them:
 
-1. **Never erase the flash.** No `espflash erase-flash`, no
-   full-chip erase. Snapshot that unit first if you care about
-   PHY cal. ESP32-S3 RF calibration lives in NVS. Do not invent
-   Sticky’s `0x90000` / 32 MB geometry. Dump length is the
-   measured size (Lite: 16 MB). M5Stack publishes a factory
-   restore image; that is not a license to skip a snapshot.
-   Capture once with `cargo xtask backup-factory-firmware`
-   before any custom image.
-2. **Do not invent an e-paper waveform.** Call panel OTP only.
-   After about ten partial refreshes, do a full refresh.
-   Uninterrupted partials can damage the panel. Details:
-   [SAFETY.md](SAFETY.md).
-3. **Park IP2315 off the system I2C bus** except the gated
-   charge transaction. Leaving it mounted can hang the bus,
-   especially at low VBAT.
-4. **Download mode is a power-button hold** (~2 s until the red
-   LED blinks), not DTR on a CH343. GPIO0 and GPIO3 are
-   strapping pins. GPIO45/46 are PDM, not a power latch.
+1. Never erase the flash. Avoid running full-chip erase commands or
+   `espflash erase-flash`. ESP32-S3 RF calibration lives in NVS. Always
+   preserve original partition geometry and dump the measured flash length
+   (16 MB on Lite hardware). Capture a full snapshot with
+   `cargo xtask backup-factory-firmware` before flashing any custom binary.
+2. Do not invent an e-paper waveform. Use panel OTP sequences directly.
+   Execute a full refresh after roughly ten partial refreshes to avoid
+   permanent ghosting. Full constraints appear in [SAFETY.md](SAFETY.md).
+3. Park IP2315 off the system I2C bus except during active charge transactions.
+   Leaving the battery controller on the bus risks locking I2C communication at
+   low battery voltages.
+4. Download mode is entered via a power-button hold. Hold the power button for
+   approximately two seconds until the red indicator flashes. GPIO0 and GPIO3
+   serve as reset strapping pins. GPIO45 and GPIO46 carry PDM microphone signals
+   rather than power latch controls.
 
-Full hazard table: [SAFETY.md](SAFETY.md). Open measurements:
-[not-yet-confirmed.md](not-yet-confirmed.md). Crate verdicts:
-[CRATES.md](CRATES.md).
+The hazard summary is documented in [SAFETY.md](SAFETY.md). Open measurements
+are tracked in [not-yet-confirmed.md](not-yet-confirmed.md), with crate
+evaluations in [CRATES.md](CRATES.md).
 
-Host I/O is `cargo xtask` only. There is no Cargo `runner`, so
-`cargo run` cannot flash.
+All host-side device interaction runs exclusively through `cargo xtask`.
 
 ## The workspace (host, no special toolchain)
 
@@ -65,36 +59,31 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo fmt --check
 ```
 
-This is the default host trio for `crates/*` and the host tools:
-they are host-testable, so no target hardware, cross toolchain,
-or serial port is involved. Firmware packages are workspace
-members but not default-members, so these commands skip them.
-Do not pass `--workspace` (that pulls Xtensa). `cargo xtask ci`
-is the full gate (that trio plus firmware clippy, rumdl,
-machete, and audit).
+These commands exercise `crates/*` and host tooling on standard host rustc
+without requiring embedded targets or attached hardware. Firmware targets are
+excluded from the default members list to prevent cross-compilation errors
+during host testing. Running `cargo xtask ci` executes the complete validation
+suite, incorporating code formatting, clippy passes, linters, and dependency
+audits.
 
 ## The firmware (Xtensa)
 
 `firmware/simple-debug` and `firmware/embassy-debug` target
-`xtensa-esp32s3-none-elf`, which needs the Espressif toolchain
-because Xtensa is not an upstream rustc target. `simple-debug`
-is blocking `esp-hal` only. `embassy-debug` uses Embassy. Build
-from the **repo root** — there is no per-image
-`.cargo/config.toml`.
+`xtensa-esp32s3-none-elf`, requiring the Espressif toolchain fork. While
+`simple-debug` employs blocking `esp-hal` primitives, `embassy-debug` runs the
+async Embassy runtime. Build commands execute from the repository root:
 
 ```shell
 cargo install espup --locked
-espup install                       # installs the `esp` toolchain + Xtensa GCC
-. $HOME/export-esp.sh               # required in every new shell
+espup install
+. $HOME/export-esp.sh
 ```
 
-The result is an ELF and `save-image` payload at
-`target/xtensa-esp32s3-none-elf/release-fw/simple-debug-fw` /
-`simple-debug.bin` (or `embassy-debug-fw` / `embassy-debug.bin`).
-A linker warning about `a LOAD segment with RWX permissions` is
-expected for esp-hal images and is not a problem.
+Build outputs are saved to `target/xtensa-esp32s3-none-elf/release-fw/`
+alongside binary image payloads. Linker notices regarding read-write-execute
+segments represent normal `esp-hal` behavior.
 
-Equivalent without xtask:
+Manual builds without xtask can be performed with:
 
 ```shell
 cargo +esp build -p simple-debug-fw --profile release-fw --locked \
@@ -103,93 +92,78 @@ cargo +esp build -p simple-debug-fw --profile release-fw --locked \
 
 ### Snapshot first
 
-Once per unit, before `flash-app`. Hold the red power button
-about 2 s until it blinks, then:
+Create a backup once per device before invoking `flash-app`. Hold the red power
+button for two seconds until it blinks, then execute:
 
 ```shell
 cargo xtask backup-factory-firmware --name my-unit
 ```
 
-`flash-app` refuses without a matching original or `--capture`.
-If more than one Espressif USB-Serial/JTAG is present, set
-`ESPFLASH_PORT`. Do not commit `developer-data/`.
+`flash-app` checks for an existing capture before proceeding. If multiple
+Espressif devices are connected, specify the target port with `ESPFLASH_PORT`.
 
 ### Path A — without Embassy (`simple-debug`)
 
-Blocking `esp-hal` proof-of-life. CDC heartbeat and button
-edges. The glass does not refresh.
+`simple-debug` provides proof-of-life verification using blocking `esp-hal`
+routines. It streams a heartbeat and button events over the CDC interface
+while keeping the display inactive.
 
 ```shell
 . $HOME/export-esp.sh
 cargo xtask build-fw simple-debug
-# hold red ~2 s until blink, then:
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
   --yes --capture my-unit
-# short-press red to leave the bootloader, then:
 cargo xtask monitor
 ```
 
-You should see repeating `hello` / `git` / `gpio` / `hb` lines.
-Press BUTTON A or BUTTON B for `edge`. Host check on a capture:
-`cargo xtask vet-idle-log --input idle-simple.log`. Envelope
-and line format:
+The output stream contains repeating `hello`, `git`, `gpio`, and `hb` lines.
+Pressing buttons produces instantaneous edge notifications. For logging
+analysis, run `cargo xtask vet-idle-log --input idle-simple.log`. Details on
+message structure are covered in
 [firmware/simple-debug/README.md](../firmware/simple-debug/README.md).
 
 ### Path B — with Embassy (`embassy-debug`)
 
-Embassy staged image. Default features are **`touch` +
-`panel`**: cold boot is the splash (Ferris + `papermono-rs`).
-BUTTON A / B walk splash → shapes → legend → tones →
-targets. Slide the right edge for the lamp (top bright,
-USB-C dim). `mic` / `radio` / `sleep` stay opt-in.
+`embassy-debug` activates async board drivers. Standard builds enable touch
+interaction and panel rendering, presenting a Ferris splash on boot and
+allowing navigation across test cards with hardware buttons. The frontlight
+brightness adjusts via edge swipes.
 
 ```shell
 . $HOME/export-esp.sh
 cargo xtask build-fw embassy-debug
-# hold red ~2 s until blink, then:
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
   --yes --capture my-unit
-# short-press red to leave the bootloader, then:
 cargo xtask monitor
 ```
 
-Ctrl-C ends monitor. Do not `kill -9` that listen.
-
-Unattended you should see `hello image=embassy-debug` and a 1 Hz
-`hb`. Splash prints `scene=splash`. Host check:
-`cargo xtask monitor --for 25 --output idle-embassy.log` then
-`cargo xtask vet-idle-log --input idle-embassy.log --image
-embassy-debug`. Cards, lamp, and CDC:
+Stop monitoring with standard interrupt signals (Ctrl-C). Unattended operation
+generates periodic heartbeats and splash events. Detailed card operations and
+CDC definitions are described in
 [firmware/embassy-debug/README.md](../firmware/embassy-debug/README.md).
 
-`flash-app` writes a `.bin`; it does not compile. If the build
-fails, do not flash a leftover ELF.
-
-`monitor` needs the usbfs udev rule
-([xtask.md](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor)).
-Do not use `monitor --reset` to recapture on Lite.
+Monitoring requires proper usbfs udev permissions. Recapturing over native CDC
+should rely on manual reset rather than serial control lines.
 
 ## Troubleshooting
 
-Failure modes that look like a code bug and are not:
+Common configuration issues:
 
 | Symptom | Cause |
 | --- | --- |
-| `rustc 1.x is not supported … esp-hal` | The `esp` toolchain is older than esp-hal needs. Run `espup update` |
-| `linker 'xtensa-esp32s3-elf-gcc' not found` | `. $HOME/export-esp.sh` was not sourced in this shell |
-| `QinHeng` / `1a86:55d3` refused | This board is Espressif `303a:1001`, not a Sticky CH343 |
-| `flash-app` wants a matching snapshot | Run `backup-factory-firmware --name …` on **this** unit first |
-| Flash succeeded, glass / CDC unchanged | Flasher stayed in bootloader. Short-press red |
-| `monitor` silent on stock UserDemo | Expected. Custom images print `simple-debug:` lines |
-| `monitor` cannot claim usbfs | Install the udev rule, stay in `dialout`, replug |
-| `cannot find module or crate xtensa_lx` | Built without the Xtensa target. Use `cargo xtask build-fw` |
-| `failed to load manifest … library/std` | Incomplete `esp` `rust-src`, usually an interrupted `espup`. Reinstall |
+| `rustc 1.x is not supported … esp-hal` | The installed toolchain is outdated. Run `espup update` |
+| `linker 'xtensa-esp32s3-elf-gcc' not found` | The environment file was not sourced. Run `. $HOME/export-esp.sh` |
+| `QinHeng` / `1a86:55d3` refused | The connected device is not an Espressif native USB node |
+| `flash-app` wants a matching snapshot | A snapshot capture must be saved for this device first |
+| Flash succeeded, glass / CDC unchanged | The target remained in bootloader mode; short-press the power button |
+| `monitor` silent on stock UserDemo | Factory firmware does not output `simple-debug:` text lines |
+| `monitor` cannot claim usbfs | Confirm udev rules are active and your user belongs to dialout |
+| `cannot find module or crate xtensa_lx` | The active target is not Xtensa; invoke builds via `cargo xtask build-fw` |
+| `failed to load manifest … library/std` | The toolchain installation was incomplete; reinstall via espup |
 
-One workspace lockfile is committed. `cargo +esp` and
-`build-fw` pass `--locked`. Confirm the lockfile still matches
-(compiles nothing):
+Verify workspace dependencies against the locked configuration:
 
 ```shell
 cargo metadata --locked --format-version 1 --no-deps
@@ -197,62 +171,43 @@ cargo metadata --locked --format-version 1 --no-deps
 
 ## Status
 
-The board crates are host-tested. They have **not** closed every
-open measurement on silicon.
+Board support crates are validated with host unit tests. Target measurements on
+physical hardware continue to be cataloged as hardware samples become
+available.
 
-`firmware/simple-debug` cross-compiles for
-`xtensa-esp32s3-none-elf`. On PaperMono-Lite it prints
-`hello` / `hb` / `edge` on USB-Serial/JTAG. No panel refresh.
+`firmware/simple-debug` compiles for `xtensa-esp32s3-none-elf`, streaming
+identification and button telemetry across USB-Serial/JTAG on PaperMono-Lite.
 
-`firmware/embassy-debug` is a separate Embassy image (workspace
-member, not a default-member). The landing image is
-`touch` + `panel` (cards + lamp). PDM, radio scan, and RTC
-sleep are `--features`. First SKU is Lite. PaperMono (`C153`)
-USB, JEDEC, and partition table are still unmeasured.
+`firmware/embassy-debug` targets the async Embassy runtime as a distinct
+workspace member package. The standard image includes touch digitizer and
+e-paper support, while microphone sampling, wireless scanning, and low-power
+sleep modes remain opt-in features.
 
-`cargo xtask` **has** talked to a PaperMono-Lite:
-`detect-connected`, `--probe`, named backup / confirm / restore,
-`flash-app`, and `monitor`. A Lite result does not confirm
-`C153`. Agents still do not invoke xtask unless a human
-explicitly asks.
-
-Compiling is not evidence about GPIO sequencing. A linked ELF
-says the types and pin roles agree with `esp-hal`; it says
-nothing about whether the panel, I2C park, or sleep is correct
-on real silicon.
+Host commands in `cargo xtask` have been verified against PaperMono-Lite
+hardware for identification, backup extraction, flashing, and serial monitoring.
 
 ## Layout
 
-| Path | What |
+| Path | Purpose |
 | --- | --- |
-| [`crates/m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | `C153-Lite`. Shared pin map for both SKUs |
-| [`crates/m5stack-papermono`](../crates/m5stack-papermono) | `C153`. Re-exports Lite; NFC + LoRa |
-| [`crates/papermono-log`](../crates/papermono-log) | Host-tested USB-Serial/JTAG line format |
-| [`crates/ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. No MCU LUT |
-| [`crates/m5pm1`](../crates/m5pm1) | PMIC registers + PWM0 |
-| [`crates/m5ioe1`](../crates/m5ioe1) | Expander banks + IP2315 gate |
-| `firmware/simple-debug` | ESP32-S3 proof-of-life. Workspace member, not a default-member |
-| `firmware/embassy-debug` | ESP32-S3 Embassy staged image. Same membership |
-| `host/papermono-host/` | Host library: detect, backup, confirm, restore, `build-fw`, `flash-app`, monitor |
-| `xtask/` | Clap front-end at the repo root (`cargo xtask`) |
-| `developer-data/` | Gitignored. Sealed snapshots in `developer-data/backups/`; not in git |
+| [`crates/m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared board pin definitions across PaperMono models |
+| [`crates/m5stack-papermono`](../crates/m5stack-papermono) | Peripheral definitions specific to the standard PaperMono SKU |
+| [`crates/papermono-log`](../crates/papermono-log) | Host-tested USB-Serial/JTAG line formatting parser |
+| [`crates/ssd1677-otp`](../crates/ssd1677-otp) | SSD1677 e-paper controller OTP driver |
+| [`crates/m5pm1`](../crates/m5pm1) | M5PM1 power controller register definitions and PWM helpers |
+| [`crates/m5ioe1`](../crates/m5ioe1) | M5IOE1 expander and charger bus isolation gate |
+| `firmware/simple-debug` | Blocking test application package for early bring-up |
+| `firmware/embassy-debug` | Async Embassy demonstration image with interactive cards |
+| `host/papermono-host/` | Host automation library covering flashing and device monitoring |
+| `xtask/` | CLI entry point dispatching host subcommands |
+| `developer-data/` | Gitignored directory holding per-device firmware snapshots |
 
-Command list: [README.md](../README.md#cargo-xtask). Flag
-catalog:
-[`.agents/skills/papermono-rs/references/xtask.md`](../.agents/skills/papermono-rs/references/xtask.md).
+Command summaries appear in the root [README.md](../README.md#cargo-xtask), with
+detailed flag specifications located in the project documentation.
 
 ## Hardware documentation
 
-The board contract lives in
-[`.agents/skills/m5stack-papermono-hardware/`](../.agents/skills/m5stack-papermono-hardware/SKILL.md):
-pin and bus map, power sequencing, display and touch geometry,
-SKU differences, flashing, datasheet catalog, plus a
-measurement backlog. When sources disagree, the skill user
-weighs them. Observed hardware on this product outranks
-official board docs and chip datasheets, which outrank
-third-party firmware.
-
-Datasheet catalog (symlink into that skill):
-[DATASHEETS.md](DATASHEETS.md). This repository’s host tools
-and crate layout:
-[`.agents/skills/papermono-rs/`](../.agents/skills/papermono-rs/SKILL.md).
+Comprehensive hardware details reside in the hardware documentation collection,
+detailing power topologies, display timings, digitizer mappings, SKU
+variations, and verified component measurements. Datasheet citations and
+peripheral registers are referenced in [DATASHEETS.md](DATASHEETS.md).

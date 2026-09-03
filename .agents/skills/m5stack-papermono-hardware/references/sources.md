@@ -21,8 +21,8 @@ Full wording: [SKILL.md](../SKILL.md#authority).
    with new valid detail; often stale or wrong.
 
 Observed outranks a datasheet default. Do not apply a datasheet
-to a chip that is not on this model. Do not treat Sticky
-measured numbers as PaperMono or PaperMono-Lite facts. Name
+to a chip that is not on this model. Do not treat external
+board measurements as PaperMono or PaperMono-Lite facts. Name
 the SKU (`C153` vs `C153-Lite`).
 
 URL and firmware map: [catalog.md](catalog.md). Vendor
@@ -66,16 +66,16 @@ not measured. Name `C153` vs `C153-Lite`.
 
 | Topic | Official / named | Other sources |
 | --- | --- | --- |
-| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo. UserDemo uses M5GFX `epd_*` plus analog-off `0x22`/`0x03` then `0x20` ([user-demo.md](user-demo.md), [display.md](display.md)). Official HTML `epd_*` times are PaperMono lab, reference only | FreeInk host-authored LUTs, “3-level grayscale”. Sticky analog-off is the wrong product |
+| Gray / LUT | 4-gray OTP; M5GFX LUTs “currently unstable”; prefer OTP-Demo. UserDemo uses M5GFX `epd_*` plus analog-off `0x22`/`0x03` then `0x20` ([user-demo.md](user-demo.md), [display.md](display.md)). Official HTML `epd_*` times are PaperMono lab, reference only | FreeInk host-authored LUTs, “3-level grayscale”. Standby recovery without reset is unconfirmed |
 | EPD SPI clock | SSD1677 write `fSCL` max 20 MHz. OTP-Demo `EDP_SPI` is 20 MHz | M5GFX PaperMono autodetect sets `freq_write` 40 MHz. [nyc-epd-spi-clock](../resources/not-yet-confirmed.md#nyc-epd-spi-clock) |
 | Canvas | 480×800. UserDemo `setRotation(0)`. Lite USB-C down: OTP RAM X = physical Y, RAM Y = physical X ([display.md](display.md), [measure.md](measure.md)) | FreeInk 800×480. OTP-Demo addresses 800×480 RAM. `C153` unmeasured |
 | Frontlight | Official HTML: M5PM1 G3 PWM `BL_FB` (brightness). Schematic V0.6.2: one AW9967DNR on `EINK_BL`. UserDemo `display.setBrightness`. Lite: PWM0 slide **drives** the lamp ([measure.md](measure.md)) | FreeInk README AW9967 (schematic-true). FreeInk Paper Mono: G3 → **PWM0**, no `gpioWarm`. CrossPoint warmth UI is for dual-channel boards (X4 Pro / Murphy M4), not this SKU. PWM1 writes left Lite constant |
 | M5IOE1 address | Schematic / pin map / UserDemo `IO_EXPANDER_ADDR = 0x4F`. Library: `0x4F` REV `'W'`; fallback candidate `0x6F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7, REV `'A'`. Library default is `0x6F`. Auto-detect `0xFF` also walks `0x70`–`0x76` (includes `0x75`); UserDemo does not use it |
 | microSD | DAT0–DAT3 in the pin table. UserDemo `slot_config.width = 4` | FreeInk “native 1-bit SDMMC” |
 | Size / weight | HTML: 62.0 × 101.0 × 8.0 mm; 74.7 g / Lite 72.4 g | Older product PDF: 61 mm / “work in progress” |
-| USB debug | Lite run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Sticky skill: CH343 `1a86:55d3` (wrong product). `C153` not measured |
-| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`) and UserDemo-matching table at `0x8000`. PIO `default_16MB.csv` is a different table | Sticky: 32 MB (wrong product). `C153` table: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| Power / wake | M5PM1 button. Arduino: IMU/RTC wake via PM1 G4/G0 then `shutdown()`. UserDemo adds ESP `ext0` GPIO4 touch deep sleep. Lite 2026-09-02: short ~0.25 s reset, hold ~2 s download, double-press off. USB-in `SYS_CMD` bounced; unplug lamp-off then 2–3 s `sleep abort` same boot ([power-and-sleep.md](power-and-sleep.md)) | Sticky GPIO45/46 latch (wrong product; those pins are PDM here). Sleep current and GPIO0 strap still need a meter |
+| USB debug | Lite run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Generic DevKit or CH343 assumptions do not apply. `C153` not measured |
+| Flash | Official 16 MB. Lite **measured** 16 MB (`0x1000000`) and UserDemo-matching table at `0x8000`. PIO `default_16MB.csv` is a different table | 32 MB assumptions do not apply. `C153` table: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table). JEDEC / PSRAM / `C153` still [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| Power / wake | M5PM1 button. Arduino: IMU/RTC wake via PM1 G4/G0 then `shutdown()`. UserDemo adds ESP `ext0` GPIO4 touch deep sleep. Lite 2026-09-02: short ~0.25 s reset, hold ~2 s download, double-press off. USB-in `SYS_CMD` bounced; unplug lamp-off then 2–3 s `sleep abort` same boot ([power-and-sleep.md](power-and-sleep.md)) | Foreign GPIO45/46 latch code (those pins are PDM here). Sleep current and GPIO0 strap still need a meter |
 | LoRa SPI host | Pin table / schematic name those GPIOs SPI1 | UserDemo `hal_lora.cpp` uses ESP-IDF `SPI3_HOST` (SPI0/1 are flash). 868.0 MHz RadioLib begin vs product 868–923 MHz |
 | LoRa module vs die | Stamp LoRa-1262: 868–923 MHz, `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, FPC on C153 | SX1262 sheet: 150–960 MHz ISM. UserDemo DIO2 as RF switch vs PinMap `SX_ANT_SW`. Do not flatten. [nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora) |
 | Bring-up | Arduino: M5PM1 then M5IOE1 then peripherals | UserDemo: 500 ms, `M5.begin`, then PM1/IOE1, then NFC identity probe for SKU |

@@ -142,8 +142,7 @@ SSD1677 Rev 1.0: write **`fSCL` max 20 MHz**; read mode max
 2.5 MHz. `BS1` L selects 4-wire (this board wires DC on
 GPIO17). Vendor OTP-Demo / M5GFX Hz are **not measured**.
 [nyc-epd-spi-clock](../resources/not-yet-confirmed.md#nyc-epd-spi-clock).
-Do not copy Sticky’s 10 MHz measured number here as if it
-were this product.
+Do not assume a 10 MHz limit without measurement on this product.
 
 ## BUSY / standby
 
@@ -157,8 +156,8 @@ analog-off standby recovers without that reset:
 UserDemo `hal_display.cpp` names analog-off as
 `writeCommand(0x22)` / `0x03` then Master Activation `0x20`,
 and analog-on as `0xC0` ([user-demo.md](user-demo.md)). That
-is eval intent. Do not copy Sticky’s “`0xC0` did not drop
-BUSY” result onto this module.
+is eval intent. Do not assume “`0xC0` did not drop
+BUSY” without direct observation on this module.
 
 ## Two vendor refresh stacks
 

@@ -33,11 +33,3 @@ CDC lines on `simple-debug:` as well as newline.
 
 `hello` / `git` / `gpio` repeat every 10 s so a late CDC attach
 still sees identity. Heartbeat is 1 Hz. Edges are 50 ms polls.
-
-This README is the crates.io landing page. Relative markdown links
-here only resolve inside this package.
-
-## Agent notes
-
-Portable agent rules for this crate live in `AGENTS.md` in this
-directory.

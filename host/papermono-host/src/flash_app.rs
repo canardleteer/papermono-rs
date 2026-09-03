@@ -11,7 +11,7 @@ use crate::Error;
 /// below this is an app-flash target (nvs `0x9000`, phy `0xf000`).
 pub const FACTORY_MIN_OFFSET: u32 = 0x10000;
 
-/// Partition label on Lite stock (not Sticky `app0`).
+/// Partition label on Lite stock.
 pub const FACTORY_LABEL: &str = "factory";
 
 const ELF_MAGIC: [u8; 4] = [0x7f, b'E', b'L', b'F'];

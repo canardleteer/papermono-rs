@@ -1,8 +1,8 @@
 # Official docs and firmware catalog
 
 This page is a map, not a pinout. Pins and rails stay in the
-other reference files. Do not copy pin numbers from reTerminal
-Sticky or M5Paper (IT8951) pages.
+other reference files. Do not copy pin numbers from other board
+pages like M5Paper (IT8951).
 
 When official pages disagree with each other or with FreeInk,
 name both sides ([sources.md](sources.md)); the skill user

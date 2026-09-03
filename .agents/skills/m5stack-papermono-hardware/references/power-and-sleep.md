@@ -12,8 +12,6 @@ and wake-from-L1 are **not measured**. Name the SKU
 [nyc-power-button](../resources/not-yet-confirmed.md#nyc-power-button),
 [nyc-pm1-wake](../resources/not-yet-confirmed.md#nyc-pm1-wake).
 
-This is not Sticky’s GPIO45/46 latch.
-
 ## Power button (M5PM1)
 
 Official product notes:
@@ -157,7 +155,7 @@ AW9967 needs that L3B rail, not only G3 PWM. `C153` open.
 
 ## Do not
 
-- Copy Sticky `PWR_HOLD` / `PWR_LOCK`.
+- Drive GPIO45/46 as a software power latch.
 - Leave L3B EPD rail on across a shutdown without an OTP
   deep-sleep command if the OTP example says otherwise (read
   OTP-Demo; do not guess analog rails).

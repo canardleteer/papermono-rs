@@ -91,11 +91,10 @@ pub const BUTTON_HOLD_PCM_MS: u32 = 1_000;
 /// Phone-band A the human may hold on the hole. Not printed on CDC.
 pub const TONE_A4_HZ: u32 = 440;
 
-/// `mic pcm hz=` when the board plays nothing (sticky
-/// `PCM_DUMP_NO_TONE_HZ`). Period is read from the rows.
+/// `mic pcm hz=` when the board plays nothing. Period is read from the rows.
 pub const PCM_DUMP_NO_TONE_HZ: u32 = 0;
 
-/// PDM window length in i16 samples (sticky `PCM_WINDOW_SAMPLES`).
+/// PDM window length in i16 samples.
 pub const PCM_WINDOW_SAMPLES: usize = 256;
 
 /// Samples per `pcm` CDC row.
@@ -104,7 +103,7 @@ pub const PCM_ROW_SAMPLES: usize = 16;
 /// Windows to dump at each known-tone mark.
 pub const TONE_DUMP_WINDOWS: u32 = 2;
 
-/// Live energy period while `PYG12` is up (sticky `MIC_REPORT_MS`).
+/// Live energy period while `PYG12` is up.
 pub const MIC_REPORT_MS: u32 = 250;
 
 /// How often the firmware polls buttons, in milliseconds.

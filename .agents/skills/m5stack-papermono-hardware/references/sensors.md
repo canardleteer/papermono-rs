@@ -15,7 +15,7 @@ Name `C153` vs `C153-Lite`
 
 Official / schematic `0x68`. Sheet default if SDO is to GND
 (`0x69` if SDO to VDDIO). INT1 goes to M5PM1 G4 (wake), not to
-a raw ESP32 GPIO as on Sticky GPIO7. Do not drive an ESP pin
+a raw ESP32 GPIO. Do not drive an ESP pin
 as IMU INT. Any-motion wake through the PMIC is documented
 Arduino intent; UserDemo `configureBmi270AnyMotion` tries
 `0x68` then `0x69` and maps any-motion to INT1
@@ -49,8 +49,7 @@ NVRAM, not a datasheet map.
 ## PDM microphone
 
 Part: LMD4737T261-AC02. CLK GPIO45, DAT GPIO46, enable M5IOE1
-`PYG12`. These are **not** ESP32-S3 USB pads (those are
-GPIO19/20). Sticky PDM-on-19/20 notes do not apply.
+`PYG12`. These are separate from the ESP32-S3 USB pads (GPIO19/20).
 
 Rate / slot / hole energy:
 [nyc-pdm-mic](../resources/not-yet-confirmed.md#nyc-pdm-mic).
@@ -64,8 +63,7 @@ period ~32–44 samples
 `hal_mic.cpp` intent: `I2S_NUM_0`, 16 kHz,
 `input_only_right`, `PYG12` off then on before `M5.Mic.begin`.
 Hold `PYG12` off when unused so the capsule is not
-half-powered (same class of caution as Sticky GPIO38, different
-pin). After `Hal::initRgb`, UserDemo leaves `PDM_EN` **high**
+half-powered. After `Hal::initRgb`, UserDemo leaves `PDM_EN` **high**
 until the mic app toggles it.
 
 GPIO45/46 are also strapping pins (WPD). Do not treat PDM bring-up

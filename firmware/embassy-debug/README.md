@@ -11,8 +11,7 @@ On the unit:
 - Cold boot paints a 1-bit Ferris splash and `papermono-rs`
   (USB-C down). Original Ferris: Karen Rustad Tölva
   ([rustacean.net](https://rustacean.net/)). Line-art
-  monification: canardleteer
-  ([assets/SOURCE.md](assets/SOURCE.md)).
+  monification details in [assets/SOURCE.md](assets/SOURCE.md).
 - BUTTON A previous card, BUTTON B next. The walk is splash →
   shapes → legend → four-gray tones → touch targets.
 - Slide the right edge for the lamp (top bright, USB-C dim).
@@ -20,10 +19,8 @@ On the unit:
   was built `--features mic` (default image leaves mic off).
 - The GPIO42 buzzer chirp is parked.
 
-Default features are `touch` + `panel`. `mic`, `radio`, and
-`sleep` are opt-in. This is not the full Sticky embassy-debug
-desk (no `operator` / `spi20` / `sd` / `charge` sit). First
-SKU is Lite.
+Default features are `touch` and `panel`. The `mic`, `radio`,
+and `sleep` features are opt-in. First SKU is Lite.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
@@ -43,7 +40,7 @@ You should see an Espressif `303a:1001` path. If you do not,
 and you already killed a listen the hard way, unplug USB-C and
 plug it back in once.
 
-### Step 2: Build, flash, and listen
+### Step 2: Build and flash
 
 Hold the red power button about 2 s until it blinks
 (download), then:

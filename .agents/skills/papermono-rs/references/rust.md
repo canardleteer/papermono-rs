@@ -68,8 +68,8 @@ cargo xtask build-fw embassy-debug
 `esp_bootloader_esp_idf::esp_app_desc!()`. Do not `--merge`.
 Lite factory is `0x10000`. After `flash-app`, short-press red.
 
-Ship a **16 MB-aware** table. Do not invent Sticky `0x90000` /
-32 MB geometry.
+Ship a **16 MB-aware** table. Do not assume arbitrary partition
+offsets or 32 MB geometry.
 
 ## Datasheet catalog vs crates
 
@@ -88,7 +88,7 @@ Ship a **16 MB-aware** table. Do not invent Sticky `0x90000` /
 | --- | --- | --- |
 | Shared pins / SKU | `m5stack-papermono-lite` | This repo. Lite firmware depends on this only |
 | C153 radios | `m5stack-papermono` | NFC + LoRa add-on |
-| SSD1677 OTP | `ssd1677-otp` | Not crates.io `ssd1677`. Not sticky `ssd1677-gray4` |
+| SSD1677 OTP | `ssd1677-otp` | Not crates.io `ssd1677`. Dedicated panel OTP driver |
 | M5PM1 | `m5pm1` | PWM0 is G3. PWM1 is unused on this SKU |
 | M5IOE1 | `m5ioe1` | Board `0x4F`. Park IP2315 on `PYG11` |
 | CDC lines | `papermono-log` | Host-tested grammar for both images |

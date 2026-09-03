@@ -25,11 +25,11 @@ physical unit point at an `nyc-*` id. Name `C153` vs
 | E-paper OTP / LUT | Call panel OTP only ([display.md](display.md) **What to do**). After ~10 partials, one OTP mono full | Invented or generic-example 105-byte `0x32` table; copying M5GFX `lut_*`; mapping `epd_*` onto OTP `0x22`; custom waveforms that are not DC-balanced; uninterrupted continuous partials; `0xFF` after `0xD7` without rebuild; a second bare `0x14` |
 | E-paper environment | Indoor, avoid prolonged sun / high UV / high temperature on the panel | Baking the glass in sun as a “feature” |
 | IP2315 on I2C | Mount via M5IOE1 `PYG11_PWM3` only for the charge transaction, then disconnect. Sheet: I2C high is VBAT; VIN detect needs pins 8/9 high | Leaving `0x75` on the bus; assuming it always enumerates at low VBAT |
-| Power path | M5PM1 button: short = on/reset, double = off, hold ~2 s until red blink = download | Sticky GPIO45/46 latch code; pulsing PDM pins as `PWR_HOLD` / `PWR_LOCK` |
+| Power path | M5PM1 button: short = on/reset, double = off, hold ~2 s until red blink = download | Driving GPIO45/46 as a power latch; pulsing PDM pins as `PWR_HOLD` / `PWR_LOCK` |
 | GPIO0 / GPIO3 straps | GPIO0 is M5PM1 `BOOT_OUT`; GPIO3 is BUTTON B (DOWN) / PinMap `USER_KEY2`. Ordinary IO only after `tH` | Driving them during strap sampling |
 | GPIO45 / GPIO46 | PDM CLK/DAT. Also ESP32-S3 strapping (WPD) | Using them as a power latch |
 | Lite SKU | Do not init ST25R3916 or SX1262 | Assuming NFC/LoRa GPIOs are free GPIO ([nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads), [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)) |
-| Flash images | 16 MB-aware table. Snapshot that unit first if you care about PHY cal ([nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)) | Sticky `0x90000` / 32 MB geometry; flashing one unit’s NVS onto another; assuming M5 factory-restore regenerates that unit’s PHY without checking |
+| Flash images | 16 MB-aware table. Snapshot that unit first if you care about PHY cal ([nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)) | Assuming 32 MB geometry or arbitrary `0x90000` offsets; flashing one unit’s NVS onto another; assuming M5 factory-restore regenerates that unit’s PHY without checking |
 | USB debug | Lite run **and** download: Espressif `303a:1001` USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Not CH343 | Treating USB-C as QinHeng `1a86:55d3`; assuming `probe-rs` until [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
 
 ## Why the panel rule comes first
@@ -85,10 +85,10 @@ mode and interfere with other devices on the same bus. M5IOE1
 the IP2315 mounted; disconnect promptly after communication. A
 short press of the power button resets the bus if it hangs.
 
-## Why Sticky flash geometry does not apply
+## Flash geometry
 
 This product is documented as **16 MB** flash and native USB
-CDC, not Sticky’s 32 MB + CH343. M5Stack publishes factory-reset
+CDC rather than 32 MB or an external USB-UART bridge. M5Stack publishes factory-reset
 firmware. ESP32-S3 PHY calibration still typically lives in NVS.
 
 Until [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)
@@ -98,8 +98,7 @@ closes (Lite table geometry is already in
 
 1. Prefer a full-chip snapshot of **your** unit before the first
    custom write. Keep it gitignored under `developer-data/`.
-2. Do not invent Sticky’s “never write below `0x90000`” line as
-   if it were measured here.
+2. Do not assume partition boundaries below `0x10000` as if they were measured here.
 3. Restore from **that unit’s** snapshot, or from M5Stack’s
    published restore image after you accept that PHY may differ.
 4. Never flash one unit’s NVS onto another.

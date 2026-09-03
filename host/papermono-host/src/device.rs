@@ -54,7 +54,7 @@ fn connect(port: &str, after_baud: Option<u32>) -> Result<Flasher, Error> {
         Ok(key) => (key.vid, key.pid),
         Err(_) => (ESPRESSIF_VID, ESPRESSIF_JTAG_PID),
     };
-    // Real Espressif ids so espflash picks USB-JTAG, not Sticky's dummy UART
+    // Real Espressif ids so espflash picks USB-JTAG, not a dummy UART
     // strategy. NoReset: operator download (power-button hold) is primary.
     let usb = UsbPortInfo {
         vid,

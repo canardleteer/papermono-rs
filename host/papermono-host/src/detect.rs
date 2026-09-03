@@ -29,7 +29,7 @@ pub const QINHENG_PID: u16 = 0x55D3;
 pub enum PortKind {
     /// Espressif `303a:1001` USB-Serial/JTAG.
     PaperMonoUsb,
-    /// QinHeng CH343 (Sticky / other boards).
+    /// QinHeng CH343 (other boards).
     QinHengCh343,
     /// Some other USB-serial adapter.
     Other,

@@ -15,15 +15,15 @@ not default-members.
 2. **Park IP2315 off the system I2C bus** except for the charge
    transaction (M5IOE1 `PYG11_PWM3`). Leaving it mounted can hang
    the bus, especially at low VBAT.
-3. **Do not copy Sticky GPIO45/46 latch code.** Those pins are
+3. **Do not drive GPIO45/46 as a power latch.** Those pins are
    PDM CLK/DAT here. Power is the M5PM1 button.
 4. **GPIO0 and GPIO3 are strapping pins.** GPIO0 is M5PM1
    `BOOT_OUT`; GPIO3 is BUTTON B (DOWN) / `USER_KEY2`.
 5. **Download mode is a power-button hold** (~2 s until the red
    LED blinks), not DTR on a CH343.
 6. **Snapshot first if you care about that unit’s PHY.** ESP32-S3
-   RF calibration lives in NVS. Do not invent Sticky’s `0x90000`
-   geometry. M5Stack publishes factory-restore images; that is
+   RF calibration lives in NVS. Do not assume custom partition
+   offsets. M5Stack publishes factory-restore images; that is
    not a license to skip a snapshot.
 
 Full hazard table: [docs/SAFETY.md](docs/SAFETY.md). Board facts
@@ -145,7 +145,7 @@ Skills:
   do not download vendor files unless they asked. Capture safe
   datasheet rows even if unused; leave hazardous encodings
   commented.
-- Do not copy Sticky pin maps, latch sequences, CH343 VID, 32 MB
+- Do not copy foreign pin maps, latch sequences, CH343 VID, 32 MB
   flash rules, or GT911 dances onto this product.
 - Use [Conventional Commits](https://www.conventionalcommits.org/).
 - Measurement-backlog items in the hardware skill stay open until

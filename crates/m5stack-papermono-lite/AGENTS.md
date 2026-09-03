@@ -19,9 +19,6 @@ Live-ask, never-erase, and flash I/O: root
 [AGENTS.md](../../AGENTS.md). Pin map:
 [m5stack-papermono-hardware](../../.agents/skills/m5stack-papermono-hardware/SKILL.md).
 
-This crate’s `README.md` is the crates.io landing page. Relative
-markdown links there only resolve inside this package.
-
 ## Agent Documentation Standards
 
 Maintain this file according to the [AGENTS.md standard](https://agents.md/),

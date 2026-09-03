@@ -2,7 +2,7 @@
 """Rasterize Ferris line art to 360×240 packed 1bpp (+ invert).
 
 Attribution: SOURCE.md (Karen Rustad Tölva / rustacean.net;
-canardleteer line-art monification).
+in-repo line-art monification).
 """
 
 from __future__ import annotations

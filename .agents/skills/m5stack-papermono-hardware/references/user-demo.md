@@ -133,8 +133,8 @@ then one `epd_quality`. Those four labels are the firmware
 enum titles; official HTML lab times (PaperMono,
 reference only) are in [display.md](display.md). Snapshot
 cache uses four gray
-representatives `{0, 96, 160, 255}`. Do not copy Sticky’s
-analog-off result onto this panel.
+representatives `{0, 96, 160, 255}`. Do not assume
+analog-off recovery without hardware verification on this panel.
 
 ## microSD (`hal_tf_card.cpp`)
 
@@ -228,7 +228,7 @@ FATFS LFN/UTF-8. Runtime MHz / DIO vs QIO on a unit:
 
 PlatformIO product-page env still points at
 `default_16MB.csv`. That is a **different** table than this
-CSV. Do not copy Sticky `0x90000` / 32 MB.
+CSV. Do not assume arbitrary partition offsets or 32 MB geometry.
 
 ## NFC app (Pro only)
 

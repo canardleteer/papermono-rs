@@ -20,7 +20,7 @@ Other rows stay official intent until their `nyc-*` ids close.
 
 Lite measured flash length: `0x1000000`. Lite stock partition
 table at `0x8000` matches UserDemo `partitions.csv` (not PIO
-`default_16MB.csv`). Do not copy Sticky `0x2000000` / `0x90000`.
+`default_16MB.csv`). Do not assume 32 MB flash geometry.
 
 Keep `*.bin` flash images out of git. Do not restore one unit’s
 full-chip image onto another until you know NVS contents are not
@@ -92,8 +92,7 @@ confirmed. DMA descriptors stay in internal RAM.
 
 ## Do not
 
-- Use Sticky 32 MB `n16r8` notes (that was the *wrong* CrossPoint
-  limit on a 32 MB Sticky). Here 16 MB is the documented size.
+- Assume 32 MB flash geometry. Here 16 MB is the documented size.
 - Assume `probe-rs` works because the product string says
   JTAG. Run `probe-rs list` on a unit first (`nyc-usb-vid`).
 - `erase-flash` before you have a snapshot you accept losing PHY

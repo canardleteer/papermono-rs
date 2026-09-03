@@ -19,7 +19,7 @@ On the unit:
   `hb`. The glass does not change.
 - BUTTON A (UP) and BUTTON B (DOWN) print `edge` on press and
   release. `btn_a=1` / `btn_b=1` is idle (released).
-- Prints on native USB-Serial/JTAG, not UART0.
+- Output streams over the native USB-Serial/JTAG interface.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
@@ -39,7 +39,7 @@ You should see an Espressif `303a:1001` path. If you do not,
 and you already killed a listen the hard way, unplug USB-C and
 plug it back in once.
 
-### Step 2: Build, flash, and listen
+### Step 2: Build and flash
 
 Hold the red power button about 2 s until it blinks
 (download), then:

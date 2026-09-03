@@ -1,18 +1,16 @@
 # ssd1677-otp
 
-Solomon Systech **SSD1677** driver for **panel OTP** waveforms
-(PaperMono OTP-Demo). `embedded-hal` 1.0 only. No ESP32-S3
-dependency. No MCU `0x32` LUT.
+Driver for the Solomon Systech SSD1677 active matrix e-paper display
+controller using panel OTP waveforms.
 
-Call site is [`OtpRefresh`](https://docs.rs/ssd1677-otp):
-`GrayFull` / `MonoFull` / `Partial`. Do not map official HTML
-`epd_*` titles onto those `0x22` bytes. Do not path-dep sticky-rs
-`ssd1677-gray4` (a different OTP path).
+Datasheet: [Solomon Systech SSD1677 Datasheet Rev 1.0](https://files.waveshare.com/upload/2/2a/SSD1677_1.0.pdf)
+([M5Stack copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/SSD1677.pdf)).
 
-This README is the crates.io landing page. Relative markdown
-links here only resolve inside this package.
+The crate is `#![no_std]` and depends exclusively on `embedded-hal` 1.0,
+avoiding any microcontroller-specific dependencies or assumptions about host
+architecture.
 
-## Agent notes
-
-Portable agent rules for this crate live in `AGENTS.md` in this
-directory.
+Panel updates are dispatched through `OtpRefresh` with options for `GrayFull`,
+`MonoFull`, and `Partial`. This driver does not implement custom MCU lookup
+tables via command 0x32, relying instead on the factory OTP waveforms programmed
+directly into the display controller.

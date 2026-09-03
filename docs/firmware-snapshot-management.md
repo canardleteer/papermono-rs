@@ -24,7 +24,7 @@ factory-reset image you can share.
   for this unit’s NVS / PHY cal.
 - Never `erase-flash`. Never `espflash flash` (default bootloader
   and table).
-- Do not invent Sticky’s “never write below `0x90000`” line.
+- Do not assume an arbitrary partition offset like `0x90000`.
 - Dump length is the **measured** flash size (official 16 MB →
   `0x1000000`). Refuse `flash-32mb.bin` unless that length
   matches.
