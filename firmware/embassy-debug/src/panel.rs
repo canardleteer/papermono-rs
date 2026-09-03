@@ -1,5 +1,22 @@
-//! OTP-Demo [`display::OtpRefresh`] only. No `0x32` LUT.
-//! Do not stamp [`display::RefreshMode`] titles.
+//! SSD1677 e-paper controller OTP waveform driver and panel safety manager.
+//!
+//! # Architecture & Display Safety Contract
+//! This module coordinates low-level SPI communication and waveform management
+//! for the 800×480 (portrait 480×800) SSD1677 active-matrix electrophoretic display.
+//!
+//! ### Hardware Safety Mandates
+//! 1. **Factory OTP Waveforms Exclusively**: Do not define or upload custom Look-Up
+//!    Tables (LUTs via command `0x32`). Custom waveforms without factory calibration
+//!    can induce severe DC bias across microcapsules, causing permanent physical degradation.
+//! 2. **Periodic Full Waveform Refresh**: Electrophoretic microcapsules accumulate residual
+//!    charges during partial updates. To preserve display contrast and prevent burn-in/ghosting,
+//!    this driver mandates a full refresh cycle ([`display::OtpRefresh::MonoFull`]) every
+//!    [`PARTIALS_BEFORE_FULL`] (6) partial updates.
+//! 3. **Deep Sleep Between Updates**: After every update sequence, the panel is placed
+//!    into hardware Deep Sleep Mode 1 (`0x10`) to deactivate high-voltage charge pumps.
+//! 4. **Hardware BUSY Line Synchronization**: The SSD1677 `BUSY` signal (`GPIO18`) goes high
+//!    during internal charge pump ramp-up and gate/source driving. Software must block until
+//!    `BUSY` returns low before initiating further transactions.
 
 use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 
@@ -16,25 +33,25 @@ use papermono_log::PanelStamp;
 
 type Epd = Ssd1677<Spi<'static, Blocking>, Output<'static>, Output<'static>>;
 
-/// USB-C-down mark in OTP RAM (white field, black ink).
+/// Target mark primitive drawn directly into display controller RAM.
 #[derive(Clone, Copy)]
 pub enum Mark {
-    /// Disk at official-portrait `(x, y)`.
+    /// Solid black circle centered at `(x, y)` with radius `r`.
     Disk { x: u16, y: u16, r: u16 },
-    /// Horizontal line through `y` (full X slide).
+    /// Horizontal line crossing the screen at ordinate `y` with thickness `half * 2`.
     HLine { y: u16, half: u16 },
-    /// Vertical line through `x` (full Y slide).
+    /// Vertical line crossing the screen at abscissa `x` with thickness `half * 2`.
     VLine { x: u16, half: u16 },
-    /// White field (walk finished).
+    /// Clears the field to solid white.
     Blank,
 }
 
-/// SPI + DC/CS after OTP init. Rails stay up.
+/// E-paper panel controller handle managing SPI transactions and refresh budgets.
 pub struct Panel {
     epd: Epd,
-    /// Mono RAM baseline is valid for `0xFF` (not after `0xD7`).
+    /// Indicates whether a valid monochromatic baseline has been written to controller RAM.
     mono_ready: bool,
-    /// Partials since the last Mode 1 full.
+    /// Number of partial refresh cycles executed since the last full refresh.
     partials: u8,
 }
 
@@ -51,9 +68,10 @@ const _: () = {
     assert!(display::OTP_PLANE_BYTES == display::PLANE_BYTES);
 };
 
-/// HW reset pulse. OTP-Demo `hardware_reset` waits 10 ms around RST.
+/// Hardware reset pulse duration in milliseconds.
 const RST_MS: u64 = 10;
-/// How long to wait for BUSY to rise after Master Activation.
+
+/// Maximum duration to wait for the BUSY signal to rise after Master Activation.
 const BUSY_RISE_MS: u64 = 100;
 
 static HAVE_STAMP: AtomicBool = AtomicBool::new(false);
@@ -67,20 +85,17 @@ const MODE_GRAY: u8 = 1;
 const MODE_MONO: u8 = 2;
 const MODE_PARTIAL: u8 = 3;
 
-/// Yield the executor this often during a blocking RAM walk.
+/// Yield the Embassy executor every N rows during blocking RAM transfers.
 const YIELD_EVERY_ROWS: u16 = 16;
 
-/// Cumulative [`display::OtpRefresh::Partial`]s before the
-/// next mono path is [`display::OtpRefresh::MonoFull`].
-/// `0` never promotes.
+/// Cumulative partial updates allowed before mandating a full clearing refresh.
 ///
 /// Follows the official PaperMono display safety rule: uninterrupted
 /// partial refreshes can damage the panel. Official documentation
 /// mandates a full refresh after roughly ten partial refreshes.
 const PARTIALS_BEFORE_FULL: u8 = 6;
 
-/// Last OTP stamp. Reprinted on 10 s `hello`. `busy_rose=0` means the
-/// waveform never started.
+/// Retrieves the most recent panel refresh telemetry stamp for periodic reporting.
 pub fn last() -> Option<PanelStamp> {
     if !HAVE_STAMP.load(Ordering::Relaxed) {
         return None;
@@ -123,6 +138,7 @@ fn store(stamp: PanelStamp) {
     cdc::panel(&stamp);
 }
 
+/// Initializes the SSD1677 display controller and powers up the panel subsystem.
 pub async fn begin(
     i2c: &mut SysI2c,
     spi2: esp_hal::peripherals::SPI2<'static>,
@@ -132,16 +148,19 @@ pub async fn begin(
     dc: esp_hal::gpio::AnyPin<'static>,
     busy: &Input<'static>,
 ) -> Option<Panel> {
+    // Enable display VDD power switch via M5IOE1 expander.
     if ioe::set_push_pull_output(i2c, ioe1::EPD_VDD_ENABLE, true).is_err() {
         return None;
     }
     Timer::after(Duration::from_millis(RST_MS)).await;
+    // Issue hardware reset pulse on EPD_RST.
     let _ = ioe::set_push_pull_output(i2c, ioe1::EPD_RST, false);
     Timer::after(Duration::from_millis(RST_MS)).await;
     let _ = ioe::set_push_pull_output(i2c, ioe1::EPD_RST, true);
     Timer::after(Duration::from_millis(RST_MS)).await;
     wait_busy_low(busy).await;
 
+    // Configure SPI2 master for e-paper data transfer at 20 MHz.
     let Ok(spi) = Spi::new(
         spi2,
         Config::default().with_frequency(Rate::from_hz(display::OTP_SPI_HZ)),
@@ -153,6 +172,7 @@ pub async fn begin(
     let dc = Output::new(dc, Level::Low, OutputConfig::default());
     let mut epd = Ssd1677::new(spi, dc, cs);
 
+    // Issue software reset command.
     let _ = epd.cmd(display::SW_RESET, &[]);
     Timer::after(Duration::from_millis(RST_MS)).await;
     wait_busy_low(busy).await;
@@ -165,7 +185,7 @@ pub async fn begin(
 }
 
 impl Panel {
-    /// OTP-Demo `refresh_gray_full` (`OtpRefresh::GrayFull`).
+    /// Renders a 4-level grayscale frame using factory OTP 4-gray waveforms.
     pub async fn paint_gray(
         &mut self,
         i2c: &mut SysI2c,
@@ -191,15 +211,11 @@ impl Panel {
             h: display::OTP_RAM_HEIGHT,
             busy_rose,
         });
-        // Lite (2026-09-01): `Partial` after this left Ferris
-        // on glass until those pixels were overdrawn. Not a
-        // faint ghost. OTP-Demo `baseline_ready = false`.
         self.mono_ready = false;
         self.partials = 0;
     }
 
-    /// [`OtpRefresh::MonoFull`] until a mono baseline exists, then
-    /// [`OtpRefresh::Partial`].
+    /// Renders a monochromatic frame using fast partial updates when a valid baseline exists.
     pub async fn paint_mono_fast(
         &mut self,
         i2c: &mut SysI2c,
@@ -214,7 +230,7 @@ impl Panel {
         self.refresh_partial_official(i2c, bw, red, busy).await;
     }
 
-    /// OTP-Demo `refresh_mono_full` (white) before the target walk.
+    /// Initializes monochromatic RAM to solid white before starting touch calibration.
     pub async fn enter_mono(&mut self, i2c: &mut SysI2c, busy: &Input<'static>) {
         self.refresh_mono_full(i2c, None, busy).await;
     }
@@ -235,9 +251,6 @@ impl Panel {
         let _ = self.epd.init_mono();
     }
 
-    /// Mono RAM window and X/Y increment. No software reset.
-    /// After gray, data entry was X decrement; a later `Partial`
-    /// write must not keep that.
     fn apply_mono_addressing(&mut self) {
         let _ = self.epd.apply_mono_addressing();
     }
@@ -255,9 +268,6 @@ impl Panel {
         Timer::after(Duration::from_millis(display::OTP_SLEEP_MS)).await;
     }
 
-    /// OTP-Demo `wake_for_partial_update`: HW reset, no SW reset.
-    /// Also applies mono addressing so a `Partial` after `GrayFull`
-    /// does not keep X-decrement.
     async fn wake_for_partial(&mut self, i2c: &mut SysI2c, busy: &Input<'_>) {
         self.hardware_reset(i2c, busy).await;
         self.apply_mono_addressing();
@@ -266,7 +276,6 @@ impl Panel {
             .cmd(display::BORDER_WAVEFORM, &[display::BORDER_OTP_PARTIAL]);
     }
 
-    /// OTP-Demo `refresh_mono_full`. `None` is both planes white.
     async fn refresh_mono_full(
         &mut self,
         i2c: &mut SysI2c,
@@ -348,8 +357,7 @@ impl Panel {
         });
     }
 
-    /// White field + one black mark. OTP-Demo partial (`0xFF`).
-    /// `Blank` is `OtpRefresh::MonoFull` so leftover ink clears.
+    /// Draws a target mark in monochromatic RAM and triggers an OTP partial refresh.
     pub async fn paint(&mut self, i2c: &mut SysI2c, mark: Mark, busy: &Input<'static>) {
         if matches!(mark, Mark::Blank) {
             self.refresh_mono_full(i2c, None, busy).await;
@@ -389,7 +397,6 @@ impl Panel {
     }
 }
 
-/// Official-portrait plane → OTP RAM with X decrement (OTP-Demo).
 async fn write_gray_plane(epd: &mut Epd, ram_cmd: u8, official: &[u8]) {
     let _ = epd.rewind_gray();
     let _ = epd.begin_ram(ram_cmd);
@@ -416,8 +423,6 @@ async fn write_gray_plane(epd: &mut Epd, ram_cmd: u8, official: &[u8]) {
     let _ = epd.end_ram();
 }
 
-/// Official portrait → OTP RAM, XY increment. Gray-black (1) → mono 0.
-/// `invert` is OTP-Demo `write_ram(..., invert)` for `0xF8`.
 async fn write_official_mono(epd: &mut Epd, ram_cmd: u8, bw: &[u8], red: &[u8], invert: bool) {
     let _ = epd.rewind();
     let _ = epd.begin_ram(ram_cmd);
@@ -478,7 +483,6 @@ fn write_mark(epd: &mut Epd, ram_cmd: u8, mark: Mark) {
 }
 
 fn fill_mark_row(row: &mut [u8], ram_y: u16, mark: Mark) {
-    // OTP-Demo mono: 1 is white, 0 is black. MSB first, X increment.
     row.fill(0xFF);
     for ram_x in 0..display::OTP_RAM_WIDTH {
         let (px, py) = display::otp_ram_to_usb_down(ram_x, ram_y);

@@ -1,8 +1,19 @@
-//! Draw a target, wait for a sloppy tap or midline slide, next.
+//! Interactive touch calibration and latency verification sequence.
 //!
-//! Either short A or short B aborts the **whole** walk (not one
-//! target) and leaves the card. Hold-A PCM is only in `ui` while
-//! sitting, not during this walk.
+//! # Architecture & Calibration Protocol
+//! This module implements an interactive touch verification walk (Card 5):
+//!
+//! - **Calibration Points**:
+//!   - Five discrete targets (center, top-left, top-right, bottom-left, bottom-right).
+//!   - Two continuous swipes: horizontal midline swipe (`slide_x`) and vertical midline swipe (`slide_y`).
+//! - **Validation Tolerances**:
+//!   - Point hits are accepted within [`touch::TARGET_SLOP_PX`] Euclidean distance.
+//!   - Swipes must span from near edge to near edge ([`touch::SLIDE_END_INSET`]).
+//! - **Cancellation & Abort**:
+//!   - Pressing either physical button (`BUTTON A` or `BUTTON B`) immediately aborts the
+//!     walk, clears any partial ink from the panel, and switches to the preceding or succeeding card.
+//! - **Display Mode**:
+//!   - Uses fast OTP partial updates ([`crate::panel::Mark`]) to minimize latency between targets.
 
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::gpio::Input;
@@ -22,19 +33,29 @@ const SLIDE_X_ID: u8 = 5;
 const SLIDE_Y_ID: u8 = 6;
 const LAST_ID: u8 = 6;
 
+/// Outcome of the touch verification walk.
 pub enum WalkEnd {
+    /// All calibration targets and gestures completed successfully.
     Done,
+    /// Walk was aborted by pressing BUTTON A (switch to previous card).
     AbortPrev,
+    /// Walk was aborted by pressing BUTTON B (switch to next card).
     AbortNext,
 }
 
+/// Outcome of an individual target evaluation.
 enum Outcome {
+    /// Target hit within tolerance: reports coordinates and error/span.
     Hit(u16, u16, u16),
+    /// Aborted by pressing BUTTON A.
     AbortA(u16, u16),
+    /// Aborted by pressing BUTTON B.
     AbortB(u16, u16),
+    /// Timeout expired before target contact was confirmed.
     Timeout(u16, u16),
 }
 
+/// Executes the full interactive touch walk across all calibration targets.
 pub async fn walk(
     i2c: &mut SysI2c,
     panel: &mut Panel,
@@ -71,6 +92,7 @@ pub async fn walk(
     WalkEnd::Done
 }
 
+/// Generates the geometric descriptor and drawing mark for target `id`.
 fn scene(id: u8) -> (&'static str, u16, u16, u16, Mark) {
     let mid_x = display::WIDTH / 2;
     let mid_y = display::HEIGHT / 2;
@@ -112,6 +134,7 @@ fn scene(id: u8) -> (&'static str, u16, u16, u16, Mark) {
     }
 }
 
+/// Awaits contact within tolerance of a circular calibration target dot.
 async fn wait_dot(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
@@ -165,6 +188,7 @@ async fn wait_dot(
     Outcome::Timeout(last_x, last_y)
 }
 
+/// Awaits a full continuous swipe across the screen along the specified axis.
 #[allow(clippy::too_many_arguments)]
 async fn wait_slide(
     i2c: &mut SysI2c,
@@ -225,6 +249,7 @@ async fn wait_slide(
     Outcome::Timeout(last_x, last_y)
 }
 
+/// Evaluates button state during target waiting: cancels the walk if pressed.
 fn abort_buttons(
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
@@ -256,12 +281,14 @@ fn abort_buttons(
     None
 }
 
+/// Computes integer Euclidean distance in pixels between two coordinates.
 fn dist_px(ax: u16, ay: u16, bx: u16, by: u16) -> u16 {
     let dx = i32::from(ax) - i32::from(bx);
     let dy = i32::from(ay) - i32::from(by);
     isqrt_u32((dx * dx + dy * dy) as u32)
 }
 
+/// Integer square root calculation via Newton-Raphson approximation.
 fn isqrt_u32(n: u32) -> u16 {
     if n == 0 {
         return 0;

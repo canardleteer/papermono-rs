@@ -1,14 +1,48 @@
-//! PaperMono-Lite simple-debug image.
+//! PaperMono-Lite simple-debug tutorial firmware.
 //!
-//! On the unit: USB-Serial/JTAG prints a repeating hello (image / SKU /
-//! clocks / reset), a git line, a GPIO sample, a 1 Hz heartbeat of
-//! BUTTON A (UP) / BUTTON B (DOWN), and edge lines on those keys. The
-//! e-paper panel does not refresh. No I2C, no NFC, no LoRa, no PDM, no
-//! GPIO45/46 latch.
+//! # Purpose & Architecture
+//! This firmware serves as an introductory, bare-metal proof-of-life reference
+//! implementation for the M5Stack PaperMono-Lite (`C153-Lite`). It demonstrates
+//! fundamental embedded Rust concepts described in *The Embedded Rust Book* and
+//! *The Rust on ESP Book*:
 //!
-//! In the MCU: blocking `esp-hal`. No Embassy, no RTOS, no panel LUT.
+//! - **`#![no_std]` and `#![no_main]`**: Operates without the Rust standard library
+//!   or an underlying operating system, taking direct control of hardware from the
+//!   Espressif second-stage bootloader.
+//! - **Blocking Hardware Abstraction Layer (`esp-hal`)**: Employs synchronous,
+//!   blocking peripheral drivers rather than an asynchronous runtime or RTOS.
+//! - **Deterministic Polling Loop**: Uses a periodic polling loop regulated by
+//!   microsecond hardware delays (`esp_hal::delay::Delay`).
+//! - **Zero Heap Allocation**: All telemetry buffers are fixed-size stack arrays
+//!   (`[u8; N]`) formatted via [`papermono_log`], eliminating dynamic memory allocation
+//!   and heap fragmentation risks.
 //!
-//! `espflash save-image` needs [`esp_bootloader_esp_idf::esp_app_desc`].
+//! # Hardware Topology & Electrical Characteristics
+//! - **USB-Serial/JTAG Telemetry**: Transmits line-oriented ASCII messages directly
+//!   over the ESP32-S3 native USB-Serial/JTAG controller (`303a:1001`), requiring no
+//!   external USB-to-UART bridge (such as a CH343).
+//! - **Tactile User Buttons**:
+//!   - `GPIO2`: BUTTON A (UP / `USER_KEY1`). Configured as active-low input with internal
+//!     weak pull-up (`Pull::Up`). Pressing the switch grounds the pin.
+//!   - `GPIO3`: BUTTON B (DOWN / `USER_KEY2`). Configured as active-low input with internal
+//!     weak pull-up (`Pull::Up`). Note: GPIO3 is also an ESP32-S3 strapping pin (floating at
+//!     reset). Pressing the switch grounds the pin.
+//! - **Monitored Board Signal Nets**:
+//!   - `GPIO0`: M5PM1 PMIC `BOOT_OUT`. Strapping pin (internal weak pull-up at reset).
+//!   - `GPIO1`: M5PM1 PMIC IRQ (`G1_PY_IRQ`). Open-drain interrupt line.
+//!   - `GPIO4`: FT6336G capacitive touch controller interrupt (`G4_TP_INT`). Active-low.
+//!   - `GPIO7`: M5IOE1 I/O expander interrupt (`PYB_IRQ`).
+//!   - `GPIO18`: SSD1677 e-paper controller `BUSY` signal. Active-high when refreshing.
+//!
+//!   All monitored board nets are sampled as high-impedance inputs without internal pulls
+//!   (`Pull::None`) to prevent unwanted bias currents or interference with external circuits.
+//!
+//! # Safety & Hardware Conservation
+//! To satisfy hardware safety constraints during early board bring-up:
+//! - The SSD1677 e-paper panel is kept completely dormant; no SPI transactions or
+//!   refresh waveforms are issued, avoiding uncalibrated LUT hazards.
+//! - System I2C bus (`GPIO47`/`GPIO48`) and expander rails remain unclocked.
+//! - PDM microphone clock/data pins (`GPIO45`/`GPIO46`) remain high-impedance.
 
 #![no_std]
 #![no_main]
@@ -30,8 +64,11 @@ use papermono_log::{
     HELLO_CAPACITY, HELLO_PERIOD_MS, IMAGE, MILLIS_PER_SEC, POLL_PERIOD_MS,
 };
 
+// Binary image metadata for the ESP-IDF 2nd-stage bootloader.
+// Enables image validation, partition table matching, and version tracking.
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// Compile-time sanity verification that board crate pin constants match official schematics.
 const _: () = {
     assert!(pins::BUTTON_A == 2);
     assert!(pins::BUTTON_B == 3);
@@ -42,12 +79,29 @@ const _: () = {
     assert!(pins::EPD_BUSY == 18);
 };
 
-/// Map cheap inputs, print the grammar, then poll. Power is the red M5PM1 button.
+/// Firmware entry point executed after the ESP-IDF second-stage bootloader transfers control.
+///
+/// # Hardware Initialization Sequence
+/// 1. Initializes chip system clocks, power management, and peripheral singletons via
+///    `esp_hal::init(Config::default())`.
+/// 2. Configures hardware cycle-counter delay provider (`esp_hal::delay::Delay`).
+/// 3. Instantiates `Input` pin drivers with appropriate electrical pull configurations:
+///    - Pushbuttons (`GPIO2`, `GPIO3`): Configured with internal weak pull-ups (`Pull::Up`).
+///    - Board status lines (`GPIO0`, `GPIO1`, `GPIO4`, `GPIO7`, `GPIO18`): Configured with
+///      `Pull::None` to sample external logic states without back-powering uninitialized rails.
+/// 4. Queries SoC clock speeds and reset reason from the Real-Time Clock Controller (RTC_CNTL).
+/// 5. Enters the non-terminating polling loop:
+///    - 10 ms: Polls tactile button states; emits instantaneous transition telemetry on edge.
+///    - 1000 ms: Emits periodic button status heartbeat (`heartbeat` line).
+///    - 10000 ms: Emits board metadata (`hello`), git revision (`git`), and GPIO bus states (`gpio`).
 #[main]
 fn main() -> ! {
+    // Take ownership of MCU peripherals and configure standard system clocks.
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let mut delay = Delay::new();
 
+    // Tactile user buttons: mechanical switches pull the net to ground when pressed.
+    // We configure internal pull-ups so the default unpressed state reads high (logic 1).
     let btn_a = Input::new(
         peripherals.GPIO2,
         InputConfig::default().with_pull(Pull::Up),
@@ -56,7 +110,11 @@ fn main() -> ! {
         peripherals.GPIO3,
         InputConfig::default().with_pull(Pull::Up),
     );
-    // No pulls: these nets are not user keys. Expander and panel stay off.
+
+    // Board status and interrupt lines:
+    // Left floating (`Pull::None`) because these lines either have dedicated external pull-ups
+    // on the PCB or are driven by peripheral chips (PMIC, expander, touch digitizer, display).
+    // Adding internal pull resistors here could cause leakage current into unpowered domains.
     let boot = Input::new(
         peripherals.GPIO0,
         InputConfig::default().with_pull(Pull::None),
@@ -78,6 +136,7 @@ fn main() -> ! {
         InputConfig::default().with_pull(Pull::None),
     );
 
+    // Construct immutable identification record with boot-time telemetry.
     let hello = Hello {
         t_s: 0,
         image: IMAGE,
@@ -87,13 +146,17 @@ fn main() -> ! {
         reset: reset_token(reset_reason()),
     };
 
+    // Tracking state for button edge detection.
     let mut t_ms = 0_u32;
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
 
+    // Deterministic polling loop.
     loop {
         let now_a = btn_a.is_high();
         let now_b = btn_b.is_high();
+
+        // Edge detection: fire immediately on state transition.
         if now_a != prev_a || now_b != prev_b {
             let edge = Edge {
                 t_ms,
@@ -105,6 +168,7 @@ fn main() -> ! {
             prev_b = now_b;
         }
 
+        // Periodic 10-second banner: re-identifies firmware, build revision, and board rails.
         if t_ms.is_multiple_of(HELLO_PERIOD_MS) {
             emit_hello(&Hello {
                 t_s: t_ms / MILLIS_PER_SEC,
@@ -120,6 +184,7 @@ fn main() -> ! {
             });
         }
 
+        // Periodic 1-second heartbeat: confirms firmware liveness and current button states.
         if t_ms.is_multiple_of(HEARTBEAT_PERIOD_MS) {
             emit_heartbeat(&Snapshot {
                 t_s: t_ms / MILLIS_PER_SEC,
@@ -128,15 +193,23 @@ fn main() -> ! {
             });
         }
 
+        // Advance simulated time tick and delay for poll interval (10 ms).
         t_ms = t_ms.saturating_add(POLL_PERIOD_MS);
         delay.delay_ms(POLL_PERIOD_MS);
     }
 }
 
+/// Transmits a formatted line with a CRLF terminator over native USB-Serial/JTAG.
+///
+/// Uses `esp_println::print!` which routes directly to the hardware FIFO of the
+/// ESP32-S3 USB Serial/JTAG controller without requiring UART interrupts or DMA.
 fn emit(line: &str) {
     print!("{line}\r\n");
 }
 
+/// Formats and emits a device identification message (`Hello`).
+///
+/// Allocates a dedicated stack buffer of size [`HELLO_CAPACITY`] to avoid heap allocation.
 fn emit_hello(hello: &Hello) {
     let mut buf = [0u8; HELLO_CAPACITY];
     if let Ok(line) = format_hello(hello, &mut buf) {
@@ -144,6 +217,9 @@ fn emit_hello(hello: &Hello) {
     }
 }
 
+/// Formats and emits build git commit metadata embedded at compile-time.
+///
+/// The commit hash and dirty status are captured by the workspace build environment.
 fn emit_git() {
     let mut buf = [0u8; GIT_CAPACITY];
     if let Ok(line) = format_git(
@@ -155,6 +231,7 @@ fn emit_git() {
     }
 }
 
+/// Formats and emits the current logic levels of monitored board nets (`GpioSample`).
 fn emit_gpio(sample: &GpioSample) {
     let mut buf = [0u8; GPIO_CAPACITY];
     if let Ok(line) = format_gpio(sample, &mut buf) {
@@ -162,6 +239,7 @@ fn emit_gpio(sample: &GpioSample) {
     }
 }
 
+/// Formats and emits the periodic 1 Hz button liveness heartbeat (`Snapshot`).
 fn emit_heartbeat(snapshot: &Snapshot) {
     let mut buf = [0u8; HEARTBEAT_CAPACITY];
     if let Ok(line) = format_heartbeat(snapshot, &mut buf) {
@@ -169,6 +247,7 @@ fn emit_heartbeat(snapshot: &Snapshot) {
     }
 }
 
+/// Formats and emits an edge transition event triggered by tactile button presses or releases.
 fn emit_edge(edge: &Edge) {
     let mut buf = [0u8; EDGE_CAPACITY];
     if let Ok(line) = format_edge(edge, &mut buf) {
@@ -176,6 +255,10 @@ fn emit_edge(edge: &Edge) {
     }
 }
 
+/// Translates the hardware reset reason reported by the RTC controller into a static string token.
+///
+/// Maps Espressif `SocResetReason` hardware registers into parser-friendly tokens recognized
+/// by `papermono-log` and host monitoring tools.
 fn reset_token(reason: Option<SocResetReason>) -> &'static str {
     match reason {
         Some(SocResetReason::ChipPowerOn) => "chip_power_on",

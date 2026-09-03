@@ -1,5 +1,17 @@
-//! On-unit Wi-Fi + BLE listen counts. No connect. No BSSID / MAC / IRK
-//! on CDC. No NVS write (`nvs_enable` is 0 in the driver).
+//! Passive Wi-Fi beacon listening and BLE advertisement scanning without association.
+//!
+//! # Architecture & Privacy Safety
+//! This module coordinates passive radio listening:
+//!
+//! - **No Association / Connection**: Operates purely as a passive observer; does not
+//!   attempt Wi-Fi authentication or Bluetooth pairing.
+//! - **Privacy Preservation**: Never logs or emits MAC addresses, SSIDs, BSSIDs, or
+//!   identity resolving keys (IRKs) over CDC. Only emits aggregate counts (`wifi n=`, `ble n=`).
+//! - **No NVS Storage Writes**: Operates without modifying non-volatile storage flash
+//!   sectors (`nvs_enable` disabled in the driver), ensuring factory RF calibration data
+//!   remains uncorrupted.
+//! - **Coexistence Sequencing**: BLE controller is brought up and executed before
+//!   triggering Wi-Fi scans to satisfy ESP32-S3 hardware RF coexistence scheduling.
 
 use core::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 
@@ -16,12 +28,16 @@ use trouble_host::prelude::*;
 
 use crate::cdc;
 
-/// BLE listen window. Advertisement reports only; no connect.
+/// Duration of the BLE passive advertisement listening window in seconds.
 const BLE_WINDOW_S: u64 = 8;
-/// Drop a stuck Wi-Fi scan so BLE is not blocked.
+
+/// Timeout after which a stalled Wi-Fi scan is aborted.
 const WIFI_TIMEOUT_S: u64 = 20;
+
+/// Maximum number of access points to buffer in memory during scan.
 const WIFI_MAX: usize = 32;
-/// Passive dwell per channel (listen for beacons; no probe).
+
+/// Passive listening dwell time per Wi-Fi 2.4 GHz channel in milliseconds.
 const WIFI_PASSIVE_MS: u64 = 150;
 
 static WIFI_N: AtomicU16 = AtomicU16::new(0);
@@ -29,6 +45,7 @@ static BLE_N: AtomicU16 = AtomicU16::new(0);
 static HAVE_WIFI: AtomicBool = AtomicBool::new(false);
 static HAVE_BLE: AtomicBool = AtomicBool::new(false);
 
+/// BLE advertisement packet handler counting valid incoming reports.
 struct CountAdv {
     n: AtomicU16,
 }
@@ -57,28 +74,33 @@ fn store_ble(n: u16) {
     cdc::ble(n);
 }
 
+/// Retrieves the count of observed Wi-Fi beacons for periodic banner reporting.
 pub fn last_wifi() -> Option<u16> {
     HAVE_WIFI
         .load(Ordering::Relaxed)
         .then(|| WIFI_N.load(Ordering::Relaxed))
 }
 
+/// Retrieves the count of observed BLE advertisement packets for periodic banner reporting.
 pub fn last_ble() -> Option<u16> {
     HAVE_BLE
         .load(Ordering::Relaxed)
         .then(|| BLE_N.load(Ordering::Relaxed))
 }
 
+/// Asynchronous Embassy task driving Bluetooth Low Energy passive scanning.
 #[embassy_executor::task]
 pub async fn ble_run(bt: BT<'static>) {
     store_ble(ble_count(bt).await);
 }
 
+/// Asynchronous Embassy task driving Wi-Fi passive channel sweeping.
 #[embassy_executor::task]
 pub async fn wifi_run(wifi: WIFI<'static>) {
     store_wifi(wifi_count(wifi).await);
 }
 
+/// Conducts a passive Wi-Fi scan and returns the number of unique APs discovered.
 async fn wifi_count(wifi: WIFI<'static>) -> u16 {
     let _sta = Interface::station();
     let station = Config::Station(StationConfig::default());
@@ -103,6 +125,7 @@ async fn wifi_count(wifi: WIFI<'static>) -> u16 {
     }
 }
 
+/// Configures BLE controller and initiates passive scanning.
 async fn ble_count(bt: BT<'static>) -> u16 {
     let Ok(connector) = BleConnector::new(bt, Default::default()) else {
         return 0;
@@ -111,6 +134,7 @@ async fn ble_count(bt: BT<'static>) -> u16 {
     ble_window(controller).await
 }
 
+/// Runs a trouble-host BLE scan session for [`BLE_WINDOW_S`] seconds.
 async fn ble_window<C>(controller: C) -> u16
 where
     C: Controller + ControllerCmdSync<LeSetScanParams>,

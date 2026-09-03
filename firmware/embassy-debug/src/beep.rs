@@ -1,12 +1,16 @@
-//! Parked GPIO42 LEDC chirp.
+//! Passive buzzer driver isolation and GPIO42 pin parking documentation.
 //!
-//! The first image that took GPIO42 (JTAG `MTMS`) for UserDemo
-//! LEDC timer 3 / channel 7 coincided with wedged card flips
-//! (`gpio busy=1`, Ferris stuck) and a lamp whose `lamp=` duty
-//! moved on CDC while the LED did not. Do not mux this pad
-//! again until `nyc-buzzer` is isolated. USB-Serial/JTAG is
-//! the USB PHY, but Table 2-4 still names GPIO42 `MTMS`.
+//! # Hardware Topology & Electrical Constraints
+//! The board connects a passive magnetic buzzer to `GPIO42`:
+//!
+//! - **Pin Multiplexing Conflict**: `GPIO42` is shared with JTAG `MTMS` (ESP32-S3
+//!   datasheet Table 2-4). In initial bring-up, attaching an active LEDC timer
+//!   waveform to `GPIO42` interfered with internal system bus operations, leading
+//!   to frozen card transitions and stuck EPD refresh cycles (`BUSY=1`).
+//! - **Safe State**: To guarantee firmware stability, `GPIO42` is kept dormant
+//!   (parked) as a high-impedance pin without attaching LEDC timers or PWM generators
+//!   until dedicated electrical isolation is verified.
 
-/// No-op. LEDC and GPIO42 stay untouched.
+/// Intentionally empty placeholder function; keeps `GPIO42` untouched.
 #[allow(dead_code)]
 pub fn ask() {}

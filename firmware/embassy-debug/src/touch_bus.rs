@@ -1,5 +1,23 @@
-//! Stage B: system I2C probes, park IP2315, one gated charge
-//! read, FT6336G rails. Lite NFC NAK.
+//! System I2C peripheral discovery, IP2315 bus isolation, and frontlight PWM control.
+//!
+//! # Architecture & Safety Protocol
+//! This module coordinates board-level peripheral orchestration over the primary
+//! I2C bus (`I2C0` on `GPIO47`/`GPIO48`):
+//!
+//! - **IP2315 Bus Isolation Safety Rule**: The IP2315 fast charger can hang or latch up
+//!   the system I2C bus, especially at lower battery voltages. It must remain disconnected
+//!   (parked) via M5IOE1 `PYG11_PWM3` (`ioe1::IP2315_I2C_GATE`) at all times except during
+//!   the brief active charge status reading window ([`bring_up`]).
+//! - **Peripheral Roster**: Probes the presence of:
+//!   - M5PM1 PMIC (`0x55` or `0x6F`)
+//!   - M5IOE1 I/O expander (`0x4F` or `0x6F`)
+//!   - RX8130CE RTC (`0x32`)
+//!   - BMI270 / QMA6100P IMU (`0x68`)
+//!   - FT6336G capacitive touch digitizer (`0x38`)
+//!   - ST25R3916 NFC (`0x50` - expected NAK on Lite)
+//!   - MicroSD card slot presence (`MICROSD_DETECT`)
+//! - **Frontlight Control**: Regulates the display frontlight LED using M5PM1 `G3`/`PWM0`
+//!   driving the AW9967 backlight boost driver.
 
 use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 
@@ -16,7 +34,7 @@ use papermono_log::{ChargeSample, I2cSample, TouchSample};
 use crate::cdc;
 use crate::ioe::{self, SysI2c};
 
-/// FT RST low then high (UserDemo / M5Unified rail-then-reset intent).
+/// Pulse widths for resetting the FT6336G touch controller following power rail enable.
 const TOUCH_RST_LOW_MS: u64 = 10;
 const TOUCH_RST_HIGH_MS: u64 = 50;
 
@@ -30,12 +48,15 @@ const CHG: u16 = 1 << 6;
 const TF: u16 = 1 << 7;
 const IOE_UM: u16 = 1 << 8;
 
-/// UserDemo `hal_tf_card.cpp` wait after `TF_EN` high.
+/// Delay following MicroSD card power enable before sampling detect pin.
 const TF_POWER_MS: u64 = 300;
-/// Official: disconnect IP2315 promptly after the charge
-/// transaction. Catalog id `m5pm1` ADC / `PWR_SRC` / `PWR_CFG`.
+
+/// Duration to hold the IP2315 gate switch closed during the charge transaction.
 const CHARGE_MOUNT_MS: u64 = 50;
+
+/// Settling delay after opening the IP2315 gate switch to ensure bus lines release.
 const CHARGE_PARK_MS: u64 = 20;
+
 const CHARGE_EN: u8 = 1 << 0;
 const CHARGE_IP: u8 = 1 << 1;
 const CHARGE_THEN: u8 = 1 << 2;
@@ -79,8 +100,7 @@ fn store_i2c(sample: I2cSample) {
     cdc::i2c(&sample);
 }
 
-/// Last bring-up `i2c` line. Reprint on the 10 s `hello` period so a
-/// late CDC attach still sees it (`monitor --reset` does not recapture).
+/// Retrieves the most recent I2C peripheral scan results for periodic banner emission.
 pub fn last_i2c() -> Option<I2cSample> {
     if !HAVE_I2C.load(Ordering::Relaxed) {
         return None;
@@ -102,7 +122,9 @@ pub fn last_i2c() -> Option<I2cSample> {
     })
 }
 
-/// Returns the M5IOE1 address that answered official `begin`.
+/// Initializes system expander rails, discovers I2C devices, and isolates unneeded peripherals.
+///
+/// Returns the responsive I2C address of the M5IOE1 expander, if found.
 pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
     Timer::after(Duration::from_millis(ioe::POWER_SETTLE_MS)).await;
 
@@ -111,15 +133,14 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
     let ioe_ack = ioe_addr.is_some();
 
     if ioe_ack {
-        // Park IP2315 before any `0x75` probe. Hold PDM off.
+        // Enforce IP2315 safety isolation before any probing. Keep PDM off.
         let _ = ioe::set_push_pull_output(i2c, ioe1::IP2315_I2C_GATE, false);
         let _ = ioe::set_push_pull_output(i2c, ioe1::PDM_VDD_ENABLE, false);
         let _ = ioe::set_input(i2c, ioe1::MICROSD_DETECT);
         let _ = ioe::set_push_pull_output(i2c, ioe1::MICROSD_ENABLE, true);
         Timer::after(Duration::from_millis(TF_POWER_MS)).await;
 
-        // AW9967 sits on the EPD 3.3 V rail (L3B). Stage B
-        // has no panel::begin; raise PYG3 before PWM0.
+        // AW9967 sits on the EPD 3.3 V rail. Raise rails and pulse touch reset.
         let _ = ioe::set_push_pull_output(i2c, ioe1::EPD_VDD_ENABLE, true);
         let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_VDD_ENABLE, true);
         let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_RST, false);
@@ -145,7 +166,6 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
     let charge = charge_once(i2c, ioe_ack).await;
     store_charge(charge);
     let chg = charge.then;
-    // Library fallback only. Do not walk `0x70`–`0x76`.
     let ioe_um = ioe::probe_addr(i2c, addresses::M5IOE1_UM);
     let tf = ioe_ack && ioe::read_input(i2c, ioe1::MICROSD_DETECT).unwrap_or(false);
     if ioe_ack {
@@ -173,7 +193,7 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
     ioe_addr
 }
 
-/// Last gated charge line. Reprint on the 10 s `hello` period.
+/// Retrieves the most recent battery and charger telemetry.
 pub fn last_charge() -> Option<ChargeSample> {
     if !HAVE_CHARGE.load(Ordering::Relaxed) {
         return None;
@@ -221,8 +241,7 @@ fn read_adc_mv(i2c: &mut SysI2c, lo_reg: u8) -> Option<u16> {
     Some(pmic::adc_mv(lo, hi))
 }
 
-/// Mount IP2315, ACK only, then park. Read M5PM1 voltages
-/// without writing `PWR_CFG`.
+/// Executes a gated IP2315 charge transaction: mounts the bus switch, reads, and promptly parks.
 async fn charge_once(i2c: &mut SysI2c, can_gate: bool) -> ChargeSample {
     let vbat = read_adc_mv(i2c, pmic::VBAT_L).unwrap_or(0);
     let vin = read_adc_mv(i2c, pmic::VIN_L).unwrap_or(0);
@@ -252,8 +271,7 @@ async fn charge_once(i2c: &mut SysI2c, can_gate: bool) -> ChargeSample {
     }
 }
 
-/// Last PWM0 duty after bring-up. Reprint on the 10 s
-/// `hello` period (Stage B has no gutter slider).
+/// Retrieves the active frontlight LED PWM duty cycle.
 pub fn last_lamp() -> Option<u16> {
     if !HAVE_LAMP.load(Ordering::Relaxed) {
         return None;
@@ -261,7 +279,7 @@ pub fn last_lamp() -> Option<u16> {
     Some(LAMP_DUTY.load(Ordering::Relaxed))
 }
 
-/// PWM0 + `PYG3`. Duty `0` is lamp off.
+/// Applies a new frontlight LED PWM duty cycle to the M5PM1 PMIC.
 #[cfg(feature = "sleep")]
 pub fn apply_lamp(i2c: &mut SysI2c, duty: u16) {
     let _ = ioe::set_push_pull_output(i2c, ioe1::EPD_VDD_ENABLE, true);
@@ -276,7 +294,7 @@ pub fn apply_lamp(i2c: &mut SysI2c, duty: u16) {
     crate::cdc::lamp(duty);
 }
 
-/// Idle sample. GPIO4 high is idle on Lite.
+/// Returns a default empty touch sample representing an idle digitizer state.
 pub fn empty_touch(int_high: bool) -> TouchSample {
     TouchSample {
         int_ready: int_high,
@@ -288,12 +306,10 @@ pub fn empty_touch(int_high: bool) -> TouchSample {
     }
 }
 
-/// Empty polls before a gutter stroke is treated as lift.
 #[cfg(feature = "panel")]
 const LAMP_EMPTY_RESET: u8 = 4;
 
-/// M5GFX `getTouchRaw`. `force` keeps reading when `/INT` blips
-/// high mid-stroke (lamp slider).
+/// Fetches multi-touch coordinate data from the FT6336G capacitive digitizer.
 #[cfg(feature = "panel")]
 pub fn read_points(i2c: &mut SysI2c, int_high: bool, force: bool) -> TouchSample {
     if int_high && !force {
@@ -317,7 +333,7 @@ pub fn read_points(i2c: &mut SysI2c, int_high: bool, force: bool) -> TouchSample
     }
 }
 
-/// Right-edge contact → PWM0 duty from official Y (top bright).
+/// Gesture detector for the display right-edge frontlight brightness slider.
 #[cfg(feature = "panel")]
 pub struct LampSlide {
     empty: u8,
@@ -326,6 +342,7 @@ pub struct LampSlide {
 
 #[cfg(feature = "panel")]
 impl LampSlide {
+    /// Creates a new inactive lamp slider gesture recognizer.
     pub const fn new() -> Self {
         Self {
             empty: 0,
@@ -333,16 +350,15 @@ impl LampSlide {
         }
     }
 
-    /// Keep polling through `/INT` high blips.
-    ///
-    /// Card nav force-reads every poll; this stays for the
-    /// target-walk path if a later image gates on INT again.
+    /// Indicates whether the right-edge gutter contact is actively tracking.
     #[allow(dead_code)]
     pub const fn armed(&self) -> bool {
         self.armed
     }
 
-    /// Apply a gutter sample. `true` means do not score as a target.
+    /// Evaluates a touch sample: updates lamp duty if inside the right gutter.
+    ///
+    /// Returns `true` if the sample was consumed by the gutter slider.
     pub fn feed(&mut self, i2c: &mut SysI2c, sample: &TouchSample) -> bool {
         if sample.n < 1 {
             self.empty = self.empty.saturating_add(1);
@@ -374,7 +390,7 @@ fn duty_from_y(y: u16) -> u16 {
     ((u32::from(from_bottom) * u32::from(pmic::PWM0_DUTY_MAX)) / u32::from(span)) as u16
 }
 
-/// M5PM1 G3 / PWM0 into AW9967. Catalog id `m5pm1`.
+/// Enables the frontlight at default brightness level.
 fn lamp_on(i2c: &mut SysI2c) {
     enable_pwm0(i2c);
     write_pwm0(i2c, pmic::FRONTLIGHT_DUTY);
