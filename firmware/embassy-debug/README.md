@@ -93,9 +93,9 @@ glass is brighter; USB-C is dimmer. CDC prints `lamp=`.
 
 ### Step 6: Sleep and wake
 
-On any card, hold BUTTON A about 2 s. The frontlight turns off and
-the glass displays "sleeping, press A or B for 1 second to restart".
-Hold BUTTON A or B about 1 s to wake up; the lamp turns back on and
+On any card, hold BUTTON A about 2 s. The frontlight and red power LED turn
+off, and the glass displays "sleeping, press A or B for 1 second to restart".
+Hold BUTTON A or B about 1 s to wake up; the lamp and red LED turn back on and
 the prior card is restored.
 
 Agent flash contract: [AGENTS.md](AGENTS.md).

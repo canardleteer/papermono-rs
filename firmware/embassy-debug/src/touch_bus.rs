@@ -295,6 +295,13 @@ pub fn apply_lamp(i2c: &mut SysI2c, duty: u16) {
     crate::cdc::lamp(duty);
 }
 
+/// Controls the M5PM1 red power/status LED indicator.
+#[cfg(feature = "sleep")]
+pub fn apply_red_led(i2c: &mut SysI2c, on: bool) {
+    let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
+    let _ = pm1.set_led(on);
+}
+
 /// Returns a default empty touch sample representing an idle digitizer state.
 pub fn empty_touch(int_high: bool) -> TouchSample {
     TouchSample {

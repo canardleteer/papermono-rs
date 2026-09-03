@@ -37,6 +37,8 @@ pub const WAKE_SRC_EXT: u8 = 1 << 5;
 pub const PWR_CFG: u8 = 0x06;
 /// [`PWR_CFG`] bit 0: `CHG_EN` (high = charging enabled).
 pub const CHG_EN: u8 = 1 << 0;
+/// [`PWR_CFG`] bit 4: `LED_EN` (high = red LED on, low = red LED off).
+pub const LED_EN: u8 = 1 << 4;
 /// Catalog id `m5pm1`, System Registers, `HOLD_CFG` (0x07).
 pub const HOLD_CFG: u8 = 0x07;
 /// [`HOLD_CFG`] bit 5: LDO 3.3 V hold.
@@ -198,6 +200,13 @@ impl<I2C: I2c> M5pm1<I2C> {
     pub fn shutdown(&mut self) -> Result<(), I2C::Error> {
         self.write_at(SYS_CMD, SYS_CMD_SHUTDOWN)
     }
+
+    /// Sets the red status LED ([`PWR_CFG`] bit 4, [`LED_EN`]).
+    pub fn set_led(&mut self, on: bool) -> Result<(), I2C::Error> {
+        let cfg = self.read_at(PWR_CFG)?;
+        let new_cfg = if on { cfg | LED_EN } else { cfg & !LED_EN };
+        self.write_at(PWR_CFG, new_cfg)
+    }
 }
 
 #[cfg(test)]
@@ -239,6 +248,23 @@ mod tests {
         let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
         assert_eq!(pm1.read_at(DEVICE_ID).unwrap(), 0x42);
         assert_eq!(pm1.read_le16(VBAT_L).unwrap(), 3921);
+        pm1.release().done();
+    }
+
+    #[test]
+    fn set_led_toggles_pwr_cfg_bit_4() {
+        let txns = [
+            Transaction::write(DEFAULT_ADDRESS, std::vec![PWR_CFG]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x17]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![PWR_CFG, 0x07]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![PWR_CFG]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x07]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![PWR_CFG, 0x17]),
+        ];
+        let i2c = Mock::new(&txns);
+        let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
+        pm1.set_led(false).unwrap();
+        pm1.set_led(true).unwrap();
         pm1.release().done();
     }
 }

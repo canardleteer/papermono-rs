@@ -246,10 +246,11 @@ async fn enter_sleep(
     }
     Timer::after(Duration::from_millis(50)).await;
 
-    // 3. Save active frontlight duty and turn off frontlight.
+    // 3. Save active frontlight duty and turn off frontlight and red LED.
     let saved_duty =
         touch_bus::last_lamp().unwrap_or(m5stack_papermono_lite::pmic::FRONTLIGHT_DUTY);
     touch_bus::apply_lamp(i2c, 0);
+    touch_bus::apply_red_led(i2c, false);
 
     // 4. Configure low-power wake paths on Button A (GPIO2) and Button B (GPIO3).
     let config = WakeupConfig::default().with_low_power_path(true);
@@ -302,6 +303,7 @@ async fn enter_sleep(
     share::BTN_A.store(true, core::sync::atomic::Ordering::Relaxed);
     share::BTN_B.store(true, core::sync::atomic::Ordering::Relaxed);
 
-    // 7. Restore frontlight duty.
+    // 7. Restore frontlight duty and red LED.
     touch_bus::apply_lamp(i2c, saved_duty);
+    touch_bus::apply_red_led(i2c, true);
 }
