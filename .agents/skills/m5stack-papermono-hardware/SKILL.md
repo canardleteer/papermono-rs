@@ -214,9 +214,9 @@ flash size is 16 MB
 
 ## Hard rules (all stacks)
 
-1. **Do not copy Sticky power-latch code.** GPIO45 and GPIO46
+1. **Do not drive GPIO45/46 as a power latch.** GPIO45 and GPIO46
    are PDM CLK/DAT here (and ESP32-S3 strapping pins). Power is
-   the M5PM1 button and rails, not `PWR_HOLD` / `PWR_LOCK`.
+   the M5PM1 button and rails, not a software latch.
 2. **GPIO0 and GPIO3 are strapping pins** (ESP32-S3 datasheet
    v2.2 §3). GPIO0 is M5PM1 `BOOT_OUT`. GPIO3 is BUTTON B
    (DOWN) / PinMap `USER_KEY2`. Do not wiggle them until hold
@@ -236,7 +236,7 @@ flash size is 16 MB
    Hold ~2 s until the red LED blinks, then release.
    [nyc-download-mode](resources/not-yet-confirmed.md#nyc-download-mode).
 6. **Ship a 16 MB-aware partition table.** Do not inherit 8 MB
-   DevKit limits. Do not copy Sticky’s 32 MB / `0x90000` geometry.
+   DevKit limits. Do not assume 32 MB geometry or arbitrary partition offsets.
 7. **Lite has no NFC and no LoRa.** Do not init ST25R3916 or
    Stamp LoRa-1262 / SX1262 on `C153-Lite`. Do not treat those
    GPIOs as free until
@@ -368,7 +368,7 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
   [nyc-cpu-flash-runtime](resources/not-yet-confirmed.md#nyc-cpu-flash-runtime).
 - **Canvas:** official 480×800. FreeInk uses 800×480. Conflict:
   [nyc-canvas-orient](resources/not-yet-confirmed.md#nyc-canvas-orient).
-- **Wake:** M5PM1, not Sticky `ext1` GPIO4. IMU INT and RTC INT
+- **Wake:** M5PM1. IMU INT and RTC INT
   go to M5PM1 GPIOs. UserDemo also uses ESP `ext0` on GPIO4
   for **touch deep sleep** (ESP stays powered down; PMIC I2C
   idle sleep 1 s) — that path is eval intent, not a current.
@@ -384,13 +384,13 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 
 ## Do not
 
-- Treat USB-C as a QinHeng CH343. This is not the Sticky.
+- Treat USB-C as an external CH343 USB-UART adapter.
 - Drive GPIO45/46 as a power latch.
 - Invent a four-gray LUT from a generic SSD1677 example.
 - Keep IP2315 on the I2C bus after a charge read.
 - Init NFC or LoRa on PaperMono-Lite.
-- Overlap assumptions from reTerminal Sticky pin maps (GT911,
-  BQ27220, BQ25616, CH343, 32 MB, GPIO7 shared INT).
+- Overlap assumptions from other board pin maps (GT911,
+  BQ27220, BQ25616, CH343, 32 MB flash, GPIO7 shared INT).
 - Use crate `bq27xxx` (this board has IP2315 + M5PM1, not a
   TI CEDV gauge).
 - Invent registers or opcodes when the vendor PDF is unread. If

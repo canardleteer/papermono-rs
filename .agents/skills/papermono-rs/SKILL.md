@@ -103,7 +103,7 @@ Catalog and encode:
   [rustacean.net](https://rustacean.net/)
   (`rustacean-flat-happy`). rustacean.net waives copyright
   and neighboring rights (CC0-style dedication).
-- **Black-and-white line-art monification:** canardleteer
+- **Line-art monification:** in-repo line art
   (`ferris-happy-line-art.svg`).
 - Firmware include is `ferris.1bpp` (360×240). Invert pair
   is stored beside it, not linked into the image.
@@ -131,8 +131,8 @@ Crate verdicts before adoption:
 Never commit a MAC, serial number, USB serial string, NVS blob,
 flash image, dump SHA, or unit-id. `developer-data/` is
 gitignored on purpose. Never add a Cargo `runner`. Never
-`erase-flash`. Never `espflash flash`. Do not invent Sticky
-`0x90000` / 32 MB geometry.
+`erase-flash`. Never `espflash flash`. Do not assume arbitrary
+partition offsets or 32 MB geometry.
 Do not init NFC or LoRa on PaperMono-Lite. Official eval
 firmware is
 [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)

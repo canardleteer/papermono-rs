@@ -4,7 +4,7 @@
 //! clocks / reset), a git line, a GPIO sample, a 1 Hz heartbeat of
 //! BUTTON A (UP) / BUTTON B (DOWN), and edge lines on those keys. The
 //! e-paper panel does not refresh. No I2C, no NFC, no LoRa, no PDM, no
-//! Sticky-style GPIO45/46 latch.
+//! GPIO45/46 latch.
 //!
 //! In the MCU: blocking `esp-hal`. No Embassy, no RTOS, no panel LUT.
 //!

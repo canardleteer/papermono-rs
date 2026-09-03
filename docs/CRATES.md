@@ -10,8 +10,8 @@ or **constants-in-BSP** (named registers in
 `m5stack-papermono-lite` / `m5stack-papermono`; I/O still in
 firmware).
 
-Do not path-dep sticky-rs `ssd1677-gray4`. That OTP path is a
-different product. Do not wrap [M5Unified](https://github.com/m5stack/M5Unified)
+Do not path-dep foreign SSD1677 drivers with differing OTP
+sequences. Do not wrap [M5Unified](https://github.com/m5stack/M5Unified)
 (C++ board HAL, `develop` branch). Panel LUTs belong to M5GFX /
 OTP-Demo, not M5Unified.
 
@@ -47,7 +47,7 @@ IP2315 crates.
 | --- | --- |
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map. `C153-Lite` firmware depends on this only |
 | [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` radio add-on. Not a `lite` Cargo feature |
-| [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT. Not sticky `ssd1677-gray4` |
+| [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
 | [`m5pm1`](../crates/m5pm1) | Register map, ADC, PWM0. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |
 | [`papermono-log`](../crates/papermono-log) | CDC line format for **both** `simple-debug-fw` and `embassy-debug-fw` |

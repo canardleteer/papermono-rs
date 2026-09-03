@@ -26,16 +26,7 @@ unit (`C153` and/or `C153-Lite`) via the matching `nyc-*`
 ids. Frontlight AW9967 vs M5PM1 PWM is not a pick-one:
 schematic V0.6.2 has PWM into AW9967.
 
-They are useful for expander sequencing comments and for “do not
-copy Sticky `holdPowerRails()` onto this board” (this product
-is not battery-latched on ESP GPIOs).
-
-## Sticky hardware skill
-
-[seeed-sticky-hardware](https://github.com/canardleteer/sticky-rs/tree/main/.agents/skills/seeed-sticky-hardware)
-is a **different product** (reTerminal Sticky). Same MCU family
-and a similar 3.97" SSD1677 module class. Different touch
-(GT911), UART (CH343), flash (32 MB), power latch, gauge.
-Do not paste its GPIO table here.
+They are useful for expander sequencing comments and for power
+management notes (this product is not battery-latched on ESP GPIOs).
 
 Full URL list for PaperMono: [catalog.md](../references/catalog.md).

@@ -8,8 +8,7 @@ reset are M5IOE1 `PYG13` / `PYG6`.
 Sheet: `/INT` = data ready; `RSTN` active-low; hold INT and
 I2C low before power-on. SCL **10–400 kHz** (Table 2-2).
 
-This is not GT911. Do not run an INT-during-reset address dance
-from the Sticky skill.
+This is not GT911. Do not run an INT-during-reset address dance.
 
 ## Active area
 

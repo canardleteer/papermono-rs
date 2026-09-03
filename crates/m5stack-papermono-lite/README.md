@@ -1,26 +1,19 @@
 # m5stack-papermono-lite
 
-Board support for the **M5Stack PaperMono-Lite** (`C153-Lite`).
+Board support and pin definitions for the M5Stack PaperMono-Lite
+(`C153-Lite`) development board.
 
-This crate is the **shared pin map** for both PaperMono SKUs: ESP32-S3
-GPIO numbers, system I2C addresses, M5IOE1 / M5PM1 nets both products
-use, and panel geometry. It is `no_std`, has no `esp-hal` dependency,
-and is host-testable.
+Hardware details:
+[PaperMono-Lite PRJ V0.6.2 Schematic](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522.pdf)
+and [M5Stack PaperMono-Lite Documentation](https://docs.m5stack.com/en/core/PaperMono-Lite).
 
-NFC and LoRa are **not** in this crate. PaperMono (`C153`) is the
-sibling `m5stack-papermono` crate. Do not drive leftover radio pads on
-Lite as extra GPIO.
+This crate provides the core pin map common to PaperMono hardware. It exports
+ESP32-S3 package pins, addresses for the system I2C bus, expander nets, power
+rail controls, and portrait panel dimensions without taking a direct
+dependency on `esp-hal`. Because the package compiles under `#![no_std]`
+without architecture-specific HAL primitives, unit tests run directly on host
+tooling.
 
-Chip registers live in `m5pm1`, `m5ioe1`, and `ssd1677-otp`.
-MCU peripherals belong in firmware. This crate does not ship a
-waveform LUT (OTP first). GPIO45 and GPIO46 are PDM, not a
-Sticky-style power latch. Park IP2315 off the system I2C bus
-except a gated charge transaction.
-
-This README is the crates.io landing page. Relative markdown links here
-only resolve inside this package.
-
-## Agent notes
-
-Portable agent rules for this crate live in `AGENTS.md` in this
-directory.
+Peripheral register details reside in companion chip crates such as `m5pm1`,
+`m5ioe1`, and `ssd1677-otp`. Radio components like NFC and LoRa are absent on
+the Lite model and are provided by the sibling `m5stack-papermono` crate.

@@ -56,7 +56,7 @@ blinks, then release. Confirmed on Lite: after that hold,
 next to the power button (`LED_EN_PP`), not the RGB
 window. `C153` still
 [nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode).
-That is not Sticky DTR/RTS into a CH343.
+This is not an automatic DTR/RTS sequence through an external UART bridge.
 
 ```shell
 # only if a human asked to talk to a device
@@ -66,8 +66,7 @@ esptool.py flash-id
 ```
 
 Lite `probe-rs list` (2026-09-02, run mode) saw `EspJtag`.
-Do not assume Sticky’s “no probes”. Do not commit the
-probe serial.
+Do not commit the probe serial.
 
 ## Confirmed live
 
@@ -138,4 +137,4 @@ measured (16 MB); JEDEC manufacturer bytes and PSRAM still
 
 - Not a pinout ([pin-map.md](pin-map.md)).
 - Not permission to invent USB VID, JEDEC, or partition offsets.
-- Not Sticky’s CH343 / 32 MB / `0x90000` notes.
+- Not external CH343, 32 MB flash, or arbitrary `0x90000` partition notes.

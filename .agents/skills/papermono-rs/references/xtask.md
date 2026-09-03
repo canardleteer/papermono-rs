@@ -58,18 +58,16 @@ cargo xtask detect-connected
 `idle-simple.log` is gitignored. `flash-app` needs a `save-image`
 payload; run `cargo xtask build-fw` first.
 
-## Not ported (sticky-rs)
+## Intentional xtask scope exclusions
 
-These sticky-rs xtask items stay out until a later stage. Do not
-copy CH343, `app0` / 32 MB, or ACM DTR.
+The following xtask features are excluded by design:
 
-| Sticky item | Why not now |
+| Excluded item | Rationale |
 | --- | --- |
-| Live `learn-uart` YAML, `learn-uart-only`, `diff-learn-uart` | Intentional. Parse + `vet-idle-log` only |
-| `simple-debug --features operator` | Drives that attended session |
+| Live `learn-uart` YAML, `learn-uart-only`, `diff-learn-uart` | Intentional: parse and `vet-idle-log` only |
+| `simple-debug --features operator` | Attended session not needed on USB-Serial/JTAG |
 | `flash-app --allow-unknown-layout` | Lite factory geometry is known (`0x10000` / `0xF00000`) |
-| `monitor --acm-tty` | Papermono is usbfs CDC. ACM DTR is the trap |
-| `ci -p ssd1677-gray4 --no-default-features` | No such crate here |
+| `monitor --acm-tty` | Papermono is usbfs CDC. ACM DTR is unreliable |
 
 ## Tool verification ledger
 
@@ -112,7 +110,7 @@ The same rows are in
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | DTR/RTS: 0 CDC bytes. Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log`. `--image embassy-debug` |
 | `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug`; `save-image --flash-size 16mb` |
-| `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red after. Not Sticky `0x90000` |
+| `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red after |
 
 ## USB session lock
 

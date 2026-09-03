@@ -33,7 +33,7 @@ read
 Do not mix this page with PlatformIO / `idf.py`. Those trees are
 wiring evidence in [cpp-platformio.md](cpp-platformio.md). Do not
 treat `esp-hal` as the only legal Rust stack. Never a generic
-SSD1677 four-gray LUT. Never Sticky latch GPIOs. Never `bq27xxx`.
+SSD1677 four-gray LUT. Never GPIO45/46 power latching. Never `bq27xxx`.
 
 Board crates live under `crates/` (host-testable, no `esp-hal`).
 `simple-debug-fw` is a workspace member, not a default-member.

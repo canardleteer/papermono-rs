@@ -17,7 +17,7 @@
 //! - Waveform LUTs (call [`display::OtpRefresh`]; do not invent
 //!   a 105-byte `0x32` table or map [`display::RefreshMode`]
 //!   onto OTP `0x22` bytes)
-//! - Sticky GPIO45/46 power-latch sequences (those pins are PDM here)
+//! - GPIO45/46 power-latch sequences (those pins are PDM here)
 //! - IP2315 traffic except a gated charge transaction
 //! - `esp-hal` pin types (firmware maps [`pins`] once)
 

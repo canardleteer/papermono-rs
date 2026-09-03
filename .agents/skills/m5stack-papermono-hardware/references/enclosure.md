@@ -94,5 +94,4 @@ read. That is the charger lamp, not the side RGB.
   `papermono-schematic` /
   `papermono-lite-schematic` in
   [datasheets.md](../resources/datasheets.md).
-- Not permission to invent a fourth key or a Sticky-style
-  right-edge triple.
+- Not permission to invent a fourth key or an extra side button.

@@ -1,6 +1,6 @@
 //! Stage C: self-hosted PDM RMS/peak on USB-Serial/JTAG. No cloud.
 //!
-//! Known-tone dump matches sticky `--features mic`: BUTTON A prints
+//! Known-tone dump: BUTTON A prints
 //! two 16 kHz windows with `hz=0` (board plays nothing). Period is
 //! counted in the rows. 16 kHz / right (UserDemo). Caller enables
 //! `PYG12` before spawn.

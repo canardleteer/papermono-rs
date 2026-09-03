@@ -32,7 +32,7 @@ Additional rules for this workspace:
 - **Do not invent registers.** If the datasheet has not been read,
   expose a documented raw primitive and record the gap.
 - **No MCU LUT.** `ssd1677-otp` calls panel OTP only. Do not ship a
-  105-byte `0x32` table. Do not path-dep sticky-rs `ssd1677-gray4`.
+  105-byte `0x32` table.
 
 ## Typestate, and where it earns its keep
 

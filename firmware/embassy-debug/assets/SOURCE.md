@@ -13,20 +13,18 @@ law, they have waived all copyright and related or neighboring
 rights to Ferris the Rustacean (published from the United
 States). That is a CC0-style public-domain dedication.
 
-**Black-and-white line-art monification:**
-**canardleteer**. Source file:
+**Line-art monification:** Source file:
 [`ferris-happy-line-art.svg`](ferris-happy-line-art.svg).
 
 ## Encode
 
 `ferris.1bpp` is 360×240 packed 1 bit-per-pixel (8
-pixels/byte, MSB-first, `1` = ink). Same canvas as the old
-4-gray `ferris.g4`. `encode_ferris.py` crops ink, fits
-360×240, thresholds, and writes:
+pixels/byte, MSB-first, `1` = ink). `encode_ferris.py`
+crops ink and scales to 360×240 pixels before generating the output files:
 
 | File | Role |
 | --- | --- |
-| `ferris-happy-line-art.svg` | canardleteer line art (in repo) |
+| `ferris-happy-line-art.svg` | In-repo line art |
 | `ferris.1bpp` | Light card (black ink, white skip). Firmware include |
 | `ferris-inv.1bpp` | Bitwise invert. Dark-mode pair; not in the image |
 | `ferris.png` | 1-bit preview of the light pack |
