@@ -697,6 +697,7 @@ dependencies = [
  "esp-rtos",
  "m5stack-papermono-lite",
  "papermono-log",
+ "sha2 0.10.9",
  "static_cell",
  "trouble-host",
 ]
@@ -3236,6 +3237,7 @@ dependencies = [
  "clap",
  "env_logger",
  "papermono-host",
+ "sha2 0.10.9",
 ]
 
 [[package]]
