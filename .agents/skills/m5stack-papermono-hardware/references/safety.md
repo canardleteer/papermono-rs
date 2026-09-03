@@ -59,7 +59,7 @@ conflict; do not flatten it
   bytes), including M5GFX `lut_quality` / `lut_text` /
   `lut_fast` / `lut_fastest`.
 - Treat official HTML `epd_quality` / `epd_text` / `epd_fast`
-  / `epd_fastest` as OTP `0x22` bytes (Lite Stage D `0xC7`
+  / `epd_fastest` as OTP `0x22` bytes (Lite panel test `0xC7`
   never raised BUSY).
 - Send OTP `Partial` after `GrayFull` without `MonoFull`.
   Lite (2026-09-01) **failure, abandoned:** Ferris stayed

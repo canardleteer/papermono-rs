@@ -60,13 +60,13 @@ mod tests {
     #[test]
     fn radio_gpios_are_not_assigned_here() {
         for &assigned in pins::ASSIGNED {
-            assert_ne!(assigned, 5, "LoRa IRQ is full-SKU only");
-            assert_ne!(assigned, 6, "NFC IRQ is full-SKU only");
-            assert_ne!(assigned, 21, "SX1262 BUSY is full-SKU only");
-            assert_ne!(assigned, 38, "LoRa MOSI is full-SKU only");
-            assert_ne!(assigned, 39, "LoRa CLK is full-SKU only");
-            assert_ne!(assigned, 40, "LoRa MISO is full-SKU only");
-            assert_ne!(assigned, 41, "SX1262 NSS is full-SKU only");
+            assert_ne!(assigned, 5, "LoRa IRQ is C153 only");
+            assert_ne!(assigned, 6, "NFC IRQ is C153 only");
+            assert_ne!(assigned, 21, "SX1262 BUSY is C153 only");
+            assert_ne!(assigned, 38, "LoRa MOSI is C153 only");
+            assert_ne!(assigned, 39, "LoRa CLK is C153 only");
+            assert_ne!(assigned, 40, "LoRa MISO is C153 only");
+            assert_ne!(assigned, 41, "SX1262 NSS is C153 only");
         }
     }
 }

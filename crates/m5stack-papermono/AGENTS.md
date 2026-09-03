@@ -10,8 +10,9 @@ Lite (2026-09-01) FT XY / OTP partial+mono facts are **Lite
 only**. Do not copy them onto `C153` (`nyc-canvas-orient`,
 `nyc-ft6336-area`, `nyc-ft6336-points`).
 
-Product PinMap names LoRa SPI as SPI1; UserDemo uses `SPI3_HOST` on
-those GPIOs. Keep both names. Do not flatten.
+Product PinMap names LoRa SPI as SPI1; official factory demo firmware
+([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
+uses `SPI3_HOST` on those GPIOs. Keep both names. Do not flatten.
 
 Live-ask, never-erase, and flash I/O: root
 [AGENTS.md](../../AGENTS.md). Pin map:

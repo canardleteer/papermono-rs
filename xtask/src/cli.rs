@@ -220,7 +220,7 @@ pub struct BuildFwCliArgs {
     /// Build the debug profile instead of `--profile release-fw`.
     #[arg(long)]
     pub debug: bool,
-    /// `cargo --no-default-features` (Stage A, or Stage B with
+    /// `cargo --no-default-features` (minimal unfeatured bring-up, or touch-only with
     /// `--features touch`).
     #[arg(long)]
     pub no_default_features: bool,

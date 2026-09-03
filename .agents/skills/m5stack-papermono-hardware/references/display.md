@@ -81,7 +81,7 @@ Silicon table: [measure.md](measure.md).
 
 ### Failures
 
-- Stage D `epd_text` + datasheet Mode 1: no BUSY rise, no
+- Panel OTP `epd_text` + datasheet Mode 1: no BUSY rise, no
   glass change.
 - Bare second Mode 1: `busy=1`, Ferris stuck (with and
   without GPIO42 chirp). Chirp stays parked.

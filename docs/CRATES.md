@@ -28,7 +28,7 @@ IP2315 crates.
 | BMI270 | possible later | **constants-in-BSP** | `CHIP_ID` `0x00` / payload `0x24`. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
-| ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **fail / wait for C153** | I2C `0x50`, `I2C_EN=VDD`. Official stack is ST RFAL (C) and UserDemo M5Unit-NFC (Arduino). Do not wrap `st25r95`. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
+| ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **fail / wait for C153** | I2C `0x50`, `I2C_EN=VDD`. Official stack is ST RFAL (C) and official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) M5Unit-NFC (Arduino). Do not wrap `st25r95`. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
 | SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **pass-with-wrapper, audit when C153 arrives** | Chip opcodes. Do not adopt in the lockfile yet. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
 | Stamp LoRa-1262 | none | **fail (board wrapper)** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC. Not in `lora-phy`. RadioLib is C++. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
 
@@ -73,6 +73,9 @@ board-info does not close the NYC item.
 `serialport`). Do not enable espflash’s `cli` feature. Never
 call full-chip erase APIs. `cargo xtask` is clap over
 `papermono-host`.
+
+[`sha2`](https://crates.io/crates/sha2) (0.10) for firmware asset
+integrity checking at build time and during `cargo xtask encode-assets`.
 
 Firmware images take `esp-hal`, `esp-println`, `esp-backtrace`,
 `esp-bootloader-esp-idf` from git tag `esp-hal-v1.2.0-rc.0`.

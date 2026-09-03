@@ -1,6 +1,6 @@
 //! M5PM1 **board nets** present on both SKUs.
 //!
-//! Registers live in `m5pm1`. LoRa_EN (`G2`) is full-SKU only.
+//! Registers live in `m5pm1`. LoRa_EN (`G2`) is C153 only.
 //! RGB red is PMIC `LED_EN_PP` (not PWM).
 
 pub use m5pm1::{

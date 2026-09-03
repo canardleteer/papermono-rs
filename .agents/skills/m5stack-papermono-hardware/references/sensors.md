@@ -53,7 +53,7 @@ Part: LMD4737T261-AC02. CLK GPIO45, DAT GPIO46, enable M5IOE1
 
 Rate / slot / hole energy:
 [nyc-pdm-mic](../resources/not-yet-confirmed.md#nyc-pdm-mic).
-Lite Stage C idle (80 ms, parked): `rms≈1356–1422`
+Lite PDM bring-up idle (80 ms, parked): `rms≈1356–1422`
 `peak=12917`. Later live 16 kHz **right**: quiet
 `rms≈1370–1395` (`peak≈14029` is the window-start
 spike). Phone A through the hole, BUTTON A dump:
@@ -71,12 +71,14 @@ as a power latch.
 
 ## RGB LED
 
-Three dies. Red: M5PM1 `LED_EN_PP` (no PWM). Green: M5IOE1
-PYG8. Blue: M5IOE1 PYG9. Official: adjustable color range is
-limited because red is not PWM.
+Three dies. Red: M5PM1 `LED_EN_PP` (no PWM; register `0x13` bit `0x20`
+enables push-pull drive, and register `0x06` bit `0x10` sets output
+level; see
+[LED_PaperMono_Class.cpp](https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/led/LED_PaperMono_Class.cpp)).
+Green: M5IOE1 PYG8 PWM channel 2. Blue: M5IOE1 PYG9 PWM channel 3.
+Official: adjustable color range is limited because red is not PWM.
 [nyc-rgb-led](../resources/not-yet-confirmed.md#nyc-rgb-led).
-UserDemo PWM: 5 kHz, green `M5IOE1_PWM_CH2`, blue
-`M5IOE1_PWM_CH1`, red `pm1.setLedEnLevel`.
+Factory demo / M5Unified PWM: 5 kHz, 8-bit duty.
 
 After power-on, red follows M5PM1 default (download-mode blink
 uses this die).

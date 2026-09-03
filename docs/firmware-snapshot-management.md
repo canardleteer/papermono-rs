@@ -20,16 +20,22 @@ A snapshot is **this unit’s bytes**, bound by SHA-256 of the USB
 iSerial (and MAC hash when `--probe` has run). It is not a
 factory-reset image you can share.
 
-- M5Stack publishes a restore image. That is **not** a substitute
-  for this unit’s NVS / PHY cal.
+- The ESP32-S3 Wi-Fi/BLE MAC address is permanently burned into
+  physical eFuses at the factory, and standard ESP-IDF
+  automatically performs RF calibration on boot into NVS when
+  wiped. However, taking a snapshot preserves the exact stock
+  partition layout, vendor demo binaries, and device state
+  without needing external restore packages.
 - Never `erase-flash`. Never `espflash flash` (default bootloader
   and table).
 - Do not assume an arbitrary partition offset like `0x90000`.
 - Dump length is the **measured** flash size (official 16 MB →
   `0x1000000`). Refuse `flash-32mb.bin` unless that length
   matches.
-- UserDemo `partitions.csv` matches **Lite stock** at `0x8000`.
-  PIO `default_16MB.csv` is still a different table. `C153` is
+- Official factory demo firmware
+  ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
+  `partitions.csv` matches **Lite stock** at `0x8000`. PIO
+  `default_16MB.csv` is still a different table. `C153` is
   [nyc-partition-table](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-partition-table).
 
 ## Two snapshot kinds
@@ -86,7 +92,9 @@ Run-mode listen (needs
 cargo xtask monitor --for 20 --output idle-simple.log
 ```
 
-Stock UserDemo is silent. Custom images print `simple-debug:`
+Stock factory demo firmware
+([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
+is silent. Custom images print `simple-debug:`
 lines. After `flash-app`, short-press red. Do not use
 `monitor --reset` to recapture on Lite.
 
@@ -111,11 +119,14 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
 | `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
+| `encode-assets` | Host-only tested | host / 2026-09-02 | Rasterize and pack SVG line art into 1bpp bitmaps |
 | `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
 `--probe`, `backup-factory-firmware`, confirm `--capture`,
 `monitor`, restore `--capture`, and `flash-app` are **Live
-tested** on Lite. `build-fw` is host-only. Flash size is 16 MB;
-the live table matches UserDemo `partitions.csv`. A Lite result
-does not confirm `C153`. Do not commit `developer-data/` or
-print dump SHA / unit-id / MAC.
+tested** on Lite. `build-fw` and `encode-assets` are host-only.
+Flash size is 16 MB; the live table matches official factory
+demo firmware
+([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
+`partitions.csv`. A Lite result does not confirm `C153`. Do not
+commit `developer-data/` or print dump SHA / unit-id / MAC.

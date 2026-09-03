@@ -23,9 +23,9 @@ pub const BUTTON_A: u8 = 2;
 pub const BUTTON_B: u8 = 3;
 /// FT6336G INT (`G4_TP_INT`).
 pub const TOUCH_INT: u8 = 4;
-/// Lite leftover: full-SKU LoRa IRQ. Input only. Do not drive.
+/// Lite leftover: C153 LoRa IRQ. Input only. Do not drive.
 pub const LEFTOVER_LORA_IRQ: u8 = 5;
-/// Lite leftover: full-SKU ST25R3916 IRQ. Input only. Do not drive.
+/// Lite leftover: C153 ST25R3916 IRQ. Input only. Do not drive.
 pub const LEFTOVER_NFC_IRQ: u8 = 6;
 /// M5IOE1 IRQ (`PYB_IRQ`).
 pub const IOE1_IRQ: u8 = 7;
@@ -54,7 +54,7 @@ pub const EPD_DC: u8 = 17;
 /// EPD BUSY. Sheet: high = busy. Glass polarity:
 /// hardware skill `nyc-otp-busy`.
 pub const EPD_BUSY: u8 = 18;
-/// Lite leftover: full-SKU SX1262 BUSY. Input only. Do not drive.
+/// Lite leftover: C153 SX1262 BUSY. Input only. Do not drive.
 /// Sheet: no internal pull.
 pub const LEFTOVER_SX_BUSY: u8 = 21;
 

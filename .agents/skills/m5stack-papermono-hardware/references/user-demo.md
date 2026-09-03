@@ -48,8 +48,9 @@ not a compile-time Lite vs full image.
    (`0x7F`) and accepts type `0x05` with a non-zero rev. Cite
    those **UserDemo constants**, not an unread ST25R3916
    register map.
-4. Drop `NFC_EN` low. `BoardVariant::Pro` if the probe
-   succeeded, else `Lite`. `hasNfcHardware()` is Pro only.
+4. Drop `NFC_EN` low. `BoardVariant::Pro` (internal demo
+   enum for `C153`) if the probe succeeded, else `Lite`.
+   `hasNfcHardware()` is `C153` only.
 
 `app_main` installs `AppNfcScan` and `AppLora` **only** when
 `hasNfcHardware()` is true. Lite backgrounds/logos are
@@ -150,7 +151,7 @@ DAT0–DAT3. FreeInk says 1-bit. Live width:
 Detect polarity:
 [nyc-tf-det](../resources/not-yet-confirmed.md#nyc-tf-det).
 
-## LoRa (`hal_lora.cpp`, full SKU / Pro only)
+## LoRa (`hal_lora.cpp`, `C153` only)
 
 GPIOs match the pin table (MOSI 38, MISO 40, SCK 39, NSS 41,
 DIO1 5, BUSY 21). Enable M5PM1 `GPIO_NUM_2`, reset
@@ -230,7 +231,7 @@ PlatformIO product-page env still points at
 `default_16MB.csv`. That is a **different** table than this
 CSV. Do not assume arbitrary partition offsets or 32 MB geometry.
 
-## NFC app (Pro only)
+## NFC app (`C153` only)
 
 `app_nfc_scan.cpp` uses M5Unit-NFC on `M5.In_I2C` after
 `Hal::setNfcPower(true)` (120 ms). IRQ unused

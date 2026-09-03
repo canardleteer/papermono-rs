@@ -5,10 +5,10 @@ Where holes and keys sit on the card. Electrical nets stay in
 [resources/enclosure/](../resources/enclosure/SOURCE.md)
 (PNG for reading; WebP is the upstream bytes).
 
-Official size: 62.0 × 101.0 × 8.0 mm. Full SKU 74.7 g; Lite
-72.4 g. Older product PDF rows said “work in progress” / 61 mm —
-name that in [sources.md](sources.md); prefer the current HTML
-tables.
+Official size: 62.0 × 101.0 × 8.0 mm. PaperMono (`C153`) 74.7 g;
+PaperMono-Lite (`C153-Lite`) 72.4 g. Older product PDF rows said
+“work in progress” / 61 mm — name that in [sources.md](sources.md);
+prefer the current HTML tables.
 
 Gray case = PaperMono (`C153`). White case = PaperMono-Lite
 (`C153-Lite`).

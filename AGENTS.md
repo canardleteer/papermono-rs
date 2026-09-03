@@ -21,10 +21,11 @@ not default-members.
    `BOOT_OUT`; GPIO3 is BUTTON B (DOWN) / `USER_KEY2`.
 5. **Download mode is a power-button hold** (~2 s until the red
    LED blinks), not DTR on a CH343.
-6. **Snapshot first if you care about that unit’s PHY.** ESP32-S3
-   RF calibration lives in NVS. Do not assume custom partition
-   offsets. M5Stack publishes factory-restore images; that is
-   not a license to skip a snapshot.
+6. **Snapshot first to preserve factory state.** The Wi-Fi/BLE MAC
+   is burned in hardware eFuses and ESP-IDF auto-calibrates RF into
+   NVS, but taking a snapshot preserves the stock partition layout,
+   factory demo image, and existing flash state without needing
+   vendor downloads.
 
 Full hazard table: [docs/SAFETY.md](docs/SAFETY.md). Board facts
 and source precedence:
@@ -152,6 +153,32 @@ Skills:
   skills can be matched to an official datasheet section or vendor
   documentation, do so directly instead of citing third-party, community,
   or secondary sources.
+- **Exact Store SKUs, no informal aliases.** Always use official
+  M5Stack commercial SKUs: `C153` (PaperMono) and `C153-Lite`
+  (PaperMono-Lite). Never use informal aliases like `full`,
+  `both`, `full-SKU`, or `Pro` in SKU tables, code comments, or
+  documentation. In tables with an `SKU` column, list `C153`,
+  `C153-Lite`, or `C153, C153-Lite`.
+- **No ephemeral or non-specific references.** Never refer to
+  ephemeral development phases or milestones ("Stage A",
+  "Stage B", "Stage C", "Stage D", "Phase 1"). Always use
+  descriptive hardware terms (such as minimal unfeatured bring-up,
+  system I2C and touch rails, PDM audio energy sampling, or
+  OTP e-paper panel refresh). Never use bare, unexplained
+  references like "UserDemo"; always identify the full provenance
+  and link the official factory demo firmware
+  ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)).
+- **Firmware examples as tutorial code.** Firmware under `firmware/`
+  (`simple-debug-fw` and `embassy-debug-fw`) must serve as
+  educational reference code. Every function, method, struct, enum,
+  and constant (public or private) must have comprehensive rustdoc
+  explaining what it does, hardware nets/buses involved, expectations,
+  and error handling. Include abundant in-line comments explaining
+  hardware register sequencing, GPIO electrical configurations
+  (pull-ups, input modes), bus arbitration, Embassy task scheduling,
+  stack buffer usage, and reset/wake-up cycles. Ground descriptions
+  in authoritative terminology from *The Embedded Rust Book*,
+  *The Rust on ESP Book*, and *The Embassy Book*.
 - Use [Conventional Commits](https://www.conventionalcommits.org/).
 - Measurement-backlog items in the hardware skill stay open until
   someone confirms them on a physical PaperMono (`C153`) or
@@ -185,6 +212,7 @@ xtask catalog a human sees, update the matching row in the
 | --- | --- | --- |
 | [README.md](README.md) | humans | firmware-examples list, `docs/assets/first-ferris.png`, xtask summary, SKUs, safety / getting-started / NYC / CRATES links |
 | [docs/getting-started.md](docs/getting-started.md) | humans | host verify, Xtensa, snapshot, Path A / Path B, troubleshooting, NYC / CRATES |
+| [docs/firmware-snapshot-management.md](docs/firmware-snapshot-management.md) | humans | capture, confirm, restore, tool ledger, honest limits |
 | [docs/CRATES.md](docs/CRATES.md) | humans + agents | pass / fail / written-here / constants-in-BSP |
 | [docs/API-RULES.md](docs/API-RULES.md) | humans + agents | chip-crate C-CTOR / C-FREE / no MCU LUT |
 | [firmware/simple-debug/README.md](firmware/simple-debug/README.md) | humans | CDC heartbeat, button check, flash / listen steps |
@@ -236,8 +264,9 @@ this model; observed hardware still outranks a datasheet default.
 See
 [Authority](.agents/skills/m5stack-papermono-hardware/SKILL.md#authority).
 PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
-IDs (`303a:1001`), a 16 MB flash size, and a UserDemo-matching
-partition table
+IDs (`303a:1001`), a 16 MB flash size, and a partition table matching
+the official factory demo firmware
+([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
 ([flashing.md](.agents/skills/m5stack-papermono-hardware/references/flashing.md#usb-measured),
 [measure.md](.agents/skills/m5stack-papermono-hardware/references/measure.md)).
 Official HTML `epd_*` times (`epd_quality` / `epd_text` /
