@@ -15,8 +15,8 @@
 //!   into the dual-plane framebuffers.
 //! - **Five-Card Walkthrough**:
 //!   1. `Splash`: Displays the Rust Ferris mascot and navigation hints.
-//!   2. `Shapes`: Verifies geometry rendering (disks, rounded boxes, triangles, intersecting crossbars).
-//!   3. `Legend`: Provides an on-device quick-reference visual guide for physical buttons and touch rails.
+//!   2. `Shapes`: Verifies geometry rendering (procedural 3-degree Koch snowflake with microsecond benchmark, triangles, boxes).
+//!   3. `Legend`: Provides an on-device quick-reference visual guide for physical buttons, sleep/wake, and touch rails.
 //!   4. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
 //!   5. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
 

@@ -13,7 +13,9 @@ On the unit:
   ([rustacean.net](https://rustacean.net/)). Line-art
   monification details in [assets/SOURCE.md](assets/SOURCE.md).
 - BUTTON A previous card, BUTTON B next. The walk is splash →
-  shapes → legend → four-gray tones → touch targets.
+  shapes (procedural 3-degree Koch snowflake benchmark) →
+  legend (pinout, touch rails, sleep/wake instructions) →
+  four-gray tones → touch targets.
 - Slide the right edge for the lamp (top bright, USB-C dim).
 - Hold BUTTON A about 2 s to enter low-power sleep; hold BUTTON A
   or B about 1 s to wake up.

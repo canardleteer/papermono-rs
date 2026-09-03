@@ -6,9 +6,11 @@
 //! - **Five-Card Finite State Machine**: Cycles sequentially through the UI scenes:
 //!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Tones` ↔ `Targets`.
 //! - **Physical Button Controls**:
-//!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>1.2 s)
-//!     triggers an audio recording / tone test when the `mic` feature is enabled.
-//!   - `BUTTON B` (`GPIO3`): Short press advances to the next card.
+//!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>2 s)
+//!     triggers low-power sleep; long press (~1 s) triggers an audio recording / tone test
+//!     when the `mic` feature is enabled.
+//!   - `BUTTON B` (`GPIO3`): Short press advances to the next card. During sleep, holding
+//!     either `BUTTON A` or `BUTTON B` for 1 s wakes the device.
 //! - **Touch Gutter Gesture**:
 //!   - Swiping along the far-right edge of the screen dynamically adjusts the display
 //!     frontlight LED brightness via PWM without advancing cards.

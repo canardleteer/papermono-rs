@@ -292,9 +292,9 @@ pub struct MicSample {
 pub enum Scene {
     /// Ferris + `papermono-rs` + A/B hints.
     Splash,
-    /// Three 1-bit rectangles.
+    /// Procedural 3-degree Koch snowflake with microsecond benchmark and test patterns.
     Shapes,
-    /// Left A/B boxes and right lamp gutter.
+    /// Physical buttons, sleep/wake controls, and right lamp gutter legend.
     Legend,
     /// Four OTP gray boxes.
     Tones,
