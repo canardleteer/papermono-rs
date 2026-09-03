@@ -87,7 +87,8 @@ pub const PWM_FREQ_L: u8 = 0x34;
 pub const FRONTLIGHT_DUTY: u16 = 1024;
 /// 12-bit PWM0 full scale.
 pub const PWM0_DUTY_MAX: u16 = 4095;
-/// PWM frequency for G3 → AW9967 (Hz). FreeInk Paper Mono is 5 kHz.
+/// Frontlight PWM frequency for M5PM1 G3 into AW9967 (Hz). Catalog id `m5pm1`,
+/// section PWM Control (`PWM_FREQ_L` 0x34).
 pub const FRONTLIGHT_PWM_HZ: u16 = 5000;
 /// Catalog id `m5pm1`, IRQ Register, `IRQ_STATUS1` (0x40).
 pub const IRQ_STATUS1: u8 = 0x40;

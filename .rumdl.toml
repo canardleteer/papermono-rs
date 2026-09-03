@@ -15,6 +15,7 @@ include = [
     "firmware/*/README.md",
     "firmware/*/AGENTS.md",
     "firmware/embassy-debug/assets/SOURCE.md",
+    "host/*/README.md",
     "docs/*.md",
     ".agents/skills/papermono-rs/SKILL.md",
     ".agents/skills/papermono-rs/references/*.md",

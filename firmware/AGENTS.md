@@ -93,9 +93,9 @@ until overdrawn; the `Partial` was fast. Successes and
 failures: hardware skill
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md#refresh-trials-lite-2026-09-01).
 After `PARTIALS_BEFORE_FULL` (6) partials, one `MonoFull`
-(`0` never). That cadence matches FreeInkUI
-`setTransitionFullEvery` (default 6). Official HTML still
-says about ten. Do not send a second bare Mode 1.
+(`0` never). That cadence satisfies the official display safety
+contract (a full refresh after roughly ten partials to prevent DC
+imbalance). Do not send a second bare Mode 1.
 
 `RefreshMode` is the official HTML **M5GFX LUT Refresh
 Speed** catalog only (PaperMono lab, reference only). Not a

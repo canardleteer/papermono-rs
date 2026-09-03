@@ -13,7 +13,7 @@ rust-version = "1.85"
 license = "MIT"
 repository = "https://github.com/canardleteer/papermono-rs"
 authors = ["canardleteer"]
-keywords = ["embedded", "esp32s3", "papermono"]
+keywords = ["bsp", "embedded", "esp32s3", "m5stack", "papermono"]
 categories = ["embedded", "hardware-support"]
 
 [workspace.dependencies]
