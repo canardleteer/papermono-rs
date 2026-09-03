@@ -49,11 +49,12 @@ Hold the red power button about 2 s until it blinks
 cargo xtask build-fw simple-debug
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
-  --yes --capture SLUG
+  --yes
 ```
 
-Use the `--name` you gave `backup-factory-firmware` as
-`SLUG`. Short-press red to leave the bootloader, then:
+If your backup was a named capture (`--name SLUG`) instead of
+`--as-original`, pass `--capture SLUG`. Short-press red to leave
+the bootloader, then:
 
 ```shell
 cargo xtask monitor

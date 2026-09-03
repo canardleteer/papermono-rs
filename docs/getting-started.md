@@ -29,19 +29,19 @@ flowchart TD
 
 In the order you are most likely to regret breaking them:
 
-1. Preserve the factory image before flashing. Avoid full-chip erase commands
+1. **Preserve the factory image before flashing.** Avoid full-chip erase commands
    or `espflash erase-flash`. While the ESP32-S3 MAC is in factory eFuses and
    ESP-IDF will auto-calibrate RF into NVS if erased, backing up the flash
    preserves the stock partition geometry, factory demo image, and device state
    without needing vendor downloads. Dump the measured flash length (16 MB on
    Lite hardware) with `cargo xtask backup-factory-firmware` before flashing.
-2. Do not invent an e-paper waveform. Use panel OTP sequences directly.
+2. **Do not invent an e-paper waveform.** Use panel OTP sequences directly.
    Execute a full refresh after roughly ten partial refreshes to avoid
    permanent ghosting. Full constraints appear in [SAFETY.md](SAFETY.md).
-3. Park IP2315 off the system I2C bus except during active charge transactions.
+3. **Park IP2315 off the system I2C bus except during active charge transactions.**
    Leaving the battery controller on the bus risks locking I2C communication at
    low battery voltages.
-4. Download mode is entered via a power-button hold. Hold the power button for
+4. **Download mode is entered via a power-button hold.** Hold the power button for
    approximately two seconds until the red indicator flashes. GPIO0 and GPIO3
    serve as reset strapping pins. GPIO45 and GPIO46 carry PDM microphone signals
    rather than power latch controls.
@@ -97,11 +97,16 @@ Create a backup once per device before invoking `flash-app`. Hold the red power
 button for two seconds until it blinks, then execute:
 
 ```shell
+# Save as unit original (recommended for factory stock):
+cargo xtask backup-factory-firmware --as-original
+
+# Or save as a named capture:
 cargo xtask backup-factory-firmware --name my-unit
 ```
 
-`flash-app` checks for an existing capture before proceeding. If multiple
-Espressif devices are connected, specify the target port with `ESPFLASH_PORT`.
+`flash-app` checks for an existing original or named capture before proceeding.
+If multiple Espressif devices are connected, specify the target port with
+`ESPFLASH_PORT`.
 
 ### Path A — without Embassy (`simple-debug`)
 
@@ -114,9 +119,12 @@ while keeping the display inactive.
 cargo xtask build-fw simple-debug
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
-  --yes --capture my-unit
+  --yes
 cargo xtask monitor
 ```
+
+If you saved a named capture (`--name my-unit`) instead of `--as-original`,
+pass `--capture my-unit` to `flash-app`.
 
 The output stream contains repeating `hello`, `git`, `gpio`, and `hb` lines.
 Pressing buttons produces instantaneous edge notifications. For logging
@@ -136,9 +144,12 @@ brightness adjusts via edge swipes.
 cargo xtask build-fw embassy-debug
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
-  --yes --capture my-unit
+  --yes
 cargo xtask monitor
 ```
+
+If you saved a named capture (`--name my-unit`) instead of `--as-original`,
+pass `--capture my-unit` to `flash-app`.
 
 Stop monitoring with standard interrupt signals (Ctrl-C). Unattended operation
 generates periodic heartbeats and splash events. Detailed card operations and
@@ -157,7 +168,7 @@ Common configuration issues:
 | `rustc 1.x is not supported … esp-hal` | The installed toolchain is outdated. Run `espup update` |
 | `linker 'xtensa-esp32s3-elf-gcc' not found` | The environment file was not sourced. Run `. $HOME/export-esp.sh` |
 | `QinHeng` / `1a86:55d3` refused | The connected device is not an Espressif native USB node |
-| `flash-app` wants a matching snapshot | A snapshot capture must be saved for this device first |
+| `flash-app` wants a matching snapshot | An original or snapshot capture must be saved for this device first |
 | Flash succeeded, glass / CDC unchanged | The target remained in bootloader mode; short-press the power button |
 | `monitor` silent on stock factory demo | Official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) does not output `simple-debug:` text lines |
 | `monitor` cannot claim usbfs | Confirm udev rules are active and your user belongs to dialout |

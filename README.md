@@ -22,7 +22,7 @@ not default-members.
   probing a unit.** A mistake can damage the panel (DC imbalance
   / invented LUTs), hang the system I2C bus (IP2315), or lose
   per-unit PHY calibration.
-- [Getting started](docs/getting-started.md) (host verify, Xtensa,
+- **[Getting started](docs/getting-started.md)** (host verify, Xtensa,
   firmware install & run).
 - [Snapshot HOWTO](docs/firmware-snapshot-management.md).
   Snapshot that unit before the first custom image if you care
@@ -73,10 +73,10 @@ QinHeng `1a86:55d3` is refused. Download is a power-button hold
 | Command | USB? | Summary |
 | --- | --- | --- |
 | `detect-connected` | no, unless `--probe` | List `303a:1001` nodes. `--probe` opens the flasher |
-| `backup-factory-firmware` | live dump yes; `--import` no | Named capture under `developer-data/backups/`. Alias `backup-firmware` |
+| `backup-factory-firmware` | live dump yes; `--import` no | Named capture or `--as-original` under `developer-data/backups/`. Alias `backup-firmware` |
 | `confirm-factory-firmware` | yes | Compare live flash to that unit's original, or `--capture SLUG` |
 | `restore-factory-firmware` | yes | write-bin that unit's original or `--capture` (`--yes`). Never a full-chip erase |
-| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs a matching capture. Does not compile |
+| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs matching original or `--capture`. Does not compile |
 | `vet-idle-log` | no | Host-only idle grammar on a `monitor` capture |
 | `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` |
 | `ci` | no | Host-only CI gate (fmt, host clippy/test, firmware clippy, rumdl, machete, audit) |
