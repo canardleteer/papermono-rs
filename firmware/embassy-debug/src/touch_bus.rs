@@ -52,9 +52,11 @@ const IOE_UM: u16 = 1 << 8;
 const TF_POWER_MS: u64 = 300;
 
 /// Duration to hold the IP2315 gate switch closed during the charge transaction.
+#[allow(dead_code)]
 const CHARGE_MOUNT_MS: u64 = 50;
 
 /// Settling delay after opening the IP2315 gate switch to ensure bus lines release.
+#[allow(dead_code)]
 const CHARGE_PARK_MS: u64 = 20;
 
 const CHARGE_EN: u8 = 1 << 0;
@@ -241,7 +243,7 @@ fn read_adc_mv(i2c: &mut SysI2c, lo_reg: u8) -> Option<u16> {
     Some(pmic::adc_mv(lo, hi))
 }
 
-/// Executes a gated IP2315 charge transaction: mounts the bus switch, reads, and promptly parks.
+/// Executes a gated IP2315 charge transaction: reads M5PM1 telemetry while ensuring IP2315 remains parked.
 async fn charge_once(i2c: &mut SysI2c, can_gate: bool) -> ChargeSample {
     let vbat = read_adc_mv(i2c, pmic::VBAT_L).unwrap_or(0);
     let vin = read_adc_mv(i2c, pmic::VIN_L).unwrap_or(0);
@@ -252,14 +254,13 @@ async fn charge_once(i2c: &mut SysI2c, can_gate: bool) -> ChargeSample {
             pm1.read_at(pmic::PWR_CFG).unwrap_or(0),
         )
     };
-    let mut ip = false;
+    // Ensure IP2315 remains parked off the system I2C bus. Mounting IP2315 (especially
+    // when VIN is present or at low VBAT) causes the charger in LED mode to pull SDA/SCL
+    // to GND, permanently locking up the bus.
     if can_gate {
-        let _ = ioe::set_push_pull_output(i2c, ioe1::IP2315_I2C_GATE, true);
-        Timer::after(Duration::from_millis(CHARGE_MOUNT_MS)).await;
-        ip = ioe::probe_addr(i2c, addresses::IP2315);
         let _ = ioe::set_push_pull_output(i2c, ioe1::IP2315_I2C_GATE, false);
-        Timer::after(Duration::from_millis(CHARGE_PARK_MS)).await;
     }
+    let ip = false;
     let then = ioe::probe_addr(i2c, addresses::IP2315);
     ChargeSample {
         vbat,

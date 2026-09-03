@@ -151,8 +151,9 @@ impl<I2C> M5pm1<I2C> {
 impl<I2C: I2c> M5pm1<I2C> {
     /// Named-register read.
     pub fn read_at(&mut self, reg: u8) -> Result<u8, I2C::Error> {
+        self.i2c.write(self.addr, &[reg])?;
         let mut val = [0u8];
-        self.i2c.write_read(self.addr, &[reg], &mut val)?;
+        self.i2c.read(self.addr, &mut val)?;
         Ok(val[0])
     }
 
@@ -230,7 +231,8 @@ mod tests {
     #[test]
     fn read_operations() {
         let txns = [
-            Transaction::write_read(DEFAULT_ADDRESS, std::vec![DEVICE_ID], std::vec![0x42]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![DEVICE_ID]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x42]),
             Transaction::write_read(DEFAULT_ADDRESS, std::vec![VBAT_L], std::vec![0x51, 0x0F]),
         ];
         let i2c = Mock::new(&txns);

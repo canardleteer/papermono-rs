@@ -98,17 +98,21 @@ pub fn write_pair(
     i2c.write(addr, &[reg, lo, hi])
 }
 
-/// Internal helper: reads a 1-byte register via repeated START (`write_read`).
+/// Internal helper: writes a 1-byte register address followed immediately by a 1-byte read.
 fn write_then_read(i2c: &mut SysI2c, addr: u8, reg: u8) -> Result<u8, esp_hal::i2c::master::Error> {
+    i2c.write(addr, &[reg])?;
     let mut val = [0u8];
-    i2c.write_read(addr, &[reg], &mut val)?;
+    i2c.read(addr, &mut val)?;
     Ok(val[0])
 }
 
 /// Validates the presence of an M5IOE1 expander by reading its unique identifier registers.
 fn ident(i2c: &mut SysI2c, addr: u8) -> bool {
     let mut uid = [0u8; 2];
-    if i2c.write_read(addr, &[ioe1::UID_L], &mut uid).is_err() {
+    if i2c.write(addr, &[ioe1::UID_L]).is_err() {
+        return false;
+    }
+    if i2c.read(addr, &mut uid).is_err() {
         return false;
     }
     write_then_read(i2c, addr, ioe1::REV).is_ok()

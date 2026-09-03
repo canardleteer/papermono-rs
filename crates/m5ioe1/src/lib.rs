@@ -164,39 +164,49 @@ impl<I2C: I2c> M5ioe1<I2C, Mounted> {
 }
 
 impl<I2C: I2c, S: GateState> M5ioe1<I2C, S> {
-    fn read_pair(&mut self, reg: u8) -> Result<(u8, u8), I2C::Error> {
-        let mut buf = [0u8; 2];
-        self.i2c.write_read(self.addr, &[reg], &mut buf)?;
-        Ok((buf[0], buf[1]))
+    fn read_reg(&mut self, reg: u8) -> Result<u8, I2C::Error> {
+        self.i2c.write(self.addr, &[reg])?;
+        let mut val = [0u8];
+        self.i2c.read(self.addr, &mut val)?;
+        Ok(val[0])
     }
 
-    fn write_pair(&mut self, reg: u8, lo: u8, hi: u8) -> Result<(), I2C::Error> {
-        self.i2c.write(self.addr, &[reg, lo, hi])
+    fn write_reg(&mut self, reg: u8, val: u8) -> Result<(), I2C::Error> {
+        self.i2c.write(self.addr, &[reg, val])
     }
 
     /// Drive `pyg` as push-pull output (DRV=0, M=1).
     pub fn set_push_pull_output(&mut self, pyg: u8, high: bool) -> Result<(), I2C::Error> {
-        let (mut m_l, mut m_h) = self.read_pair(GPIO_M_L)?;
-        let (mut o_l, mut o_h) = self.read_pair(GPIO_O_L)?;
-        let (mut d_l, mut d_h) = self.read_pair(GPIO_DRV_L)?;
+        let mut m_l = self.read_reg(GPIO_M_L)?;
+        let mut m_h = self.read_reg(GPIO_M_H)?;
+        let mut o_l = self.read_reg(GPIO_O_L)?;
+        let mut o_h = self.read_reg(GPIO_O_H)?;
+        let mut d_l = self.read_reg(GPIO_DRV_L)?;
+        let mut d_h = self.read_reg(GPIO_DRV_H)?;
         apply_bit(&mut m_l, &mut m_h, pyg, true);
         apply_bit(&mut o_l, &mut o_h, pyg, high);
         apply_bit(&mut d_l, &mut d_h, pyg, false);
-        self.write_pair(GPIO_DRV_L, d_l, d_h)?;
-        self.write_pair(GPIO_O_L, o_l, o_h)?;
-        self.write_pair(GPIO_M_L, m_l, m_h)
+        self.write_reg(GPIO_DRV_L, d_l)?;
+        self.write_reg(GPIO_DRV_H, d_h)?;
+        self.write_reg(GPIO_O_L, o_l)?;
+        self.write_reg(GPIO_O_H, o_h)?;
+        self.write_reg(GPIO_M_L, m_l)?;
+        self.write_reg(GPIO_M_H, m_h)
     }
 
     /// `M=0` input.
     pub fn set_input(&mut self, pyg: u8) -> Result<(), I2C::Error> {
-        let (mut m_l, mut m_h) = self.read_pair(GPIO_M_L)?;
+        let mut m_l = self.read_reg(GPIO_M_L)?;
+        let mut m_h = self.read_reg(GPIO_M_H)?;
         apply_bit(&mut m_l, &mut m_h, pyg, false);
-        self.write_pair(GPIO_M_L, m_l, m_h)
+        self.write_reg(GPIO_M_L, m_l)?;
+        self.write_reg(GPIO_M_H, m_h)
     }
 
     /// `GPIO_I_*` level. `true` is high.
     pub fn read_input(&mut self, pyg: u8) -> Result<bool, I2C::Error> {
-        let (low, high) = self.read_pair(GPIO_I_L)?;
+        let low = self.read_reg(GPIO_I_L)?;
+        let high = self.read_reg(GPIO_I_H)?;
         Ok(input_level(low, high, pyg).unwrap_or(false))
     }
 }
@@ -208,56 +218,48 @@ pub fn set_push_pull_output<I2C: I2c>(
     pyg: u8,
     high: bool,
 ) -> Result<(), I2C::Error> {
-    let (mut m_l, mut m_h) = read_pair(i2c, addr, GPIO_M_L)?;
-    let (mut o_l, mut o_h) = read_pair(i2c, addr, GPIO_O_L)?;
-    let (mut d_l, mut d_h) = read_pair(i2c, addr, GPIO_DRV_L)?;
+    let mut m_l = read_reg(i2c, addr, GPIO_M_L)?;
+    let mut m_h = read_reg(i2c, addr, GPIO_M_H)?;
+    let mut o_l = read_reg(i2c, addr, GPIO_O_L)?;
+    let mut o_h = read_reg(i2c, addr, GPIO_O_H)?;
+    let mut d_l = read_reg(i2c, addr, GPIO_DRV_L)?;
+    let mut d_h = read_reg(i2c, addr, GPIO_DRV_H)?;
     apply_bit(&mut m_l, &mut m_h, pyg, true);
     apply_bit(&mut o_l, &mut o_h, pyg, high);
     apply_bit(&mut d_l, &mut d_h, pyg, false);
-    write_pair(i2c, addr, GPIO_DRV_L, d_l, d_h)?;
-    write_pair(i2c, addr, GPIO_O_L, o_l, o_h)?;
-    write_pair(i2c, addr, GPIO_M_L, m_l, m_h)
+    write_reg(i2c, addr, GPIO_DRV_L, d_l)?;
+    write_reg(i2c, addr, GPIO_DRV_H, d_h)?;
+    write_reg(i2c, addr, GPIO_O_L, o_l)?;
+    write_reg(i2c, addr, GPIO_O_H, o_h)?;
+    write_reg(i2c, addr, GPIO_M_L, m_l)?;
+    write_reg(i2c, addr, GPIO_M_H, m_h)
 }
 
 /// One-shot `M=0` input.
 pub fn set_input<I2C: I2c>(i2c: &mut I2C, addr: u8, pyg: u8) -> Result<(), I2C::Error> {
-    let (mut m_l, mut m_h) = read_pair(i2c, addr, GPIO_M_L)?;
+    let mut m_l = read_reg(i2c, addr, GPIO_M_L)?;
+    let mut m_h = read_reg(i2c, addr, GPIO_M_H)?;
     apply_bit(&mut m_l, &mut m_h, pyg, false);
-    write_pair(i2c, addr, GPIO_M_L, m_l, m_h)
+    write_reg(i2c, addr, GPIO_M_L, m_l)?;
+    write_reg(i2c, addr, GPIO_M_H, m_h)
 }
 
 /// One-shot `GPIO_I_*` level.
 pub fn read_input<I2C: I2c>(i2c: &mut I2C, addr: u8, pyg: u8) -> Result<bool, I2C::Error> {
-    let (low, high) = read_pair(i2c, addr, GPIO_I_L)?;
+    let low = read_reg(i2c, addr, GPIO_I_L)?;
+    let high = read_reg(i2c, addr, GPIO_I_H)?;
     Ok(input_level(low, high, pyg).unwrap_or(false))
 }
 
-/// Read a single 8-bit register via repeated START (`write_read`).
-pub fn read_reg<I2C: I2c>(i2c: &mut I2C, addr: u8, reg: u8) -> Result<u8, I2C::Error> {
+fn read_reg<I2C: I2c>(i2c: &mut I2C, addr: u8, reg: u8) -> Result<u8, I2C::Error> {
+    i2c.write(addr, &[reg])?;
     let mut val = [0u8];
-    i2c.write_read(addr, &[reg], &mut val)?;
+    i2c.read(addr, &mut val)?;
     Ok(val[0])
 }
 
-/// Write a single 8-bit register.
-pub fn write_reg<I2C: I2c>(i2c: &mut I2C, addr: u8, reg: u8, val: u8) -> Result<(), I2C::Error> {
+fn write_reg<I2C: I2c>(i2c: &mut I2C, addr: u8, reg: u8, val: u8) -> Result<(), I2C::Error> {
     i2c.write(addr, &[reg, val])
-}
-
-fn read_pair<I2C: I2c>(i2c: &mut I2C, addr: u8, reg: u8) -> Result<(u8, u8), I2C::Error> {
-    let mut buf = [0u8; 2];
-    i2c.write_read(addr, &[reg], &mut buf)?;
-    Ok((buf[0], buf[1]))
-}
-
-fn write_pair<I2C: I2c>(
-    i2c: &mut I2C,
-    addr: u8,
-    reg: u8,
-    lo: u8,
-    hi: u8,
-) -> Result<(), I2C::Error> {
-    i2c.write(addr, &[reg, lo, hi])
 }
 
 #[cfg(test)]
@@ -275,16 +277,42 @@ mod tests {
         assert_eq!(high, 1 << 2);
     }
 
+    fn read_txn(reg: u8, val: u8) -> [Transaction; 2] {
+        [
+            Transaction::write(BOARD_ADDRESS, std::vec![reg]),
+            Transaction::read(BOARD_ADDRESS, std::vec![val]),
+        ]
+    }
+
     #[test]
     fn new_parks_pyg11() {
-        let txns = [
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_M_L], std::vec![0, 0]),
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_O_L], std::vec![0, 0]),
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_DRV_L], std::vec![0xFF, 0xFF]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_DRV_L, 0xFF, !(1u8 << 2)]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_O_L, 0, 0]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_L, 0, 1 << 2]),
-        ];
+        let mut txns = std::vec![];
+        for &(reg, val) in &[
+            (GPIO_M_L, 0u8),
+            (GPIO_M_H, 0),
+            (GPIO_O_L, 0),
+            (GPIO_O_H, 0),
+            (GPIO_DRV_L, 0xFF),
+            (GPIO_DRV_H, 0xFF),
+        ] {
+            txns.extend(read_txn(reg, val));
+        }
+        // After apply_bit: M high bit 2 set, O high bit 2 clear, DRV high bit 2 clear.
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_DRV_L, 0xFF],
+        ));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_DRV_H, !(1u8 << 2)],
+        ));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_O_L, 0]));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_O_H, 0]));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_L, 0]));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_M_H, 1 << 2],
+        ));
         let i2c = Mock::new(&txns);
         let ioe = M5ioe1::new(i2c, BOARD_ADDRESS).unwrap();
         ioe.release().done();
@@ -292,14 +320,35 @@ mod tests {
 
     #[test]
     fn free_fn_set_push_pull_output() {
-        let txns = [
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_M_L], std::vec![0, 0]),
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_O_L], std::vec![0, 0]),
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_DRV_L], std::vec![0xFF, 0xFF]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_DRV_L, !(1u8 << 2), 0xFF]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_O_L, 1 << 2, 0]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_L, 1 << 2, 0]),
-        ];
+        let mut txns = std::vec![];
+        for &(reg, val) in &[
+            (GPIO_M_L, 0u8),
+            (GPIO_M_H, 0),
+            (GPIO_O_L, 0),
+            (GPIO_O_H, 0),
+            (GPIO_DRV_L, 0xFF),
+            (GPIO_DRV_H, 0xFF),
+        ] {
+            txns.extend(read_txn(reg, val));
+        }
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_DRV_L, !(1u8 << 2)],
+        ));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_DRV_H, 0xFF],
+        ));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_O_L, 1 << 2],
+        ));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_O_H, 0]));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_M_L, 1 << 2],
+        ));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_H, 0]));
         let mut i2c = Mock::new(&txns);
         set_push_pull_output(&mut i2c, BOARD_ADDRESS, 3, true).unwrap();
         i2c.done();
@@ -307,11 +356,16 @@ mod tests {
 
     #[test]
     fn input_operations() {
-        let txns = [
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_M_L], std::vec![0xFF, 0xFF]),
-            Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_L, !(1u8 << 0), 0xFF]),
-            Transaction::write_read(BOARD_ADDRESS, std::vec![GPIO_I_L], std::vec![0x01, 0x00]),
-        ];
+        let mut txns = std::vec![];
+        txns.extend(read_txn(GPIO_M_L, 0xFF));
+        txns.extend(read_txn(GPIO_M_H, 0xFF));
+        txns.push(Transaction::write(
+            BOARD_ADDRESS,
+            std::vec![GPIO_M_L, !(1u8 << 0)],
+        ));
+        txns.push(Transaction::write(BOARD_ADDRESS, std::vec![GPIO_M_H, 0xFF]));
+        txns.extend(read_txn(GPIO_I_L, 0x01));
+        txns.extend(read_txn(GPIO_I_H, 0x00));
         let mut i2c = Mock::new(&txns);
         set_input(&mut i2c, BOARD_ADDRESS, 1).unwrap();
         assert!(read_input(&mut i2c, BOARD_ADDRESS, 1).unwrap());
