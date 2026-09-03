@@ -52,8 +52,9 @@ SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
 Do not send `Partial` after `GrayFull` without `MonoFull`.
 Do not start a new waveform while BUSY is high.
 
-Five cards: splash Ferris + `papermono-rs`, shapes, legend
-(A / B / red power / right lamp), four-gray tones, target
+Five cards: splash Ferris + `papermono-rs`, shapes (procedural
+3-degree Koch snowflake with microsecond benchmark), legend
+(A / B / sleep / red power / right lamp), four-gray tones, target
 walk. Short A previous, short B next, wrap. Right-edge
 contact sets PWM0 from Y (top bright). Hold A 2 s triggers
 sleep notice and light sleep; hold A or B 1 s wakes. Hold A

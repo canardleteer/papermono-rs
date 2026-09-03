@@ -46,6 +46,8 @@ pub enum LineKind {
     Sleep,
     /// Wake source (`wake src=`).
     Wake,
+    /// Snowflake render benchmark (`snowflake us=`).
+    Snowflake,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -145,6 +147,7 @@ pub fn classify(body: &str) -> LineKind {
         "charge" => LineKind::Charge,
         "sleep" => LineKind::Sleep,
         "wake" => LineKind::Wake,
+        "snowflake" => LineKind::Snowflake,
         _ => LineKind::Unknown,
     }
 }
@@ -287,6 +290,13 @@ mod tests {
         assert_eq!(
             records("simple-debug: wake src=20\n").next().unwrap().kind,
             LineKind::Wake
+        );
+        assert_eq!(
+            records("simple-debug: snowflake us=450\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::Snowflake
         );
     }
 

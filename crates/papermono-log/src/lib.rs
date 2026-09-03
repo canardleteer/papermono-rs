@@ -4,7 +4,7 @@
 //! the log contract can be tested on the host. Every line starts with
 //! [`LOG_PREFIX`]. Kinds: `hello`, `git=`, `hb`, `edge`, `gpio`,
 //! `leftover`, `i2c`, `touch`, `mic`, `pcm`, `panel`, `scene=`,
-//! `lamp=`, `wifi`, `ble`, `charge`, `sleep`, `wake`. No MAC /
+//! `lamp=`, `wifi`, `ble`, `charge`, `sleep`, `wake`, `snowflake`. No MAC /
 //! BSSID / IRK / USB serial fields.
 
 #![no_std]
@@ -84,6 +84,9 @@ pub const SCENE_CAPACITY: usize = 48;
 
 /// Bytes reserved for a lamp duty line (`lamp=1024`).
 pub const LAMP_CAPACITY: usize = 40;
+
+/// Bytes reserved for a snowflake render timing line (`snowflake us=12345`).
+pub const SNOWFLAKE_CAPACITY: usize = 48;
 
 /// How long BUTTON A must stay low to dump PCM (page-prev is a tap).
 pub const BUTTON_HOLD_PCM_MS: u32 = 1_000;
@@ -734,6 +737,11 @@ pub fn format_lamp(duty: u16, buf: &mut [u8]) -> Result<&str, FormatError> {
     write_into(buf, format_args!("{}: lamp={duty}", LOG_PREFIX))
 }
 
+/// Writes `simple-debug: snowflake us=<us>` without a trailing newline.
+pub fn format_snowflake(us: u32, buf: &mut [u8]) -> Result<&str, FormatError> {
+    write_into(buf, format_args!("{}: snowflake us={us}", LOG_PREFIX))
+}
+
 /// Writes a panel stamp without a trailing newline.
 pub fn format_panel<'a>(stamp: &PanelStamp, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
     write_into(
@@ -1115,6 +1123,11 @@ mod tests {
         assert_eq!(
             format_lamp(1024, &mut lamp).unwrap(),
             "simple-debug: lamp=1024"
+        );
+        let mut snowflake = [0u8; SNOWFLAKE_CAPACITY];
+        assert_eq!(
+            format_snowflake(1234, &mut snowflake).unwrap(),
+            "simple-debug: snowflake us=1234"
         );
         assert_eq!(BUTTON_HOLD_PCM_MS, 1_000);
     }

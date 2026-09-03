@@ -82,9 +82,11 @@ embassy-debug`.
 
 ### Step 4: Change cards
 
-Short-press BUTTON B. The glass should walk splash → shapes →
-legend → tones → targets, then wrap. BUTTON A walks the other
-way. CDC prints `scene=`.
+Short-press BUTTON B. The glass should walk splash → shapes (procedural
+3-degree Koch snowflake with on-screen and CDC microsecond benchmark) →
+legend (pinout, touch rails, and sleep/wake instructions) → tones → targets,
+then wrap. BUTTON A walks the other way. CDC prints `scene=` and
+`snowflake us=`.
 
 ### Step 5: Slide the lamp
 

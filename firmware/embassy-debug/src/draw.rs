@@ -20,6 +20,8 @@
 //!   4. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
 //!   5. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
 
+use core::fmt::Write;
+use embassy_time::Instant;
 use embedded_graphics::mono_font::ascii::FONT_10X20;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -39,13 +41,23 @@ const _: () = assert!(FERRIS.len() == FERRIS_BYTES);
 const _: () = assert!(FERRIS_W.is_multiple_of(8));
 
 /// Renders the requested interactive card scene into dual-plane framebuffers.
-pub fn render(scene: Scene, bw: &mut [u8], red: &mut [u8]) {
+/// Returns the benchmark render duration in microseconds if the scene computes one.
+pub fn render(scene: Scene, bw: &mut [u8], red: &mut [u8]) -> Option<u32> {
     match scene {
-        Scene::Splash => draw_splash(bw, red),
-        Scene::Shapes => draw_shapes(bw, red),
-        Scene::Legend => draw_legend(bw, red),
-        Scene::Tones => draw_tones(bw, red),
-        Scene::Targets => {}
+        Scene::Splash => {
+            draw_splash(bw, red);
+            None
+        }
+        Scene::Shapes => Some(draw_shapes(bw, red)),
+        Scene::Legend => {
+            draw_legend(bw, red);
+            None
+        }
+        Scene::Tones => {
+            draw_tones(bw, red);
+            None
+        }
+        Scene::Targets => None,
     }
 }
 
@@ -120,8 +132,8 @@ fn draw_splash(bw: &mut [u8], red: &mut [u8]) {
     .draw(&mut GrayInk::new(bw, red));
 }
 
-/// Renders Card 2: Geometric test patterns validating aspect ratio and display orientation.
-fn draw_shapes(bw: &mut [u8], red: &mut [u8]) {
+/// Renders Card 2: Geometric test patterns validating aspect ratio, display orientation, and procedural rendering.
+fn draw_shapes(bw: &mut [u8], red: &mut [u8]) -> u32 {
     clear(bw, red, display::GRAY_WHITE);
     stroke_rect(
         bw,
@@ -141,8 +153,11 @@ fn draw_shapes(bw: &mut [u8], red: &mut [u8]) {
         display::HEIGHT - 32,
         display::GRAY_DARK,
     );
-    fill_disk(bw, red, 120, 200, 70, display::GRAY_BLACK);
-    fill_disk(bw, red, 360, 200, 70, display::GRAY_DARK);
+
+    let start = Instant::now();
+    draw_koch_snowflake(bw, red, 3, (240, 200), 135, display::GRAY_BLACK);
+    let elapsed_us = Instant::now().duration_since(start).as_micros() as u32;
+
     fill_triangle_up(bw, red, 70, 360, 140, 120, display::GRAY_LIGHT);
     fill_rect(bw, red, 270, 360, 140, 120, display::GRAY_BLACK);
     let cx = i32::from(display::WIDTH) / 2;
@@ -154,9 +169,22 @@ fn draw_shapes(bw: &mut [u8], red: &mut [u8]) {
         Alignment::Center,
     )
     .draw(&mut GrayInk::new(bw, red));
+
+    let mut buf = [0u8; 48];
+    let mut writer = BufWriter {
+        buf: &mut buf,
+        pos: 0,
+    };
+    let _ = write!(writer, "Koch Snowflake (3 deg): {elapsed_us} us");
+    if let Ok(label) = core::str::from_utf8(&writer.buf[..writer.pos]) {
+        let _ = Text::with_alignment(label, Point::new(cx, 615), style, Alignment::Center)
+            .draw(&mut GrayInk::new(bw, red));
+    }
+
+    elapsed_us
 }
 
-/// Renders Card 3: Legend displaying hardware pinout and button functions.
+/// Renders Card 3: Legend displaying hardware pinout, button functions, and sleep controls.
 fn draw_legend(bw: &mut [u8], red: &mut [u8]) {
     clear(bw, red, display::GRAY_WHITE);
     let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
@@ -171,21 +199,22 @@ fn draw_legend(bw: &mut [u8], red: &mut [u8]) {
     .draw(&mut ink);
 
     let items = [
-        ("BUTTON A (GPIO2)", "Previous card / hold for mic"),
-        ("BUTTON B (GPIO3)", "Next card"),
+        ("BUTTON A (GPIO2)", "Previous card / hold 2s sleep"),
+        ("BUTTON B (GPIO3)", "Next card / hold 1s wake"),
+        ("SLEEP & WAKE", "Hold A 2s: sleep. Hold A/B 1s: wake"),
         ("RIGHT GUTTER", "Frontlight brightness slider"),
         ("TOUCH DIGITIZER", "FT6336G capacitive I2C (0x38)"),
         ("PMIC (M5PM1)", "Power rails, buttons, battery ADC"),
         ("EXPANDER (M5IOE1)", "Power gates & peripheral resets"),
-        ("POWER BUTTON", "Short press wake / hold download"),
+        ("POWER BUTTON", "Short press reset / hold download"),
     ];
 
-    let mut y = 110;
+    let mut y = 90;
     for (k, v) in items {
         let _ = Text::new(k, Point::new(30, y), style).draw(&mut ink);
         let _ = Text::new(v, Point::new(50, y + 25), style).draw(&mut ink);
-        y += 65;
-        // The power button item is placed about 10 pixels lower as requested.
+        y += 70;
+        // The power button item is placed about 10 pixels lower.
         if k == "EXPANDER (M5IOE1)" {
             y += 10;
         }
@@ -242,21 +271,121 @@ fn clear(bw: &mut [u8], red: &mut [u8], tone: u8) {
     fill_rect(bw, red, 0, 0, display::WIDTH, display::HEIGHT, tone);
 }
 
-/// Draws a filled circle at center `(cx, cy)` with radius `r`.
-fn fill_disk(bw: &mut [u8], red: &mut [u8], cx: u16, cy: u16, r: u16, tone: u8) {
-    let r2 = i32::from(r) * i32::from(r);
-    let x0 = cx.saturating_sub(r);
-    let y0 = cy.saturating_sub(r);
-    let x1 = cx.saturating_add(r).min(display::WIDTH.saturating_sub(1));
-    let y1 = cy.saturating_add(r).min(display::HEIGHT.saturating_sub(1));
-    for y in y0..=y1 {
-        for x in x0..=x1 {
-            let dx = i32::from(x) - i32::from(cx);
-            let dy = i32::from(y) - i32::from(cy);
-            if dx * dx + dy * dy <= r2 {
-                set_gray(bw, red, x, y, tone);
-            }
+/// Renders an order-`depth` Koch snowflake centered at `center` with circumradius `r`.
+fn draw_koch_snowflake(
+    bw: &mut [u8],
+    red: &mut [u8],
+    depth: u32,
+    (cx, cy): (u16, u16),
+    r: u16,
+    tone: u8,
+) {
+    let cx_q = (i32::from(cx)) << 16;
+    let cy_q = (i32::from(cy)) << 16;
+    let r_i64 = i64::from(r);
+
+    // In Q16: sin(60 deg) = 56756, cos(60 deg) = 32768.
+    let r_sin = (r_i64 * 56756) as i32;
+    let r_cos = (r_i64 * 32768) as i32;
+
+    // Top apex (V0)
+    let v0 = (cx_q, cy_q - ((i32::from(r)) << 16));
+
+    // Bottom-right apex (V1)
+    let v1 = (cx_q + r_sin, cy_q + r_cos);
+
+    // Bottom-left apex (V2)
+    let v2 = (cx_q - r_sin, cy_q + r_cos);
+
+    // 3 sides of the base equilateral triangle in clockwise order
+    koch_curve(bw, red, depth, v0, v1, tone);
+    koch_curve(bw, red, depth, v1, v2, tone);
+    koch_curve(bw, red, depth, v2, v0, tone);
+}
+
+/// Recursively generates one side of the Koch snowflake in fixed-point Q16 coordinates.
+fn koch_curve(
+    bw: &mut [u8],
+    red: &mut [u8],
+    depth: u32,
+    (x0, y0): (i32, i32),
+    (x1, y1): (i32, i32),
+    tone: u8,
+) {
+    if depth == 0 {
+        let px0 = (x0 + 32768) >> 16;
+        let py0 = (y0 + 32768) >> 16;
+        let px1 = (x1 + 32768) >> 16;
+        let py1 = (y1 + 32768) >> 16;
+        draw_line(bw, red, px0, py0, px1, py1, tone);
+        return;
+    }
+
+    let ux = (x1 - x0) / 3;
+    let uy = (y1 - y0) / 3;
+
+    let p1 = (x0 + ux, y0 + uy);
+    let p3 = (p1.0 + ux, p1.1 + uy);
+
+    // Rotate u by -60 degrees to construct the outward-pointing apex P2:
+    // x' = ux * cos(-60 deg) - uy * sin(-60 deg)
+    // y' = ux * sin(-60 deg) + uy * cos(-60 deg)
+    // with cos(-60) = 32768 / 65536, sin(-60) = -56756 / 65536
+    const COS_60: i64 = 32768;
+    const SIN_NEG_60: i64 = -56756;
+
+    let rot_x = ((i64::from(ux) * COS_60 - i64::from(uy) * SIN_NEG_60) >> 16) as i32;
+    let rot_y = ((i64::from(ux) * SIN_NEG_60 + i64::from(uy) * COS_60) >> 16) as i32;
+
+    let p2 = (p1.0 + rot_x, p1.1 + rot_y);
+
+    koch_curve(bw, red, depth - 1, (x0, y0), p1, tone);
+    koch_curve(bw, red, depth - 1, p1, p2, tone);
+    koch_curve(bw, red, depth - 1, p2, p3, tone);
+    koch_curve(bw, red, depth - 1, p3, (x1, y1), tone);
+}
+
+/// Draws a single-pixel line between two integer coordinates using Bresenham's algorithm.
+fn draw_line(bw: &mut [u8], red: &mut [u8], mut x0: i32, mut y0: i32, x1: i32, y1: i32, tone: u8) {
+    let dx = (x1 - x0).abs();
+    let sx = if x0 < x1 { 1 } else { -1 };
+    let dy = -(y1 - y0).abs();
+    let sy = if y0 < y1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop {
+        if x0 >= 0 && x0 < i32::from(display::WIDTH) && y0 >= 0 && y0 < i32::from(display::HEIGHT) {
+            set_gray(bw, red, x0 as u16, y0 as u16, tone);
         }
+        if x0 == x1 && y0 == y1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 >= dy {
+            err += dy;
+            x0 += sx;
+        }
+        if e2 <= dx {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+/// Minimal non-allocating string buffer writer for on-screen metrics formatting.
+struct BufWriter<'a> {
+    buf: &'a mut [u8],
+    pos: usize,
+}
+
+impl<'a> core::fmt::Write for BufWriter<'a> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let bytes = s.as_bytes();
+        let remain = self.buf.len().saturating_sub(self.pos);
+        let to_copy = bytes.len().min(remain);
+        self.buf[self.pos..self.pos + to_copy].copy_from_slice(&bytes[..to_copy]);
+        self.pos += to_copy;
+        Ok(())
     }
 }
 

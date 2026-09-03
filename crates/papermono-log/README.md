@@ -26,6 +26,7 @@ simple-debug: lamp=1024
 simple-debug: wifi n=12
 simple-debug: ble n=4
 simple-debug: charge vbat=3921 vin=5080 src=05 chg_en=1 ip=1 then=0
+simple-debug: snowflake us=450
 ```
 
 `hello image=` is `simple-debug` or `embassy-debug`. Split glued

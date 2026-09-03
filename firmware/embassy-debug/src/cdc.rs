@@ -20,7 +20,7 @@ use papermono_log::{
 #[cfg(feature = "touch")]
 use papermono_log::{format_lamp, LAMP_CAPACITY};
 #[cfg(feature = "panel")]
-use papermono_log::{format_scene, Scene, SCENE_CAPACITY};
+use papermono_log::{format_scene, format_snowflake, Scene, SCENE_CAPACITY, SNOWFLAKE_CAPACITY};
 
 /// Writes a raw string slice followed by CRLF (`\r\n`) to the native USB FIFO.
 pub fn emit(line: &str) {
@@ -149,6 +149,15 @@ pub fn mic_pcm(hz: u32, samples: &[i16]) {
 pub fn scene(scene: Scene) {
     let mut buf = [0u8; SCENE_CAPACITY];
     if let Ok(line) = format_scene(scene, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits procedural snowflake render duration in microseconds.
+#[cfg(feature = "panel")]
+pub fn snowflake(us: u32) {
+    let mut buf = [0u8; SNOWFLAKE_CAPACITY];
+    if let Ok(line) = format_snowflake(us, &mut buf) {
         emit(line);
     }
 }

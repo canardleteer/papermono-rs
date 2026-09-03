@@ -135,7 +135,9 @@ async fn paint(
     if scene == Scene::Targets {
         return;
     }
-    draw::render(scene, &mut planes.bw, &mut planes.red);
+    if let Some(us) = draw::render(scene, &mut planes.bw, &mut planes.red) {
+        cdc::snowflake(us);
+    }
     if scene.uses_gray() {
         panel.paint_gray(i2c, &planes.bw, &planes.red, busy).await;
     } else {
