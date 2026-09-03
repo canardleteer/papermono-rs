@@ -212,8 +212,9 @@ battery lead). A USB wattmeter does not close this.
 Stopwatch short / double / hold-to-download on a unit. Compare
 to the “~2 s” note.
 
-**Lite written (2026-09-02):** short ~0.25 s resets (red
-off during reboot, solid red after). Hold to first blink
+**Lite written (2026-09-02, 2026-09-03):** short ~0.25 s
+resets (red off during reboot, solid red after; also cleanly
+resets when the MCU is in light sleep). Hold to first blink
 ~2 s (same red die). Double-press gap too short to time;
 USB unplugged, lamp and red go fully off; one short press
 turns the unit back on. `C153` still open.
@@ -252,8 +253,9 @@ path. Not a current measurement.
 `SYS_CMD` bounced (sheet 5VIN recovery). Unplug after
 lamp-on: human lamp off, then on again in **2–3 s**. CDC
 same boot: `wake src=08` / `0a`, `sleep abort`. Not a 10 s
-RTC GPIO wake. Code stays `--features sleep` (default off).
-IMU / touch `ext0` still open. `C153` open.
+RTC GPIO wake. In `embassy-debug-fw`, sleep is implemented as
+interactive ESP32-S3 light sleep with low-power GPIO2/GPIO3 button
+wake (2026-09-03). IMU / touch `ext0` still open. `C153` open.
 [power-and-sleep.md](../references/power-and-sleep.md),
 [user-demo.md](../references/user-demo.md).
 
@@ -485,6 +487,12 @@ not remuxed. [pin-map.md](../references/pin-map.md).
 ### nyc-rgb-led
 
 Confirm red ignores PWM; sweep G/B. Download-mode blink is red.
+
+**Lite partial (`C153-Lite`, 2026-09-03):** confirmed red status
+LED is driven by M5PM1 register `0x06` (`PWR_CFG`) bit 4
+(`LED_EN_PP`). Clearing bit 4 turns the red LED off; setting bit 4
+turns it back on. Used in `embassy-debug-fw` to turn off the red LED
+during low-power light sleep. `C153` open.
 [sensors.md](../references/sensors.md).
 
 ### nyc-buzzer

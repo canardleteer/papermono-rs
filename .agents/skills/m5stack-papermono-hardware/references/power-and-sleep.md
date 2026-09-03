@@ -96,6 +96,25 @@ only; no current meter.
 [nyc-pm1-wake](../resources/not-yet-confirmed.md#nyc-pm1-wake)
 stays open. `C153` open.
 
+**Lite interactive button sleep and wake (measured 2026-09-03, `C153-Lite`).**
+Implemented in `embassy-debug-fw` (enabled by default under `sleep` feature).
+
+- **Trigger:** Holding BUTTON A (GPIO2) for ~2 s enters light sleep.
+- **Display:** Panel renders "sleeping, press A or B for 1 second to restart".
+- **Power down:** Frontlight PWM0 set to 0; M5PM1 red status LED (`LED_EN_PP`)
+  extinguished by clearing bit 4 of register `0x06` (`PWR_CFG`) over I2C,
+  eliminating ~1–3 mA ballast current drain.
+- **Light sleep:** ESP32-S3 `LowPower::sleep_light(RtcSleepConfig::default())`
+  with low-power wake paths on BUTTON A and BUTTON B (GPIO2 and GPIO3,
+  `Event::LowLevel`).
+- **USB drop:** Halting the XTAL/PLL clocks causes USB-Serial/JTAG to drop off
+  the host USB bus (confirmed live via `cargo xtask monitor` disconnect).
+- **Wake qualification:** Brief accidental contacts (<1 s) stay asleep.
+  Holding BUTTON A or BUTTON B for ~1 s qualifies wake-up, restores the M5PM1
+  red LED, restores frontlight PWM duty, and repaints the prior card.
+- **Power button:** Short press (~0.25 s) during light sleep resets into a
+  clean cold boot.
+
 ## Charger (IP2315)
 
 I2C 7-bit `0x75` (sheet 8-bit write `0xEA` / read `0xEB`),

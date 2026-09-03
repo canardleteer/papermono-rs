@@ -12,5 +12,5 @@ using `embedded-hal` 1.0 traits.
 
 On PaperMono hardware, PWM0 drives frontlight brightness as a multiplexed
 channel over GPIO3, whereas PWM1 runs on an independent timer. The driver
-supports analog-to-digital conversions, battery status reads, and software
-power-down through an explicit method.
+supports analog-to-digital conversions, battery status reads, status LED
+control over `LED_EN_PP`, and software power-down through an explicit method.

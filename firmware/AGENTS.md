@@ -24,7 +24,7 @@ excludes `simple-debug-fw` and `embassy-debug-fw`.
 | Path | Stack | First SKU | Status |
 | --- | --- | --- | --- |
 | `simple-debug/` | blocking `esp-hal` | Lite (`m5stack-papermono-lite`) | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
-| `embassy-debug/` | `esp-hal` + Embassy | Lite (`m5stack-papermono-lite`) | Member. `image=embassy-debug`. Default `touch` + `panel`. `mic` / `radio` / `sleep` opt-in. Five OTP cards, no LUT |
+| `embassy-debug/` | `esp-hal` + Embassy | Lite (`m5stack-papermono-lite`) | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep`. `mic` / `radio` opt-in. Five OTP cards, no LUT |
 
 `esp-idf-hal` remains a valid stack (hardware skill `rust.md`); it
 is not a first image. Default images depend on

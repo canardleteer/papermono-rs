@@ -82,3 +82,9 @@ Factory demo / M5Unified PWM: 5 kHz, 8-bit duty.
 
 After power-on, red follows M5PM1 default (download-mode blink
 uses this die).
+
+Confirmed live on `C153-Lite` (2026-09-03): writing `0` to bit 4
+(`0x10`) of M5PM1 register `0x06` (`PWR_CFG`) extinguishes the
+red status LED, and writing `1` turns it back on. Used in
+`embassy-debug-fw` to eliminate the 1–3 mA ballast current drain
+during low-power light sleep.
