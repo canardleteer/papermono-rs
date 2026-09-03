@@ -111,6 +111,11 @@ M5PM1 also exposes battery/charging telemetry in its driver.
 Prefer that for UI; use IP2315 only when a register on that
 chip is required, then isolate.
 
+M5Unified ([Power_Class.cpp#L72-L96](https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/Power_Class.cpp#L72-L96))
+enables the gate by driving M5IOE1 `PYG11` high, waits 2 ms for the rail/bus to
+settle, and then polls the IP2315 status register up to 64 times in a retry
+loop to verify communication readiness before reading charge state.
+
 **Lite (`C153-Lite`, 2026-09-02):** one gated boot
 transaction, USB in. M5PM1 `VBAT` 4198 mV, `VIN` 5012 mV,
 `PWR_SRC` `0x05` (battery + 5VIN), `CHG_EN` on. IP2315
@@ -147,7 +152,7 @@ warm GPIOs). That is true on X4 Pro / Murphy M4, not here.
 day, PWM1 writes left the lamp constant. Not a lux or
 percent meter.
 
-**Lite (2026-09-02, Stage B):** PWM0 `lamp=1024` with
+**Lite (2026-09-02, rail verification):** PWM0 `lamp=1024` with
 `PYG3` (`EPD_VDD`) off left the lamp **dark**. The same
 duty after `PYG3` high (no `EPD_RST`, no OTP) was **on**.
 AW9967 needs that L3B rail, not only G3 PWM. `C153` open.

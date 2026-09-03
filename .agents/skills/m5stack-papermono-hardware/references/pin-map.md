@@ -10,7 +10,7 @@ them when a net disagrees with this file. Dated **view as
 markdown** snapshot (2026-09-01):
 [official-html/SOURCE.md](../resources/official-html/SOURCE.md).
 [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
-SKU column: both, full (`C153`) only, or Lite-absent.
+SKU column: `C153, C153-Lite` or `C153`.
 
 Do not copy GPIO numbers from other products onto this board.
 
@@ -18,37 +18,37 @@ Do not copy GPIO numbers from other products onto this board.
 
 | GPIO | Direction | Signal | SKU | Notes |
 | ---: | --- | --- | --- | --- |
-| 0 | I/O | M5PM1 `BOOT_OUT` | both | **Strapping** (WPU). [nyc-gpio0-strap](../resources/not-yet-confirmed.md#nyc-gpio0-strap) |
-| 1 | Input | M5PM1 IRQ | both | `G1_PY_IRQ` |
-| 2 | Input | USER_KEY1, BUTTON A (UP) | both | Upper black key. Lite: idle high, press low |
-| 3 | Input | USER_KEY2, BUTTON B (DOWN) | both | Lower black key. **Strapping** (floating at reset). Lite: idle high, press low |
-| 4 | Input | FT6336G INT | both | `G4_TP_INT` |
-| 5 | Input | LoRa IRQ | full | Lite: [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads) |
-| 6 | Input | ST25R3916 IRQ | full | Lite: [nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads) |
-| 7 | Input | M5IOE1 IRQ | both | `PYB_IRQ` |
-| 8 | SDMMC | DAT3 | both | |
-| 9 | SDMMC | DAT2 | both | |
-| 10 | SDMMC | DAT1 | both | |
-| 11 | SDMMC | DAT0 | both | |
-| 12 | SDMMC | CMD | both | |
-| 13 | SDMMC | CLK | both | |
-| 14 | Output | EPD MOSI | both | SPI2 |
-| 15 | Output | EPD SCLK | both | SPI2 |
-| 16 | Output | EPD CS | both | |
-| 17 | Output | EPD DC | both | |
-| 18 | Input | EPD BUSY | both | Sheet: high = busy. Glass: [nyc-otp-busy](../resources/not-yet-confirmed.md#nyc-otp-busy) |
-| 19 | USB | USB D− | both | Native USB pads. PDM is **not** here |
-| 20 | USB | USB D+ | both | Native USB pads |
-| 21 | Input | SX1262 BUSY | full | No internal pull (Table 2-1). Lite: [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads) |
-| 38 | Output | LoRa SPI MOSI | full | Schematic/product “SPI1”. UserDemo `SPI3_HOST` |
-| 39 | Output | LoRa SPI CLK | full | Mux off JTAG `MTCK` |
-| 40 | Input | LoRa SPI MISO | full | Mux off JTAG `MTDO` |
-| 41 | Output | SX1262 NSS | full | Mux off JTAG `MTDI` |
-| 42 | PWM | Buzzer `BB_PWM` | both | Mux off JTAG `MTMS` |
-| 45 | Output | PDM CLK | both | **Strapping** (WPD). Not a power latch |
-| 46 | Input | PDM DAT | both | **Strapping** (WPD). Not a power latch |
-| 47 | OD data | System I2C SDA | both | `G47_SYS_SDA` |
-| 48 | OD clock | System I2C SCL | both | `G48_SYS_SCL` |
+| 0 | I/O | M5PM1 `BOOT_OUT` | C153, C153-Lite | **Strapping** (WPU). [nyc-gpio0-strap](../resources/not-yet-confirmed.md#nyc-gpio0-strap) |
+| 1 | Input | M5PM1 IRQ | C153, C153-Lite | `G1_PY_IRQ` |
+| 2 | Input | USER_KEY1, BUTTON A (UP) | C153, C153-Lite | Upper black key. Lite: idle high, press low |
+| 3 | Input | USER_KEY2, BUTTON B (DOWN) | C153, C153-Lite | Lower black key. **Strapping** (floating at reset). Lite: idle high, press low |
+| 4 | Input | FT6336G INT | C153, C153-Lite | `G4_TP_INT` |
+| 5 | Input | LoRa IRQ | C153 | Lite: [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads) |
+| 6 | Input | ST25R3916 IRQ | C153 | Lite: [nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads) |
+| 7 | Input | M5IOE1 IRQ | C153, C153-Lite | `PYB_IRQ` |
+| 8 | SDMMC | DAT3 | C153, C153-Lite | |
+| 9 | SDMMC | DAT2 | C153, C153-Lite | |
+| 10 | SDMMC | DAT1 | C153, C153-Lite | |
+| 11 | SDMMC | DAT0 | C153, C153-Lite | |
+| 12 | SDMMC | CMD | C153, C153-Lite | |
+| 13 | SDMMC | CLK | C153, C153-Lite | |
+| 14 | Output | EPD MOSI | C153, C153-Lite | SPI2 |
+| 15 | Output | EPD SCLK | C153, C153-Lite | SPI2 |
+| 16 | Output | EPD CS | C153, C153-Lite | |
+| 17 | Output | EPD DC | C153, C153-Lite | |
+| 18 | Input | EPD BUSY | C153, C153-Lite | Sheet: high = busy. Glass: [nyc-otp-busy](../resources/not-yet-confirmed.md#nyc-otp-busy) |
+| 19 | USB | USB D− | C153, C153-Lite | Native USB pads. PDM is **not** here |
+| 20 | USB | USB D+ | C153, C153-Lite | Native USB pads |
+| 21 | Input | SX1262 BUSY | C153 | No internal pull (Table 2-1). Lite: [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads) |
+| 38 | Output | LoRa SPI MOSI | C153 | Schematic/product “SPI1”. UserDemo `SPI3_HOST` |
+| 39 | Output | LoRa SPI CLK | C153 | Mux off JTAG `MTCK` |
+| 40 | Input | LoRa SPI MISO | C153 | Mux off JTAG `MTDO` |
+| 41 | Output | SX1262 NSS | C153 | Mux off JTAG `MTDI` |
+| 42 | PWM | Buzzer `BB_PWM` | C153, C153-Lite | Mux off JTAG `MTMS` |
+| 45 | Output | PDM CLK | C153, C153-Lite | **Strapping** (WPD). Not a power latch |
+| 46 | Input | PDM DAT | C153, C153-Lite | **Strapping** (WPD). Not a power latch |
+| 47 | OD data | System I2C SDA | C153, C153-Lite | `G47_SYS_SDA` |
+| 48 | OD clock | System I2C SCL | C153, C153-Lite | `G48_SYS_SCL` |
 
 UART0 TX/RX (GPIO43/44) are ESP32-S3 defaults. Lite run mode
 enumerates native Espressif USB-Serial/JTAG (`303a:1001`),
@@ -61,13 +61,13 @@ Whether UART0 also enumerates, and `C153` / download:
 
 | Device | 7-bit | SKU | Notes |
 | --- | ---: | --- | --- |
-| FT6336G | `0x38` | both | Official pin map. **Not in** the public FT6336G PDF |
-| RX8130CE | `0x32` | both | Schematic `IIC Adress:0x32`. Epson extract garbled |
-| BMI270 | `0x68` | both | Sheet default if SDO to GND; schematic labels `0x68` |
-| M5PM1 | `0x6E` | both | UM V 1.9; GPIO default open-drain |
-| M5IOE1 | `0x4F` | both | Schematic / docs / UserDemo. Chip UM V 1.4 is `0x6F`–`0x76` from IO7. Library fallback `0x6F`; REV `'W'` at `0x4F`. Lite official `begin`: `ioe_addr=4f`. Lite UM `0x6F` NAK |
-| IP2315 | `0x75` | both | 8-bit `0xEA`/`0xEB`. Gated by `PYG11_PWM3` |
-| ST25R3916 | `0x50` | full | Sheet `50h`. Schematic `I2C_EN=VDD`. UserDemo SKU probe at this address |
+| FT6336G | `0x38` | C153, C153-Lite | Official pin map. **Not in** the public FT6336G PDF |
+| RX8130CE | `0x32` | C153, C153-Lite | Schematic `IIC Adress:0x32`. Epson extract garbled |
+| BMI270 | `0x68` | C153, C153-Lite | Sheet default if SDO to GND; schematic labels `0x68` |
+| M5PM1 | `0x6E` | C153, C153-Lite | UM V 1.9; GPIO default open-drain |
+| M5IOE1 | `0x4F` | C153, C153-Lite | Schematic / docs / factory demo. Chip UM V 1.4 is `0x6F`–`0x76` from IO7. Library fallback `0x6F`; REV `'W'` at `0x4F`. Lite official `begin`: `ioe_addr=4f`. Lite UM `0x6F` NAK |
+| IP2315 | `0x75` | C153, C153-Lite | 8-bit `0xEA`/`0xEB`. Gated by `PYG11_PWM3` |
+| ST25R3916 | `0x50` | C153 | Sheet `50h`. Schematic `I2C_EN=VDD`. Factory demo SKU probe at this address |
 
 One bus: SDA=47, SCL=48, schematic `IIC PULL_UP`. Chip caps:
 M5PM1/M5IOE1 100 kHz default / 400 kHz; FT6336G SCL 10–400 kHz;
@@ -88,7 +88,7 @@ PWM). Pull-up or push-pull, or the pin does not drive high.
 | --- | --- |
 | SDA/SCL/IRQ/BOOT_OUT | ESP32 GPIO47/48/1/0 |
 | G0 `WAKEin` | RTC INT |
-| G2 | LoRa_EN (full SKU) |
+| G2 | LoRa_EN (C153) |
 | G3 PWM0 | Frontlight `BL_FB` into AW9967 (`EINK_BL`) |
 | G4 `WAKEin` | IMU INT |
 | `LED_EN_PP` | RGB red. Not PWM |
@@ -99,19 +99,19 @@ Official Arduino table names `M5IOE1_PIN_n` as `PYGn`.
 
 | M5IOE1 | Function | SKU |
 | --- | --- | --- |
-| PYG1 | microSD detect (`TF_DET`) | both |
-| PYG2 | LoRa antenna switch | full |
-| PYG3 | EPD 3.3 V enable | both |
-| PYG4 | NFC enable | full |
-| PYG5 | EPD RST | both |
-| PYG6 | Touch RST | both |
-| PYG8 PWM | RGB green | both |
-| PYG9 PWM | RGB blue | both |
-| PYG10 | LoRa reset | full |
-| PYG11 | IP2315 I2C gate | both |
-| PYG12 | PDM VDD enable | both |
-| PYG13 | Touch VDD enable | both |
-| PYG14 | microSD enable | both |
+| PYG1 | microSD detect (`TF_DET`) | C153, C153-Lite |
+| PYG2 | LoRa antenna switch | C153 |
+| PYG3 | EPD 3.3 V enable | C153, C153-Lite |
+| PYG4 | NFC enable | C153 |
+| PYG5 | EPD RST | C153, C153-Lite |
+| PYG6 | Touch RST | C153, C153-Lite |
+| PYG8 PWM | RGB green | C153, C153-Lite |
+| PYG9 PWM | RGB blue | C153, C153-Lite |
+| PYG10 | LoRa reset | C153 |
+| PYG11 | IP2315 I2C gate | C153, C153-Lite |
+| PYG12 | PDM VDD enable | C153, C153-Lite |
+| PYG13 | Touch VDD enable | C153, C153-Lite |
+| PYG14 | microSD enable | C153, C153-Lite |
 
 `TF_DET` is pulled up by the microSD power domain. Slot switch
 closed pulls detect low.
@@ -122,7 +122,7 @@ closed pulls detect low.
 | Bus | Pins | Devices |
 | --- | --- | --- |
 | SPI2 | MOSI 14, SCLK 15, CS 16, DC 17, BUSY 18 | SSD1677 (MOSI-only in the pin table) |
-| LoRa SPI | MOSI 38, MISO 40, CLK 39, NSS 41, BUSY 21, IRQ 5 | Stamp LoRa-1262 (full). Product table: SPI1. UserDemo: `SPI3_HOST` on those GPIOs ([user-demo.md](user-demo.md)) |
+| LoRa SPI | MOSI 38, MISO 40, CLK 39, NSS 41, BUSY 21, IRQ 5 | Stamp LoRa-1262 (C153). Product table: SPI1. UserDemo: `SPI3_HOST` on those GPIOs ([user-demo.md](user-demo.md)) |
 | SDMMC | CMD 12, CLK 13, DAT0–3 11/10/9/8 | microSD |
 
 EPD and SD do **not** share a controller. Schematic names
@@ -131,7 +131,7 @@ says 1-bit. Live width on a physical unit:
 [nyc-sdmmc-width](../resources/not-yet-confirmed.md#nyc-sdmmc-width).
 SSD1677 write spec max 20 MHz; clock on a unit:
 [nyc-epd-spi-clock](../resources/not-yet-confirmed.md#nyc-epd-spi-clock).
-SX1262 SPI spec max 16 MHz (full SKU). That is the **die**.
+SX1262 SPI spec max 16 MHz (C153). That is the **die**.
 The populated part is Stamp LoRa-1262 (module): 868–923 MHz,
 FPC antenna, `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`.
 [nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora).
@@ -144,7 +144,7 @@ sink, no PD controller in the extract.
 
 Official HTML **PinMap** and product comparison: Lite has no
 NFC and no LoRa modules (those headings exist only on the
-full-SKU page). The Lite V0.6.2 schematic still **draws**
+`C153` page). The Lite V0.6.2 schematic still **draws**
 Stamp LoRa-1262 and RFID/NFC blocks (gallery page 05 / PDF).
 The extract names SX1262, ST25R3916, `PYB_NFC_EN`, and LoRa
 SPI nets. Lite page-05 extract also says `PYB_NFC_EN is a

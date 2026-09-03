@@ -53,9 +53,9 @@ on boot is still intent. `C153`, `probe-rs`, extra CDC:
 Not QinHeng `1a86:55d3`. Same VID:PID as many ESP32-S3
 DevKits; pass `--port` if more than one is plugged in.
 
-## NFC and LoRa (full SKU)
+## NFC and LoRa (`C153`)
 
-ST25R3916 `0x50` (sheet `50h`), IRQ GPIO6. Full schematic:
+ST25R3916 `0x50` (sheet `50h`), IRQ GPIO6. `C153` schematic:
 `I2C_EN=VDD; I2C mode`. UserDemo SKU probe and NFC app keep
 the field off except while scanning
 ([user-demo.md](user-demo.md)). SX1262 GPIOs 38/40/39/41/21/5

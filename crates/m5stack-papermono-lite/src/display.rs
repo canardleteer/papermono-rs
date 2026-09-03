@@ -20,7 +20,7 @@ pub use ssd1677_otp::{
     WRITE_RAM_RED,
 };
 
-/// Official panel width (pixels). HTML tables / UserDemo rotation 0.
+/// Official panel width (pixels). HTML tables / factory demo rotation 0.
 pub const WIDTH: u16 = 480;
 /// Official panel height (pixels).
 pub const HEIGHT: u16 = 800;

@@ -7,7 +7,7 @@ use crate::device::DeviceIo;
 use crate::layout::{require_capture_backup, require_original_backup, Layout};
 use crate::Error;
 
-/// Lite measured `factory` start (UserDemo `partitions.csv`). Nothing
+/// Lite measured `factory` start (matching factory demo `partitions.csv`). Nothing
 /// below this is an app-flash target (nvs `0x9000`, phy `0xf000`).
 pub const FACTORY_MIN_OFFSET: u32 = 0x10000;
 

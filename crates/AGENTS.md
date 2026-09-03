@@ -34,9 +34,10 @@ Put new code where the hardware is:
 Lite firmware depends on `m5stack-papermono-lite` only so it
 cannot name radio GPIOs. Do not init NFC or LoRa on Lite. Do
 not `#[cfg(feature = "lite")]` (or `nfc` / `lora`) through
-display, I2C, or Embassy. UserDemo’s one-ELF runtime NFC probe
-is vendor app policy, not this BSP; leftover pads stay
-undriven until `nyc-lite-nfc-pads` / `nyc-lite-lora-pads`
+display, I2C, or Embassy. The official factory demo firmware
+([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
+one-ELF runtime NFC probe is vendor app policy, not this BSP; leftover
+pads stay undriven until `nyc-lite-nfc-pads` / `nyc-lite-lora-pads`
 close.
 
 Collapsing the thin C153 crate into optional features later is

@@ -52,25 +52,25 @@ that unit exists. Do **not** init NFC/LoRa on Lite.
 
 | Surface | SKU | NYC |
 | --- | --- | --- |
-| ESP32-S3R8 (USB, flash, straps) | both | [nyc-flash-id](#nyc-flash-id), [nyc-usb-vid](#nyc-usb-vid), [nyc-cpu-flash-runtime](#nyc-cpu-flash-runtime), [nyc-gpio0-strap](#nyc-gpio0-strap), [nyc-nvs-phy](#nyc-nvs-phy) |
-| Octal PSRAM | both | [nyc-flash-id](#nyc-flash-id) |
-| Wi-Fi 2.4 GHz + BLE | both | [nyc-wifi-ble](#nyc-wifi-ble) |
-| SSD1677 | both | [nyc-epd-spi-clock](#nyc-epd-spi-clock), [nyc-otp-busy](#nyc-otp-busy), [nyc-lut-path](#nyc-lut-path), [nyc-canvas-orient](#nyc-canvas-orient), [nyc-partial-ghost](#nyc-partial-ghost), [nyc-panel-sheet](#nyc-panel-sheet) |
-| FT6336G | both | [nyc-ft6336-area](#nyc-ft6336-area), [nyc-ft6336-points](#nyc-ft6336-points) |
-| M5PM1 | both | [nyc-sleep-current](#nyc-sleep-current), [nyc-power-button](#nyc-power-button), [nyc-pm1-wake](#nyc-pm1-wake), [nyc-gpio0-strap](#nyc-gpio0-strap) |
-| AW9967 frontlight (PWM0) | both | [nyc-frontlight](#nyc-frontlight) |
-| M5IOE1 | both | leftover-pad rows; full roster [nyc-i2c-ack](#nyc-i2c-ack) |
-| IP2315 | both | [nyc-ip2315-bus](#nyc-ip2315-bus), [nyc-charge-stat](#nyc-charge-stat) |
-| BMI270 | both | [nyc-bmi270](#nyc-bmi270); INT [nyc-pm1-wake](#nyc-pm1-wake) |
-| RX8130CE | both | [nyc-rx8130](#nyc-rx8130); INT [nyc-pm1-wake](#nyc-pm1-wake) |
-| LMD4737 PDM | both | [nyc-pdm-mic](#nyc-pdm-mic) |
-| Buzzer GPIO42 | both | [nyc-buzzer](#nyc-buzzer) |
-| RGB LED | both | [nyc-rgb-led](#nyc-rgb-led) |
-| microSD | both | [nyc-sdmmc-width](#nyc-sdmmc-width), [nyc-tf-det](#nyc-tf-det) |
-| ST25R3916 | full | [nyc-nfc-ack](#nyc-nfc-ack). Lite: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
-| SX1262 die | full | [nyc-lora-ack](#nyc-lora-ack) |
-| Stamp LoRa-1262 module | full | [nyc-stamp-lora](#nyc-stamp-lora). Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
-| Full I2C roster incl. `0x50` | full | [nyc-i2c-ack](#nyc-i2c-ack) |
+| ESP32-S3R8 (USB, flash, straps) | C153, C153-Lite | [nyc-flash-id](#nyc-flash-id), [nyc-usb-vid](#nyc-usb-vid), [nyc-cpu-flash-runtime](#nyc-cpu-flash-runtime), [nyc-gpio0-strap](#nyc-gpio0-strap), [nyc-nvs-phy](#nyc-nvs-phy) |
+| Octal PSRAM | C153, C153-Lite | [nyc-flash-id](#nyc-flash-id) |
+| Wi-Fi 2.4 GHz + BLE | C153, C153-Lite | [nyc-wifi-ble](#nyc-wifi-ble) |
+| SSD1677 | C153, C153-Lite | [nyc-epd-spi-clock](#nyc-epd-spi-clock), [nyc-otp-busy](#nyc-otp-busy), [nyc-lut-path](#nyc-lut-path), [nyc-canvas-orient](#nyc-canvas-orient), [nyc-partial-ghost](#nyc-partial-ghost), [nyc-panel-sheet](#nyc-panel-sheet) |
+| FT6336G | C153, C153-Lite | [nyc-ft6336-area](#nyc-ft6336-area), [nyc-ft6336-points](#nyc-ft6336-points) |
+| M5PM1 | C153, C153-Lite | [nyc-sleep-current](#nyc-sleep-current), [nyc-power-button](#nyc-power-button), [nyc-pm1-wake](#nyc-pm1-wake), [nyc-gpio0-strap](#nyc-gpio0-strap) |
+| AW9967 frontlight (PWM0) | C153, C153-Lite | [nyc-frontlight](#nyc-frontlight) |
+| M5IOE1 | C153, C153-Lite | leftover-pad rows; full roster [nyc-i2c-ack](#nyc-i2c-ack) |
+| IP2315 | C153, C153-Lite | [nyc-ip2315-bus](#nyc-ip2315-bus), [nyc-charge-stat](#nyc-charge-stat) |
+| BMI270 | C153, C153-Lite | [nyc-bmi270](#nyc-bmi270); INT [nyc-pm1-wake](#nyc-pm1-wake) |
+| RX8130CE | C153, C153-Lite | [nyc-rx8130](#nyc-rx8130); INT [nyc-pm1-wake](#nyc-pm1-wake) |
+| LMD4737 PDM | C153, C153-Lite | [nyc-pdm-mic](#nyc-pdm-mic) |
+| Buzzer GPIO42 | C153, C153-Lite | [nyc-buzzer](#nyc-buzzer) |
+| RGB LED | C153, C153-Lite | [nyc-rgb-led](#nyc-rgb-led) |
+| microSD | C153, C153-Lite | [nyc-sdmmc-width](#nyc-sdmmc-width), [nyc-tf-det](#nyc-tf-det) |
+| ST25R3916 | C153 | [nyc-nfc-ack](#nyc-nfc-ack). Lite: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
+| SX1262 die | C153 | [nyc-lora-ack](#nyc-lora-ack) |
+| Stamp LoRa-1262 module | C153 | [nyc-stamp-lora](#nyc-stamp-lora). Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
+| Full I2C roster incl. `0x50` | C153 | [nyc-i2c-ack](#nyc-i2c-ack) |
 
 ## Index
 
@@ -105,8 +105,8 @@ that unit exists. Do **not** init NFC/LoRa on Lite.
 | [nyc-sdmmc-width](#nyc-sdmmc-width) | 1-bit vs DAT0–DAT3 | [input-storage.md](../references/input-storage.md) |
 | [nyc-tf-det](#nyc-tf-det) | Insert = 0 | [input-storage.md](../references/input-storage.md) |
 | [nyc-stamp-lora](#nyc-stamp-lora) | Stamp LoRa-1262 module vs SX1262 die | [pin-map.md](../references/pin-map.md) |
-| [nyc-lora-ack](#nyc-lora-ack) | SX1262 SPI status on full SKU | [pin-map.md](../references/pin-map.md) |
-| [nyc-nfc-ack](#nyc-nfc-ack) | ST25R3916 `0x50` on full SKU | [pin-map.md](../references/pin-map.md) |
+| [nyc-lora-ack](#nyc-lora-ack) | SX1262 SPI status on C153 | [pin-map.md](../references/pin-map.md) |
+| [nyc-nfc-ack](#nyc-nfc-ack) | ST25R3916 `0x50` on C153 | [pin-map.md](../references/pin-map.md) |
 | [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) | Lite GPIO6 / PYG4 NC vs routed | [pin-map.md](../references/pin-map.md) |
 | [nyc-lite-lora-pads](#nyc-lite-lora-pads) | Lite SPI1 / IRQ NC vs routed | [pin-map.md](../references/pin-map.md) |
 | [nyc-rgb-led](#nyc-rgb-led) | Red not PWM; G/B range | [sensors.md](../references/sensors.md) |
@@ -265,7 +265,7 @@ an AW9967 register map. PWM1 writes are the wrong channel.
 **Partial (2026-09-01, `C153-Lite`):** right-edge slide
 **changes brightness** with PWM0 at 5 kHz 12-bit. Same day,
 PWM1 left the lamp constant.
-**Lite (2026-09-02, Stage B):** PWM0 `lamp=1024` needs
+**Lite (2026-09-02, rail verification):** PWM0 `lamp=1024` needs
 `PYG3` (`EPD_VDD`) or the lamp stays dark. No `EPD_RST`.
 [power-and-sleep.md](../references/power-and-sleep.md),
 [measure.md](../references/measure.md). `C153` open.
@@ -281,12 +281,12 @@ Name the SKU.
 
 OTP-Demo: BUSY idle level, busy-during-refresh level, and
 whether a Seeed-style analog-off standby recovers without a
-hardware reset. UserDemo analog-off sequence is named in
+hardware reset. Factory demo analog-off sequence is named in
 [user-demo.md](../references/user-demo.md); do not treat that
 as a measured recovery.
 [display.md](../references/display.md).
 
-**Partial (2026-09-01, `C153-Lite`):** First Stage D stamp
+**Partial (2026-09-01, `C153-Lite`):** First panel test stamp
 (`0xC7`, 480×800) never raised BUSY. Later same day OTP-Demo
 `0xD7` / 800×480: CDC `busy_rose=1`, idle `gpio busy=0`.
 Same day: partial `0xFF` and mono `0xF8`/`0x14` also
@@ -356,7 +356,7 @@ How many simultaneous contacts report? Public sheet says 1–2.
 
 ### nyc-i2c-ack
 
-Full SKU, system I2C scan after M5PM1/M5IOE1 init, IP2315
+C153, system I2C scan after M5PM1/M5IOE1 init, IP2315
 isolated: expect `0x32`, `0x38`, `0x4F`, `0x50`, `0x68`,
 `0x6E`. `0x75` only while gated on.
 [pin-map.md](../references/pin-map.md).
@@ -437,7 +437,7 @@ Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) only.
 
 ### nyc-lora-ack
 
-Full SKU only. **Blocked until a `C153` is in hand.** After
+C153 only. **Blocked until a `C153` is in hand.** After
 Stamp rails ([nyc-stamp-lora](#nyc-stamp-lora)): mux
 GPIO39–41 off JTAG, honor BUSY, SPI status of the **SX1262
 die**. Product band 868–923 MHz; UserDemo 868.0 MHz is the
@@ -448,7 +448,7 @@ pass-with-wrapper; rails stay in `m5stack-papermono`.
 
 ### nyc-nfc-ack
 
-Full SKU only. **Blocked until a `C153` is in hand.** NFC
+C153 only. **Blocked until a `C153` is in hand.** NFC
 rail on, `0x50` ACK, UserDemo `probeNfcIdentity` (`0x7F` /
 type `0x05`; cite those constants, not an unread register
 map). Park RF. Do not leave the field on in default images.

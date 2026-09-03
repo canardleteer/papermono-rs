@@ -5,7 +5,7 @@ description: >-
   PaperMono (SKU C153) or PaperMono-Lite (SKU C153-Lite): ESP32-S3R8,
   800x480/480x800 SSD1677 e-paper, FT6336G, M5PM1, M5IOE1, native USB,
   including GPIO and expander maps, power-rail bring-up, display/touch/
-  IMU/battery wiring, SDMMC, NFC/LoRa on the full SKU, deep sleep,
+  IMU/battery wiring, SDMMC, NFC/LoRa on PaperMono (C153), deep sleep,
   flashing, destroy-the-board hazards, named constants vs magic
   opcodes, datasheet section citations, M5GFX refresh modes
   (`epd_quality`, `epd_text`, `epd_fast`, `epd_fastest`), or when
@@ -244,7 +244,7 @@ flash size is 16 MB
    / [nyc-lite-lora-pads](resources/not-yet-confirmed.md#nyc-lite-lora-pads)
    close.
 8. **Display SPI is not shared with microSD.** EPD is SPI2
-   (GPIO14–18). SD is SDMMC (GPIO8–13). LoRa (full SKU) uses
+   (GPIO14–18). SD is SDMMC (GPIO8–13). LoRa (C153) uses
    GPIO38–41 / 5 / 21; UserDemo attaches that bus to
    `SPI3_HOST`, not ESP-IDF `SPI1_HOST`.
 9. **M5PM1 and M5IOE1 GPIO default open-drain** (including
@@ -321,14 +321,15 @@ Arduino / M5PM1 docs:
    boot: OTP full refresh, not an invented LUT.
 6. Touch: `PYG13` VDD, `PYG6` RST; FT6336G `0x38`; INT GPIO4.
 7. Sensors on the same I2C: BMI270 `0x68`, RX8130CE `0x32`.
-8. Full SKU only: ST25R3916 `0x50`, SX1262 on the LoRa GPIOs
+8. C153 only: ST25R3916 `0x50`, SX1262 on the LoRa GPIOs
    after `LoRa_EN` (M5PM1 G2).
 
 UserDemo eval HAL
 ([user-demo.md](references/user-demo.md)): 500 ms wait,
 `M5.begin` (display/touch via M5Unified, internal mic/spk/imu
 off), then M5PM1/M5IOE1, then **runtime NFC identity probe**
-to choose Pro vs Lite. NFC and LoRa apps install only when
+to choose between C153 (internal enum `Pro`) and C153-Lite.
+NFC and LoRa apps install only when
 that probe succeeds. Mic, SD, and LoRa init stay deferred.
 
 ## Subsystem map

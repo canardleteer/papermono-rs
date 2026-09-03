@@ -58,9 +58,9 @@ mod tests {
     #[test]
     fn radio_expander_pins_are_not_assigned_here() {
         for assigned in ASSIGNED {
-            assert_ne!(*assigned, 2, "LoRa antenna switch is full-SKU only");
-            assert_ne!(*assigned, 4, "NFC enable is full-SKU only");
-            assert_ne!(*assigned, 10, "LoRa reset is full-SKU only");
+            assert_ne!(*assigned, 2, "LoRa antenna switch is C153 only");
+            assert_ne!(*assigned, 4, "NFC enable is C153 only");
+            assert_ne!(*assigned, 10, "LoRa reset is C153 only");
         }
     }
 

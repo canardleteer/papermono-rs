@@ -43,7 +43,7 @@ pub struct BuildFwArgs {
     pub features: Vec<String>,
     /// `true` is `--profile release-fw` (the documented default).
     pub release: bool,
-    /// Pass `--no-default-features` (Stage A: no I2C / PDM / panel).
+    /// Pass `--no-default-features` (minimal unfeatured bring-up: no I2C / PDM / panel).
     pub no_default_features: bool,
 }
 

@@ -59,7 +59,9 @@ as run mode. Serial omitted.
 This is native Espressif USB-Serial/JTAG on USB-C, not a
 CH343. Vendor Arduino `USB_CDC_ON_BOOT` is still **intent**;
 run and download enumeration used the JTAG/serial product
-string.
+string. UiFlow2 MicroPython defines USB VID `0x303A` and PID
+`0x816B` for its PaperMono runtime firmware (Board ID 29,
+240 MHz CPU, 8 MB Octal SPIRAM, 16 MB QIO Flash).
 
 **Lite run (2026-09-02):** one USB device, three
 interfaces: CDC comm `02/02`, CDC data `0a/00` (one ACM),

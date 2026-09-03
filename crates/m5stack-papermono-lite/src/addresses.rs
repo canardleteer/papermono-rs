@@ -16,12 +16,12 @@ pub const RX8130CE: u8 = 0x32;
 pub const BMI270: u8 = 0x68;
 /// M5PM1 PMIC. UM V 1.9.
 pub const M5PM1: u8 = 0x6E;
-/// M5IOE1 on **this board**. Schematic / docs / UserDemo.
+/// M5IOE1 on **this board**. Schematic / docs / factory demo.
 ///
 /// Chip UM V 1.4 lists `0x6F`–`0x76` from IO7. Do not flatten that
 /// range onto this constant. Library fallback is [`M5IOE1_UM`].
 pub const M5IOE1: u8 = 0x4F;
-/// M5IOE1 library default / UM floor. UserDemo `begin(0x4F)` fallback.
+/// M5IOE1 library default / UM floor. Factory demo `begin(0x4F)` fallback.
 ///
 /// Not a walk of `0x70`–`0x76` (`0x75` is IP2315).
 pub const M5IOE1_UM: u8 = 0x6F;
@@ -34,7 +34,7 @@ pub const IP2315: u8 = 0x75;
 pub const ST25R3916_LEFTOVER: u8 = 0x50;
 /// Catalog id `st25r3916`, Device_ID (read-only). Leftover probe only.
 ///
-/// Do not send UserDemo `NFC_READ_IC_IDENTITY_CMD` (`0x7F`).
+/// Do not send factory demo `NFC_READ_IC_IDENTITY_CMD` (`0x7F`).
 pub const ST25R3916_LEFTOVER_DEVICE_ID: u8 = 0x00;
 
 #[cfg(test)]

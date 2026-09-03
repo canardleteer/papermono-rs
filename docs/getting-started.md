@@ -29,11 +29,12 @@ flowchart TD
 
 In the order you are most likely to regret breaking them:
 
-1. Never erase the flash. Avoid running full-chip erase commands or
-   `espflash erase-flash`. ESP32-S3 RF calibration lives in NVS. Always
-   preserve original partition geometry and dump the measured flash length
-   (16 MB on Lite hardware). Capture a full snapshot with
-   `cargo xtask backup-factory-firmware` before flashing any custom binary.
+1. Preserve the factory image before flashing. Avoid full-chip erase commands
+   or `espflash erase-flash`. While the ESP32-S3 MAC is in factory eFuses and
+   ESP-IDF will auto-calibrate RF into NVS if erased, backing up the flash
+   preserves the stock partition geometry, factory demo image, and device state
+   without needing vendor downloads. Dump the measured flash length (16 MB on
+   Lite hardware) with `cargo xtask backup-factory-firmware` before flashing.
 2. Do not invent an e-paper waveform. Use panel OTP sequences directly.
    Execute a full refresh after roughly ten partial refreshes to avoid
    permanent ghosting. Full constraints appear in [SAFETY.md](SAFETY.md).
@@ -158,7 +159,7 @@ Common configuration issues:
 | `QinHeng` / `1a86:55d3` refused | The connected device is not an Espressif native USB node |
 | `flash-app` wants a matching snapshot | A snapshot capture must be saved for this device first |
 | Flash succeeded, glass / CDC unchanged | The target remained in bootloader mode; short-press the power button |
-| `monitor` silent on stock UserDemo | Factory firmware does not output `simple-debug:` text lines |
+| `monitor` silent on stock factory demo | Official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) does not output `simple-debug:` text lines |
 | `monitor` cannot claim usbfs | Confirm udev rules are active and your user belongs to dialout |
 | `cannot find module or crate xtensa_lx` | The active target is not Xtensa; invoke builds via `cargo xtask build-fw` |
 | `failed to load manifest … library/std` | The toolchain installation was incomplete; reinstall via espup |

@@ -24,11 +24,11 @@ pub const CONTROL: u8 = 0x1E;
 pub const TIMER_EN: u8 = 0x10;
 /// TSEL 64 Hz. M5Unified `clk_t` for a 10 s count of 640.
 pub const TSEL_64HZ: u8 = 0x01;
-/// 10 s at 64 Hz (UserDemo `RTC_WAKE_TIMER_MS`).
+/// 10 s at 64 Hz (factory demo `RTC_WAKE_TIMER_MS`).
 pub const TIMER_10S_COUNTS: u16 = 640;
 /// User RAM byte we use as a one-shot “already woke” mark.
 ///
-/// Not UserDemo index 0/1 packing. Do not write `SEC`.
+/// Not factory demo index 0/1 packing. Do not write `SEC`.
 pub const USER_RAM_MARK: u8 = 0x23;
 /// Value in [`USER_RAM_MARK`] after we arm RTC sleep.
 pub const USER_RAM_SLEPT: u8 = 0xA5;

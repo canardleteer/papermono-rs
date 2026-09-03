@@ -19,18 +19,21 @@ The living HTML can still change.
 | PaperMono-Lite (`C153-Lite`) | https://docs.m5stack.com/en/core/PaperMono-Lite |
 | HTML **view as markdown** (2026-09-01) | [PaperMono.2026-09-01.md](../resources/official-html/PaperMono.2026-09-01.md), [PaperMono-Lite.2026-09-01.md](../resources/official-html/PaperMono-Lite.2026-09-01.md) ([SOURCE.md](../resources/official-html/SOURCE.md)) |
 | Product SKU aliases (UserDemo README) | https://docs.m5stack.com/en/products/sku/C153 and https://docs.m5stack.com/en/products/sku/C153-LITE |
-| Product PDF (full) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono.pdf |
-| Product PDF (Lite) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono-Lite.pdf |
-| Shop (full) | https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display |
-| Shop (Lite) | https://shop.m5stack.com/products/papermono-lite-dev-kit-800x480-3-97-e-ink-display |
+| Product PDF (C153) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono.pdf |
+| Product PDF (C153-Lite) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono-Lite.pdf |
+| Shop (C153) | https://shop.m5stack.com/products/m5papermono-with-lora-nfc-800x480-3-97-eink-display |
+| Shop (C153-Lite) | https://shop.m5stack.com/products/papermono-lite-dev-kit-800x480-3-97-e-ink-display |
 | Stamp LoRa-1262 | https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262 |
 | M5Unified (`develop`) | https://github.com/m5stack/M5Unified |
 | Arduino M5PM1 / M5IOE1 | https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1 |
 | UiFlow2 flash | https://docs.m5stack.com/en/uiflow2/papermono/program |
-| Schematic PDF (full) V0.6.2 2026-05-22 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf |
-| Schematic PDF (Lite) V0.6.2 2026-05-22 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522.pdf |
-| Model size PDF (full) | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/C153_PaperMono_model_size.pdf |
-| Model size PDF (Lite) | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/C153-Lite_PaperMono-Lite_model_size.pdf |
+| M5Unified LED driver | https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/led/LED_PaperMono_Class.hpp |
+| UiFlow2 MicroPython board config | https://github.com/m5stack/uiflow-micropython/tree/587e134c61b31431335351e04ebfc05f69064bb7/m5stack/boards/M5STACK_PaperMono |
+| M5Unified Power IP2315 gate sequence | https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/Power_Class.cpp#L72-L96 |
+| Schematic PDF (C153) V0.6.2 2026-05-22 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf |
+| Schematic PDF (C153-Lite) V0.6.2 2026-05-22 | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/PaperMono-Lite_PRJ_V0.6.2_20260522.pdf |
+| Model size PDF (C153) | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/C153_PaperMono_model_size.pdf |
+| Model size PDF (C153-Lite) | https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1268/C153-Lite_PaperMono-Lite_model_size.pdf |
 
 Schematic PDFs are cache ids `papermono-schematic` and
 `papermono-lite-schematic` in
@@ -112,7 +115,7 @@ nets; use the PNGs when the extract drops wires. Cache:
 SKU: burn Lite firmware on Lite. UserDemo is one binary that
 **skips** NFC/LoRa apps when `Hal::hasNfcHardware()` is false;
 that is not a license to init those chips on Lite. Do not
-assume a full-SKU **UiFlow2 / Easyloader** image is safe on
+assume a `C153` **UiFlow2 / Easyloader** image is safe on
 Lite.
 
 ## Native ESP-IDF (no Arduino)
