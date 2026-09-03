@@ -14,7 +14,7 @@ use crate::cdc;
 use crate::ioe::SysI2c;
 use crate::panel::{Mark, Panel};
 use crate::share;
-use crate::touch_bus::{self, LampSlide};
+use crate::touch_bus;
 
 const DOT_X: [u16; 5] = [240, 80, 400, 80, 400];
 const DOT_Y: [u16; 5] = [400, 80, 80, 720, 720];
@@ -42,16 +42,15 @@ pub async fn walk(
     btn_b: &Input<'static>,
     tp: &Input<'static>,
     busy: &Input<'static>,
-    lamp: &mut LampSlide,
 ) -> WalkEnd {
     for id in 0..=LAST_ID {
         let (kind, tx, ty, r, mark) = scene(id);
         cdc::touch_target(id, kind, tx, ty, r);
         panel.paint(i2c, mark, busy).await;
         let out = if id < SLIDE_X_ID {
-            wait_dot(i2c, btn_a, btn_b, tp, lamp, id, tx, ty).await
+            wait_dot(i2c, btn_a, btn_b, tp, id, tx, ty).await
         } else {
-            wait_slide(i2c, btn_a, btn_b, tp, lamp, id, id == SLIDE_X_ID, tx, ty).await
+            wait_slide(i2c, btn_a, btn_b, tp, id, id == SLIDE_X_ID, tx, ty).await
         };
         match out {
             Outcome::Hit(x, y, d) => cdc::touch_verdict(id, "hit", x, y, tx, ty, d),
@@ -113,13 +112,11 @@ fn scene(id: u8) -> (&'static str, u16, u16, u16, Mark) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn wait_dot(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
-    lamp: &mut LampSlide,
     id: u8,
     tx: u16,
     ty: u16,
@@ -149,14 +146,11 @@ async fn wait_dot(
                 cdc::touch_at(id, &sample, tx, ty);
                 return Outcome::Hit(sample.x, sample.y, d);
             }
-            // Gutter sits over the x=400 dots; slop already scored.
-            if !lamp.feed(i2c, &sample) {
-                n0_once = true;
-                cdc::touch_at(id, &sample, tx, ty);
-                if miss_once {
-                    cdc::touch_verdict(id, "miss", sample.x, sample.y, tx, ty, d);
-                    miss_once = false;
-                }
+            n0_once = true;
+            cdc::touch_at(id, &sample, tx, ty);
+            if miss_once {
+                cdc::touch_verdict(id, "miss", sample.x, sample.y, tx, ty, d);
+                miss_once = false;
             }
         } else if sample.n < 1 {
             miss_once = true;
@@ -177,7 +171,6 @@ async fn wait_slide(
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
-    lamp: &mut LampSlide,
     id: u8,
     along_x: bool,
     line_x: u16,
@@ -224,8 +217,6 @@ async fn wait_slide(
                 {
                     return Outcome::Hit(last_x, last_y, span);
                 }
-            } else {
-                let _ = lamp.feed(i2c, &sample);
             }
         }
         t_ms = t_ms.saturating_add(POLL_PERIOD_MS);
