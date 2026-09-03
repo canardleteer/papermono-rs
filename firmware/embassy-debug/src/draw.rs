@@ -86,7 +86,7 @@ fn draw_legend(bw: &mut [u8], red: &mut [u8]) {
     const B_Y: u16 = 188;
     // Red power key box centre, not the RGB LED (~400). Lite,
     // USB-C down, operator photo 2026-09-01.
-    const POWER_Y: u16 = 500;
+    const POWER_Y: u16 = 510;
 
     clear(bw, red, display::GRAY_WHITE);
     let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);

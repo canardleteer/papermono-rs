@@ -49,7 +49,7 @@ pub async fn run(
         paint(&mut i2c, &mut panel, &busy, scene, planes).await;
         if scene == Scene::Targets {
             panel.enter_mono(&mut i2c, &busy).await;
-            match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy, &mut lamp).await {
+            match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
                     if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp).await {
                         scene = apply(scene, nav);
