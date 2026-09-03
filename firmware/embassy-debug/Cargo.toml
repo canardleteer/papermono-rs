@@ -78,3 +78,7 @@ m5stack-papermono-lite = { path = "../../crates/m5stack-papermono-lite" }
 papermono-log = { path = "../../crates/papermono-log" }
 embedded-graphics = "0.8.2"
 static_cell = "2.1.1"
+
+[build-dependencies]
+sha2 = "0.10.9"
+

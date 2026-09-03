@@ -19,7 +19,7 @@ States). That is a CC0-style public-domain dedication.
 ## Encode
 
 `ferris.1bpp` is 360×240 packed 1 bit-per-pixel (8
-pixels/byte, MSB-first, `1` = ink). `encode_ferris.py`
+pixels/byte, MSB-first, `1` = ink). `cargo xtask encode-assets`
 crops ink and scales to 360×240 pixels before generating the output files:
 
 | File | Role |
@@ -31,5 +31,5 @@ crops ink and scales to 360×240 pixels before generating the output files:
 | `ferris-inv.png` | 1-bit preview of the invert |
 
 ```shell
-python3 firmware/embassy-debug/assets/encode_ferris.py
+cargo xtask encode-assets
 ```

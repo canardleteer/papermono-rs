@@ -34,6 +34,7 @@ assuming a command works on a unit.
 | `ci` | no | Host + firmware clippy: fmt, host clippy/test, `cargo +esp clippy -p simple-debug-fw`, `embassy-debug-fw` (default, `--no-default-features`, then `touch` / `mic` / `panel` / `touch,radio` / `touch,sleep` with `--no-default-features`), rumdl, machete, audit. Needs esp toolchain |
 | `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). Needs the [usbfs udev rule](#usbfs-udev-for-monitor). After a listen, ACM may be gone; `--port /dev/bus/usb/BBB/DDD` from `lsusb` still works. `--reset` is in `--help` as **do not use**: Lite live DTR/RTS left CDC silent. Short-press red. Not download |
 | `build-fw` | no | Host-only. `cargo +esp` (`--locked`) then `espflash save-image --flash-size 16mb`. IMAGE is `simple-debug` or `embassy-debug`. ELF and `.bin` under `target/xtensa-esp32s3-none-elf/release-fw/` |
+| `encode-assets` | no | Host-only. Rasterize and pack SVG line art into 1bpp firmware bitmaps (`ferris.1bpp`, `ferris-inv.1bpp`) and record SHA-256 in `ferris-happy-line-art.svg.sha256` |
 
 ```shell
 cargo xtask detect-connected
@@ -51,6 +52,7 @@ cargo xtask detect-connected
 #   --features touch,mic,radio
 # cargo xtask flash-app --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin --yes --capture stock-lite
 # cargo xtask vet-idle-log --input idle-simple.log
+# cargo xtask encode-assets
 # cargo xtask ci
 # cargo xtask monitor --for 20 --output idle-simple.log
 ```

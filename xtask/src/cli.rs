@@ -77,6 +77,8 @@ pub enum Command {
     /// Host-only CI gate (fmt, clippy, test, extra tools)
     #[command(long_about = CI_ABOUT)]
     Ci,
+    /// Host-only: rasterize SVG line art into 1bpp firmware bitmaps
+    EncodeAssets,
     /// Read USB-Serial/JTAG at 115200 (`--reset` does not recapture)
     Monitor(MonitorArgs),
 }
@@ -258,6 +260,7 @@ impl Cli {
         let repo = repo_root();
         match self.command {
             Command::Ci => crate::ci::run(&repo),
+            Command::EncodeAssets => crate::encode_assets::run(&repo),
             Command::BuildFw(args) => {
                 let out = build_fw(
                     &repo,
@@ -284,9 +287,12 @@ impl Cli {
                 refuse_if_legacy_backups_at_repo_root(&repo)?;
                 let layout = Layout::from_repo_root(repo);
                 match command {
-                    Command::Ci | Command::BuildFw(_) | Command::VetIdleLog(_) => {
+                    Command::Ci
+                    | Command::BuildFw(_)
+                    | Command::VetIdleLog(_)
+                    | Command::EncodeAssets => {
                         unreachable!(
-                            "ci, build-fw, and vet-idle-log return before leftover-backup refuse"
+                            "ci, build-fw, vet-idle-log, and encode-assets return before leftover-backup refuse"
                         )
                     }
                     Command::DetectConnected(args) => {
@@ -452,6 +458,17 @@ mod tests {
         match cli.command {
             super::Command::Ci => {}
             other => panic!("expected Ci, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn encode_assets_parses() {
+        use clap::Parser;
+
+        let cli = Cli::try_parse_from(["xtask", "encode-assets"]).expect("encode-assets");
+        match cli.command {
+            super::Command::EncodeAssets => {}
+            other => panic!("expected EncodeAssets, got {other:?}"),
         }
     }
 
