@@ -39,9 +39,9 @@ pub const OTP_TARGET_TITLE: &str = "otp_target";
 pub const OTP_FAST_TITLE: &str = "otp_fast";
 /// Catalog default for “partials then one Mode 1 full”.
 ///
-/// Official: after about ten. Firmware policy lives on the image
-/// (`embassy-debug` `PARTIALS_BEFORE_FULL`), aligning with this default.
-pub const PARTIALS_BEFORE_FULL: u8 = 6;
+/// Official guidance is about ten. Embassy-debug uses this value
+/// (18 = 3× the prior firmware budget of 6) for non-soft mono paints.
+pub const PARTIALS_BEFORE_FULL: u8 = 18;
 
 /// Official HTML **M5GFX LUT Refresh Speed** titles.
 ///
@@ -98,6 +98,99 @@ pub const fn otp_ram_to_usb_down(ram_x: u16, ram_y: u16) -> (u16, u16) {
     (ram_y, ram_x)
 }
 
+/// USB-down portrait page width (official short edge).
+pub const PAGE_PORTRAIT_W: u16 = WIDTH;
+/// USB-down portrait page height (official long edge).
+pub const PAGE_PORTRAIT_H: u16 = HEIGHT;
+/// Landscape page width (long edge).
+pub const PAGE_LANDSCAPE_W: u16 = HEIGHT;
+/// Landscape page height (short edge).
+pub const PAGE_LANDSCAPE_H: u16 = WIDTH;
+
+/// In-plane page used to draw upright content for a hold.
+///
+/// Face-up and face-down are not variants: a flat unit has no
+/// in-plane “up.” Keep the last rotation (default [`Self::Portrait0`]).
+/// Policy matches sticky-rs; Lite BMI270 axis→pose is USB-C down = −X
+/// ([sensors.md](../../.agents/skills/m5stack-papermono-hardware/references/sensors.md)).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PageRotation {
+    /// USB-C on the bottom short edge. Page is [`PAGE_PORTRAIT_W`] ×
+    /// [`PAGE_PORTRAIT_H`].
+    #[default]
+    Portrait0,
+    /// USB-C on the top short edge. Same portrait page, mapped 180°.
+    Portrait180,
+    /// USB-C on the right short edge. Page is [`PAGE_LANDSCAPE_W`] ×
+    /// [`PAGE_LANDSCAPE_H`].
+    Landscape0,
+    /// USB-C on the left short edge. Same landscape page, mapped 180°.
+    Landscape180,
+}
+
+impl PageRotation {
+    /// Logical page size for this hold, `(width, height)`.
+    #[must_use]
+    pub const fn page_size(self) -> (u16, u16) {
+        match self {
+            Self::Portrait0 | Self::Portrait180 => (PAGE_PORTRAIT_W, PAGE_PORTRAIT_H),
+            Self::Landscape0 | Self::Landscape180 => (PAGE_LANDSCAPE_W, PAGE_LANDSCAPE_H),
+        }
+    }
+
+    /// True when the page is the 480×800 portrait aspect.
+    #[must_use]
+    pub const fn is_portrait(self) -> bool {
+        matches!(self, Self::Portrait0 | Self::Portrait180)
+    }
+
+    /// CDC / log token for this rotation.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Portrait0 => "Portrait0",
+            Self::Portrait180 => "Portrait180",
+            Self::Landscape0 => "Landscape0",
+            Self::Landscape180 => "Landscape180",
+        }
+    }
+}
+
+/// Maps a page pixel onto the official USB-C-down 480×800 framebuffer.
+///
+/// Page `(0, 0)` is the top-left as the user holds the card. Output is
+/// physical USB-down coordinates consumed by OTP plane packing
+/// ([`otp_ram_to_usb_down`] inverse path in firmware).
+#[must_use]
+pub const fn page_to_framebuffer(px: u16, py: u16, rotation: PageRotation) -> Option<(u16, u16)> {
+    let (page_w, page_h) = rotation.page_size();
+    if px >= page_w || py >= page_h {
+        return None;
+    }
+    Some(match rotation {
+        PageRotation::Portrait0 => (px, py),
+        PageRotation::Portrait180 => (WIDTH - 1 - px, HEIGHT - 1 - py),
+        // USB-C on the right short edge: page X runs along physical −Y.
+        PageRotation::Landscape0 => (py, HEIGHT - 1 - px),
+        // USB-C on the left short edge.
+        PageRotation::Landscape180 => (PAGE_LANDSCAPE_H - 1 - py, px),
+    })
+}
+
+/// Inverse of [`page_to_framebuffer`] for touch hit-testing in page space.
+#[must_use]
+pub const fn framebuffer_to_page(fx: u16, fy: u16, rotation: PageRotation) -> Option<(u16, u16)> {
+    if fx >= WIDTH || fy >= HEIGHT {
+        return None;
+    }
+    Some(match rotation {
+        PageRotation::Portrait0 => (fx, fy),
+        PageRotation::Portrait180 => (WIDTH - 1 - fx, HEIGHT - 1 - fy),
+        PageRotation::Landscape0 => (HEIGHT - 1 - fy, fx),
+        PageRotation::Landscape180 => (fy, WIDTH - 1 - fx),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,5 +233,31 @@ mod tests {
         assert_eq!(RefreshMode::EpdText.title(), "epd_text");
         assert_eq!(OTP_TARGET_TITLE, "otp_target");
         const { assert!(PARTIALS_BEFORE_FULL > 0) };
+    }
+
+    #[test]
+    fn page_framebuffer_round_trips() {
+        for rot in [
+            PageRotation::Portrait0,
+            PageRotation::Portrait180,
+            PageRotation::Landscape0,
+            PageRotation::Landscape180,
+        ] {
+            let (pw, ph) = rot.page_size();
+            for &(px, py) in &[
+                (0, 0),
+                (pw - 1, 0),
+                (0, ph - 1),
+                (pw - 1, ph - 1),
+                (pw / 2, ph / 2),
+            ] {
+                let (fx, fy) = page_to_framebuffer(px, py, rot).expect("in bounds");
+                assert_eq!(framebuffer_to_page(fx, fy, rot), Some((px, py)));
+            }
+        }
+        assert_eq!(PageRotation::Portrait0.page_size(), (480, 800));
+        assert_eq!(PageRotation::Landscape0.page_size(), (800, 480));
+        assert!(PageRotation::Portrait0.is_portrait());
+        assert!(!PageRotation::Landscape0.is_portrait());
     }
 }

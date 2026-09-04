@@ -26,7 +26,12 @@ On the unit:
 - The GPIO42 buzzer chirp is parked.
 
 Default features are `touch`, `panel`, `sleep`, and `radio`.
-The `mic` feature is opt-in. First SKU is Lite.
+The `mic` and `orient` features are opt-in. First SKU is Lite.
+
+`orient` enables BMI270-driven page rotation (portrait / landscape
+and 180° flips). Cards redraw upright for the hold; CDC prints
+`imu pose=` with raw XYZ so the axis map can be confirmed on glass.
+Without `orient`, the UI stays USB-C-down portrait.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).

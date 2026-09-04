@@ -25,7 +25,7 @@ IP2315 crates.
 | --- | --- | --- | --- |
 | FT6336G | public PDF has **no register map** | **constants-in-BSP** | M5GFX `decode_m5gfx` in the board crate. Do not invent a FocalTech map |
 | AW9967 | no crate | **constants-in-BSP** | PWM into `EINK_BL`. No invented AW9967 register map. [nyc-frontlight](not-yet-confirmed.md#nyc-frontlight) |
-| BMI270 | possible later | **constants-in-BSP** | `CHIP_ID` `0x00` / payload `0x24`. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
+| BMI270 | possible later | **constants-in-BSP** (+ accel bring-up helpers) | `CHIP_ID` `0x00` / payload `0x24`. Soft-reset + Bosch standard 8 KiB config (`INIT_ADDR_*` + `INIT_DATA`) + raw `DATA_8`…`DATA_13`. Orientation classify is sticky-rs policy; Lite axis map USB-C down = −X. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
 | ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **fail / wait for C153** | I2C `0x50`, `I2C_EN=VDD`. Official stack is ST RFAL (C) and official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) M5Unit-NFC (Arduino). Do not wrap `st25r95`. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |

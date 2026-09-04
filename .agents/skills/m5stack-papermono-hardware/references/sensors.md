@@ -25,7 +25,26 @@ Arduino intent; UserDemo `configureBmi270AnyMotion` tries
 2026-09-02). Optional later: a motion sample. `C153` still
 [nyc-bmi270](../resources/not-yet-confirmed.md#nyc-bmi270).
 
-Registers: cache id `bmi270`.
+### Enclosure orientation (embassy-debug `orient`)
+
+Sticky-rs-style dominant-axis classify (0.70 g threshold) lives in
+`m5stack-papermono-lite::imu`. Face-up / face-down keep the last
+in-plane page. Firmware draws in `PageRotation` page space and maps
+into the fixed USB-C-down 480×800 framebuffer.
+
+**Lite (`C153-Lite`, 2026-09-04) axis map:** with glass toward
+the operator, USB-C down is dominant on BMI270 **−X** (not Y).
+X↔Y vs sticky-rs LSM6. Embassy-debug `--features orient`:
+−X → `Portrait0`, +X → `Portrait180`, +Y → `Landscape0`
+(USB-C right), −Y → `Landscape180` (USB-C left). Face ±Z
+unchanged. Aspect confirmed 2026-09-04 (USB-C down was
+landscape before X↔Y); landscape Y signs flipped the same
+day after glass showed landscape upside-down.
+
+Init uses the Bosch standard 8 KiB `bmi270_config_file`
+(`bmi270_config.SOURCE.md`) with `INIT_ADDR_0`/`INIT_ADDR_1`
+addressing — not the maximum-FIFO variant blob. `INTERNAL_STATUS`
+is register `0x21`.
 
 ## RX8130CE
 

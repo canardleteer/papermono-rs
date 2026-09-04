@@ -2245,6 +2245,8 @@ dependencies = [
 name = "m5stack-papermono-lite"
 version = "0.1.0"
 dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-mock",
  "m5ioe1",
  "m5pm1",
  "ssd1677-otp",

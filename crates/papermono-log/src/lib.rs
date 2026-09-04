@@ -100,6 +100,9 @@ pub const WIFI_AP_CAPACITY: usize = 96;
 /// Bytes reserved for a Wi-Fi HTTP line (`wifi_http req=...`).
 pub const WIFI_HTTP_CAPACITY: usize = 96;
 
+/// Bytes reserved for an IMU pose line (`imu pose=... x=...`).
+pub const IMU_CAPACITY: usize = 96;
+
 /// How long BUTTON A must stay low to dump PCM (page-prev is a tap).
 pub const BUTTON_HOLD_PCM_MS: u32 = 1_000;
 
@@ -814,6 +817,23 @@ pub fn format_wifi_http<'a>(
     )
 }
 
+/// Writes `simple-debug: imu pose=<pose> x=<x> y=<y> z=<z>` without a trailing newline.
+///
+/// Pose tokens are enclosure labels (`Portrait0`, `FaceUp`, `none`, …).
+/// Raw XYZ are BMI270 ±2 g LSB. No MAC or other identifiers.
+pub fn format_imu<'a>(
+    pose: &str,
+    x: i16,
+    y: i16,
+    z: i16,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!("{}: imu pose={pose} x={x} y={y} z={z}", LOG_PREFIX),
+    )
+}
+
 /// Writes a panel stamp without a trailing newline.
 pub fn format_panel<'a>(stamp: &PanelStamp, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
     write_into(
@@ -1258,6 +1278,11 @@ mod tests {
         assert_eq!(
             format_wifi_http(1, "/", &mut http_buf).unwrap(),
             "simple-debug: wifi_http req=1 path=/"
+        );
+        let mut imu_buf = [0u8; IMU_CAPACITY];
+        assert_eq!(
+            format_imu("Portrait0", 0, -16384, 0, &mut imu_buf).unwrap(),
+            "simple-debug: imu pose=Portrait0 x=0 y=-16384 z=0"
         );
         assert_eq!(BUTTON_HOLD_PCM_MS, 1_000);
     }

@@ -4,11 +4,14 @@ Shared board types for PaperMono-Lite (`C153-Lite`) and the
 nets both SKUs share. Chip registers live in `m5pm1`,
 `m5ioe1`, and `ssd1677-otp`. This crate keeps board nets,
 official 480×800 geometry, `otp_ram_to_usb_down`,
+`PageRotation` / `page_to_framebuffer`, BMI270 accel
+bring-up + sticky-style `classify` (Lite: USB-C down = −X),
 `RefreshMode` (HTML `epd_*` catalog), FT M5GFX
 `decode_m5gfx` (not a FocalTech map), lamp gutter, and
 GPIO42 LEDC window. Firmware call site is
 `display::OtpRefresh`. No `esp-hal`. No LUT. No NFC. No
-LoRa. Hardware skill `touch.md` / `display.md`.
+LoRa. Hardware skill `touch.md` / `display.md` /
+`sensors.md`.
 
 Firmware maps `pins::*` onto HAL pins in one place. Do not init NFC or
 LoRa from an image that depends only on this crate. Leftover pads:

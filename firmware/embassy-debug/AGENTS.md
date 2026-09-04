@@ -25,8 +25,10 @@ opt-in. `simple-debug-fw` stays featureless.
 | `mic` | **off** | PDM energy + hold-A PCM dump |
 | `radio` | on | BLE pairing + Wi-Fi survey / SoftAP cards + wifi/ble counts. No MAC/BSSID/IRK. No NVS |
 | `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
+| `orient` | **off** | BMI270 page rotation (sticky-rs style). Provisional axis map until glass-confirmed |
 
-`mic`, `panel`, and `sleep` depend on `touch` (expander). `sleep` depends on `panel`.
+`mic`, `panel`, `sleep`, and `orient` depend on `touch`
+(expander). `sleep` / `orient` depend on `panel`.
 
 ```shell
 cargo xtask build-fw embassy-debug
@@ -35,6 +37,7 @@ cargo xtask build-fw embassy-debug --no-default-features \
   --features touch
 cargo xtask build-fw embassy-debug --features mic
 cargo xtask build-fw embassy-debug --features radio
+cargo xtask build-fw embassy-debug --features orient
 ```
 
 Panel call site is `display::OtpRefresh` only:
@@ -42,10 +45,10 @@ Panel call site is `display::OtpRefresh` only:
 | Card / step | Sequence |
 | --- | --- |
 | Tones | `GrayFull` |
-| Splash / shapes / legend / bluetooth / wifi_survey / wifi_ap | `paint_mono_fast` (`soft` on same-card Bluetooth / Wi-Fi / Legend status redraws → stay on `Partial`; card change honors partial budget → `MonoFull`) |
+| Splash / shapes / legend / bluetooth / wifi_survey / wifi_ap | `paint_mono_fast` (`soft` on same-card Bluetooth / Wi-Fi / Legend status redraws **and** same-card orientation remaps → stay on `Partial`; card change honors partial budget → `MonoFull`) |
 | Enter targets | `MonoFull` |
 | Marks | `Partial` |
-| After `PARTIALS_BEFORE_FULL` (6) | next **non-soft** mono is `MonoFull` |
+| After `PARTIALS_BEFORE_FULL` (18) | next **non-soft** mono is `MonoFull` |
 
 Deep sleep after each refresh; M5IOE1 `EPD_RST` to wake; no
 SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
@@ -146,8 +149,9 @@ do not echo those on the wire.
 glyphs** or they clip the right edge.
 
 **Soft refresh:** same-card Bluetooth / Wi-Fi / Legend redraws
-use `paint_mono_fast(..., soft = true)` so status updates stay
-on OTP `Partial` past `PARTIALS_BEFORE_FULL` instead of flashing
+and same-card orientation remaps use
+`paint_mono_fast(..., soft = true)` so they stay on OTP
+`Partial` past `PARTIALS_BEFORE_FULL` instead of flashing
 `MonoFull`. Card change honors the budget.
 
 1. **Channel survey**: Human opens the `wifi_survey` card and taps
@@ -170,6 +174,23 @@ on OTP `Partial` past `PARTIALS_BEFORE_FULL` instead of flashing
 Lite SoftAP host-verified 2026-09-04:
 [measure.md](../../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 `C153` still open.
+
+## IMU page rotation (`orient`)
+
+Opt-in Cargo feature. Sticky-rs policy ported to BMI270:
+
+- Dominant-axis classify at 0.70 g; FaceUp/FaceDown keep last page.
+- Draw in page space (`PageRotation`); map via
+  `display::page_to_framebuffer` into fixed USB-down 480×800 planes.
+- Touch Wi-Fi buttons use `framebuffer_to_page` then
+  `draw::wifi_action_hit`. Lamp gutter stays **physical** right edge.
+- CDC `imu pose=… x=… y=… z=…` every 5 s and on page change.
+- Axis→pose (Lite 2026-09-04): −X `Portrait0`, +X `Portrait180`,
+  +Y `Landscape0`, −Y `Landscape180`. `C153` still unconfirmed.
+
+```shell
+cargo xtask build-fw embassy-debug --features orient
+```
 
 ## Firmware examples as tutorial code
 

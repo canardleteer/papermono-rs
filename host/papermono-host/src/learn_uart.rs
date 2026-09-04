@@ -253,6 +253,7 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::WifiSurvey => "wifi_survey",
         LineKind::WifiAp => "wifi_ap",
         LineKind::WifiHttp => "wifi_http",
+        LineKind::Imu => "imu",
         LineKind::Unknown => "unknown",
     }
 }

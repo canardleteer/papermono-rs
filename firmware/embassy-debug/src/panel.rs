@@ -11,7 +11,7 @@
 //! 2. **Periodic Full Waveform Refresh**: Electrophoretic microcapsules accumulate residual
 //!    charges during partial updates. To preserve display contrast and prevent burn-in/ghosting,
 //!    this driver mandates a full refresh cycle ([`display::OtpRefresh::MonoFull`]) every
-//!    [`PARTIALS_BEFORE_FULL`] (6) partial updates.
+//!    [`PARTIALS_BEFORE_FULL`] (18) partial updates.
 //! 3. **Deep Sleep Between Updates**: After every update sequence, the panel is placed
 //!    into hardware Deep Sleep Mode 1 (`0x10`) to deactivate high-voltage charge pumps.
 //! 4. **Hardware BUSY Line Synchronization**: The SSD1677 `BUSY` signal (`GPIO18`) goes high
@@ -90,10 +90,10 @@ const YIELD_EVERY_ROWS: u16 = 16;
 
 /// Cumulative partial updates allowed before mandating a full clearing refresh.
 ///
-/// Follows the official PaperMono display safety rule: uninterrupted
-/// partial refreshes can damage the panel. Official documentation
-/// mandates a full refresh after roughly ten partial refreshes.
-const PARTIALS_BEFORE_FULL: u8 = 6;
+/// Uninterrupted partials can damage the panel; vendor guidance is roughly
+/// ten. This image uses 18 (3× the prior budget of 6) so B&W card walks flash
+/// `MonoFull` less often. Soft same-card redraws still skip this budget.
+const PARTIALS_BEFORE_FULL: u8 = 18;
 
 /// Retrieves the most recent panel refresh telemetry stamp for periodic reporting.
 pub fn last() -> Option<PanelStamp> {
@@ -220,9 +220,10 @@ impl Panel {
     /// - When no mono baseline exists (`mono_ready` is false), always runs
     ///   [`Self::refresh_mono_full`].
     /// - When `soft` is true (same-card status/telemetry redraw: Bluetooth PIN,
-    ///   Wi-Fi survey/hotspot counters, Legend battery), prefers
-    ///   [`Self::refresh_partial_official`] even after the partial budget so a
-    ///   black-and-white→black-and-white update does not flash a full mono wipe.
+    ///   Wi-Fi survey/hotspot counters, Legend battery; or same-card orientation
+    ///   remap), prefers [`Self::refresh_partial_official`] even after the
+    ///   partial budget so a black-and-white→black-and-white update does not
+    ///   flash a full mono wipe.
     ///   The next non-soft paint (card navigation) still takes a mono full refresh once
     ///   [`PARTIALS_BEFORE_FULL`] is reached, preserving the DC-balance contract.
     /// - When `soft` is false (card change), runs a full mono refresh after
@@ -235,8 +236,7 @@ impl Panel {
         busy: &Input<'static>,
         soft: bool,
     ) {
-        let budget_exhausted =
-            PARTIALS_BEFORE_FULL > 0 && self.partials >= PARTIALS_BEFORE_FULL;
+        let budget_exhausted = PARTIALS_BEFORE_FULL > 0 && self.partials >= PARTIALS_BEFORE_FULL;
         if !self.mono_ready || (!soft && budget_exhausted) {
             self.refresh_mono_full(i2c, Some((bw, red)), busy).await;
             return;

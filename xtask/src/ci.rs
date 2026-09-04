@@ -51,6 +51,11 @@ pub fn run(repo_root: &Path) -> Result<(), Error> {
         "embassy-debug-fw",
         &["--no-default-features", "--features", "touch,sleep"],
     )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "touch,panel,orient"],
+    )?;
 
     require_on_path("rumdl", "cargo install rumdl")?;
     step(repo_root, "rumdl", &["check"])?;

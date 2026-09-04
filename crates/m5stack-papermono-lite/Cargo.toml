@@ -16,6 +16,10 @@ categories.workspace = true
 m5pm1 = { path = "../m5pm1" }
 m5ioe1 = { path = "../m5ioe1" }
 ssd1677-otp = { path = "../ssd1677-otp" }
+embedded-hal.workspace = true
+
+[dev-dependencies]
+embedded-hal-mock.workspace = true
 
 [lints]
 workspace = true

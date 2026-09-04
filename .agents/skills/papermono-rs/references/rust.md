@@ -105,3 +105,6 @@ still honors `PARTIALS_BEFORE_FULL`. Agent workflows:
 Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
 (**Radio**). Silicon: hardware
 [measure.md](../../m5stack-papermono-hardware/references/measure.md).
+
+Opt-in `--features orient`: BMI270 page rotation (sticky-rs
+policy). Lite axis map: USB-C down = −X (see sensors.md).

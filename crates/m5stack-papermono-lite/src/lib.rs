@@ -36,6 +36,7 @@ pub use m5pm1;
 pub use ssd1677_otp;
 
 pub mod addresses;
+pub mod bmi270_config;
 pub mod buzzer;
 pub mod display;
 pub mod imu;

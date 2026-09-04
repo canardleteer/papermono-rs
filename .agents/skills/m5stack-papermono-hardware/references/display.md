@@ -45,18 +45,19 @@ titles stay on `RefreshMode` as a catalog only.
 | 4-gray card | `OtpRefresh::GrayFull` (`0xD7`) |
 | Rebuild mono after gray, or a full clear | `OtpRefresh::MonoFull` (`0xF8` then `0x14`, both planes) |
 | Fast flip after a mono baseline | `OtpRefresh::Partial` (`0xFF`, RAM 1 only) |
-| After N partials (card change) | one `MonoFull` (embassy-debug `PARTIALS_BEFORE_FULL` = 6) |
+| After N partials (card change) | one `MonoFull` (embassy-debug `PARTIALS_BEFORE_FULL` = 18) |
 | Same-card status redraw | stay on `Partial` (`paint_mono_fast(..., soft = true)`); do not flash `MonoFull` mid-update |
 
 **Soft vs hard mono (embassy-debug, Lite 2026-09-04):** Legend
-battery, Bluetooth passkey, Wi-Fi survey, and SoftAP status
-redraws pass `soft = true` so they keep `Partial` even after
-the usual six-partial budget. Card navigation and sleep paint
-pass `soft = false` and still take `MonoFull` when the budget
-is due. Soft paints still increment the partial counter; they
-only skip the forced full on that redraw. Do not treat soft
-as permission for uninterrupted continuous partials forever —
-navigation still clears the budget.
+battery, Bluetooth passkey, Wi-Fi survey, SoftAP status redraws,
+and same-card **orientation** remaps pass `soft = true` so they
+keep `Partial` even after the usual partial budget. Card
+navigation and sleep paint pass `soft = false` and still take
+`MonoFull` when the budget is due. Soft paints still increment
+the partial counter; they only skip the forced full on that
+redraw. Do not treat soft as permission for uninterrupted
+continuous partials forever — navigation still clears the
+budget.
 
 Do **not** upload `0x32`. Do **not** send `Partial` after
 `GrayFull` until `MonoFull`. Do **not** send a second bare
@@ -143,11 +144,21 @@ X-decrement `0x02` and `0xD7`.
 - `Partial` after `GrayFull` without `MonoFull` is
   **abandoned** (Ferris stayed until overdrawn).
 - `MonoFull` both planes white: glass went **white**.
-- After about six partials, one `MonoFull` on the next
+- After about eighteen partials, one `MonoFull` on the next
   **non-soft** mono paint. Same-card Legend / Bluetooth /
-  Wi-Fi status redraws may stay on `Partial` past that
-  budget (`soft = true`). Official HTML still says about ten
+  Wi-Fi status redraws and same-card orientation remaps may
+  stay on `Partial` past that budget (`soft = true`). Official
+  HTML still says about ten
   ([nyc-partial-ghost](../resources/not-yet-confirmed.md#nyc-partial-ghost)).
+
+## IMU-driven UI rotation
+
+embassy-debug opt-in `--features orient` ports the sticky-rs
+page model: draw upright in `PageRotation` page space, map
+into the fixed USB-C-down 480×800 framebuffer via
+`page_to_framebuffer`. Face-up / face-down keep the last
+in-plane page. BMI270 axis→pose: Lite USB-C down = −X
+([sensors.md](sensors.md)).
 
 ## SPI clock
 

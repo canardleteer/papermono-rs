@@ -277,3 +277,12 @@ pub fn wifi_http(req: u32, path: &str) {
         emit(line);
     }
 }
+
+/// Emits BMI270 enclosure pose and raw accel XYZ (`imu pose=`).
+#[cfg(feature = "orient")]
+pub fn imu(pose: &str, x: i16, y: i16, z: i16) {
+    let mut buf = [0u8; papermono_log::IMU_CAPACITY];
+    if let Ok(line) = papermono_log::format_imu(pose, x, y, z, &mut buf) {
+        emit(line);
+    }
+}

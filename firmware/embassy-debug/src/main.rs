@@ -31,10 +31,11 @@
 //!   statically using [`static_cell::ConstStaticCell`].
 //! - **Optional Features**:
 //!   - `touch` (default): System I2C bus, M5IOE1 expander, M5PM1 PMIC, FT6336G digitizer.
-//!   - `panel` (default): SSD1677 OTP e-paper display with 5-card interactive UI.
+//!   - `panel` (default): SSD1677 OTP e-paper display with interactive UI cards.
 //!   - `mic` (opt-in): PDM microphone RMS and peak energy measurement via DMA.
-//!   - `radio` (opt-in): Wi-Fi and BLE passive scanning (requires `esp-alloc` heap).
-//!   - `sleep` (opt-in): RX8130CE RTC wake timer and PM1 deep shutdown sequencing.
+//!   - `radio` (default): BLE pairing + Wi-Fi survey / SoftAP cards.
+//!   - `sleep` (default): Button A hold sleep / A or B hold wake.
+//!   - `orient` (opt-in): BMI270-driven page rotation (sticky-rs style).
 
 #![no_std]
 #![no_main]

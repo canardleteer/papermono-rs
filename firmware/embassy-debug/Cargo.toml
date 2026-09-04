@@ -20,6 +20,10 @@ mic = ["touch"]
 panel = ["touch"]
 # Interactive button sleep & wake: Button A hold 2 s to sleep, 1 s A/B hold to wake.
 sleep = ["touch", "panel"]
+# BMI270-driven page rotation (sticky-rs style). Opt-in until axis map is
+# confirmed on glass. Needs touch I2C + panel. Survey/SoftAP cards redraw
+# in page space; lamp gutter stays physical USB-down right edge.
+orient = ["touch", "panel"]
 # BLE pairing + Wi-Fi survey / SoftAP cards (+ optional wifi/ble counts).
 # Landing default-on; survey and SoftAP stay idle until touch. No NVS.
 # No foreign MAC/BSSID/IRK on CDC. SoftAP prints fixed demo SSID/pass only.

@@ -56,6 +56,8 @@ pub enum LineKind {
     WifiAp,
     /// Wi-Fi HTTP request log (`wifi_http`).
     WifiHttp,
+    /// BMI270 enclosure pose (`imu`).
+    Imu,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -160,6 +162,7 @@ pub fn classify(body: &str) -> LineKind {
         "wifi_survey" => LineKind::WifiSurvey,
         "wifi_ap" => LineKind::WifiAp,
         "wifi_http" => LineKind::WifiHttp,
+        "imu" => LineKind::Imu,
         _ => LineKind::Unknown,
     }
 }
@@ -330,6 +333,13 @@ mod tests {
                 .unwrap()
                 .kind,
             LineKind::WifiHttp
+        );
+        assert_eq!(
+            records("simple-debug: imu pose=Portrait0 x=0 y=-16384 z=0\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::Imu
         );
     }
 

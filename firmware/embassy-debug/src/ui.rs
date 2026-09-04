@@ -27,11 +27,15 @@
 //! - **Dynamic Wi-Fi Telemetry Refresh**:
 //!   - When stationary on `WifiSurvey` or `WifiAp`, any state transition (scan completion, client connection,
 //!     or HTTP GET request) immediately triggers a fast refresh to update the display.
+//! - **IMU page rotation** (`orient` feature): BMI270 dominant-axis classify (sticky-rs
+//!   policy) remaps the current card into portrait/landscape page space. Face-up /
+//!   face-down keep the last in-plane page. Lamp gutter stays physical USB-down.
 //! - **Soft same-card redraws**: Bluetooth, Wi-Fi survey/hotspot, and Legend
 //!   status updates reuse OTP Partial when a mono baseline exists, even after
 //!   the usual partial budget, so PIN / AP / battery telemetry does not flash a
-//!   full mono wipe. Card navigation still takes `MonoFull` once the budget is
-//!   reached (DC-balance).
+//!   full mono wipe. Same-card **orientation** remaps also stay soft (Partial).
+//!   Card navigation still takes `MonoFull` once the budget is reached
+//!   (DC-balance).
 //! - **Zero Heap Allocation**: Framebuffers are statically allocated using
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
@@ -43,7 +47,9 @@ use esp_hal::gpio::{Event, WakeupConfig};
 use esp_hal::rtc_cntl::sleep::LowPower;
 #[cfg(feature = "sleep")]
 use esp_hal::rtc_cntl::sleep::RtcSleepConfig;
-use m5stack_papermono_lite::display;
+use m5stack_papermono_lite::display::{self, PageRotation};
+#[cfg(feature = "orient")]
+use m5stack_papermono_lite::imu;
 use papermono_log::{Edge, Scene, BUTTON_HOLD_PCM_MS};
 use static_cell::ConstStaticCell;
 
@@ -86,6 +92,14 @@ const NAV_POLL_MS: u32 = 10;
 /// Automatic refresh interval for the Legend card (60 seconds) to update live battery telemetry.
 const LEGEND_AUTO_REFRESH_MS: u32 = 60_000;
 
+/// IMU poll period while waiting on a card (sticky-rs uses 250 ms).
+#[cfg(feature = "orient")]
+const IMU_POLL_MS: u32 = 250;
+
+/// How often to print `imu pose=` while holding still (sticky-rs uses 5 s).
+#[cfg(feature = "orient")]
+const IMU_REPORT_MS: u32 = 5_000;
+
 /// Button A hold duration (2 seconds) to trigger sleep.
 #[cfg(feature = "sleep")]
 const BUTTON_HOLD_SLEEP_MS: u32 = 2_000;
@@ -107,11 +121,47 @@ pub async fn run(
     let planes = PLANES.take();
     let mut scene = Scene::Splash;
     let mut last_painted: Option<Scene> = None;
+    let mut last_rotation: Option<PageRotation> = None;
+    let mut rotation = PageRotation::Portrait0;
     let mut lamp = LampSlide::new();
+
+    #[cfg(feature = "orient")]
+    {
+        let _ = imu::soft_reset(&mut i2c);
+        Timer::after(Duration::from_millis(30)).await;
+        let _ = imu::disable_adv_power_save(&mut i2c);
+        Timer::after(Duration::from_millis(1)).await;
+        match imu::load_config(&mut i2c) {
+            Ok(()) => cdc::imu("cfg-ok", 0, 0, 0),
+            Err(_) => cdc::imu("cfg-fail", 0, 0, 0),
+        }
+        Timer::after(Duration::from_millis(50)).await;
+        let status = imu::read_internal_status(&mut i2c).unwrap_or(0);
+        cdc::imu("status", i16::from(status), 0, 0);
+        let _ = imu::enable_accel_sampling(&mut i2c);
+        Timer::after(Duration::from_millis(20)).await;
+        // Seed rotation from the first readable sample when possible.
+        if let Ok(sample) = imu::read_accel(&mut i2c) {
+            if let Some(pose) = imu::classify(sample.x, sample.y, sample.z) {
+                cdc::imu(pose.as_str(), sample.x, sample.y, sample.z);
+                if let Some(page) = pose.page_rotation() {
+                    rotation = page;
+                }
+            } else {
+                cdc::imu("none", sample.x, sample.y, sample.z);
+            }
+        }
+    }
+
     loop {
-        let soft = last_painted == Some(scene) && scene_allows_soft_refresh(scene);
-        let drawn_revs = paint(&mut i2c, &mut panel, &busy, scene, planes, soft).await;
+        let same_scene = last_painted == Some(scene);
+        let orient_changed = last_rotation.is_some_and(|r| r != rotation);
+        let soft = same_scene
+            && (orient_changed
+                || (last_rotation == Some(rotation) && scene_allows_soft_refresh(scene)));
+        let drawn_revs = paint(&mut i2c, &mut panel, &busy, scene, planes, soft, rotation).await;
         last_painted = Some(scene);
+        last_rotation = Some(rotation);
         if scene == Scene::Targets {
             panel.enter_mono(&mut i2c, &busy).await;
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
@@ -121,8 +171,10 @@ pub async fn run(
                         auto_refresh_ms: None,
                         ble_watch_rev: None,
                         wifi_watch_rev: None,
+                        rotation,
                     };
-                    if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx).await
+                    if let Some(nav) =
+                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx, &mut rotation).await
                     {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
@@ -132,7 +184,7 @@ pub async fn run(
                             Nav::Sleep => {
                                 enter_sleep(
                                     &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b,
-                                    &mut lpwr,
+                                    &mut lpwr, rotation,
                                 )
                                 .await;
                             }
@@ -152,8 +204,11 @@ pub async fn run(
                 auto_refresh_ms,
                 ble_watch_rev,
                 wifi_watch_rev,
+                rotation,
             };
-            if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx).await {
+            if let Some(nav) =
+                wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx, &mut rotation).await
+            {
                 match nav {
                     Nav::Prev => scene = scene.prev(),
                     Nav::Next => scene = scene.next(),
@@ -162,6 +217,7 @@ pub async fn run(
                     Nav::Sleep => {
                         enter_sleep(
                             &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b, &mut lpwr,
+                            rotation,
                         )
                         .await;
                     }
@@ -177,6 +233,8 @@ struct NavContext {
     auto_refresh_ms: Option<u32>,
     ble_watch_rev: Option<u32>,
     wifi_watch_rev: Option<u32>,
+    /// Current in-plane page used for touch hit-testing.
+    rotation: PageRotation,
 }
 
 /// State revision snapshot observed before rendering begins, tracking asynchronous radio events.
@@ -198,9 +256,10 @@ const fn scene_allows_soft_refresh(scene: Scene) -> bool {
 /// Returns the BLE and Wi-Fi state revisions observed before rendering began, allowing
 /// caller tasks to detect if asynchronous radio events arrived during the panel refresh.
 ///
-/// When `soft` is true (same-card Bluetooth / Wi-Fi / Legend status update), the mono
-/// path prefers OTP Partial even after the usual partial budget so a black-and-white
-/// redraw does not flash `MonoFull`. Card navigation passes `soft = false`.
+/// When `soft` is true (same-card Bluetooth / Wi-Fi / Legend status update, or
+/// same-card orientation remap), the mono path prefers OTP Partial even after
+/// the usual partial budget so a black-and-white redraw does not flash
+/// `MonoFull`. Card navigation passes `soft = false`.
 async fn paint(
     i2c: &mut SysI2c,
     panel: &mut Panel,
@@ -208,6 +267,7 @@ async fn paint(
     scene: Scene,
     planes: &mut Planes,
     soft: bool,
+    rotation: PageRotation,
 ) -> DrawnRevs {
     let ble_rev = crate::radio::state_rev();
     let wifi_rev = crate::radio::wifi_state_rev();
@@ -224,7 +284,7 @@ async fn paint(
     } else {
         touch_bus::last_charge()
     };
-    if let Some(us) = draw::render(scene, &mut planes.bw, &mut planes.red, charge) {
+    if let Some(us) = draw::render(scene, &mut planes.bw, &mut planes.red, charge, rotation) {
         cdc::snowflake(us);
     }
     if scene.uses_gray() {
@@ -262,6 +322,7 @@ async fn wait_nav(
     tp: &Input<'static>,
     lamp: &mut LampSlide,
     ctx: NavContext,
+    #[cfg_attr(not(feature = "orient"), allow(unused_variables))] rotation: &mut PageRotation,
 ) -> Option<Nav> {
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
@@ -269,6 +330,10 @@ async fn wait_nav(
     let mut a_held = false;
     let mut t_ms = 0_u32;
     let mut button_touch_down = false;
+    #[cfg(feature = "orient")]
+    let mut imu_since_ms = 0_u32;
+    #[cfg(feature = "orient")]
+    let mut imu_report_ms = 0_u32;
     loop {
         // If a BLE state transition occurred (before wait_nav began, during paint, or during this loop),
         // refresh immediately so the e-paper glass reflects the new pairing status without delay.
@@ -283,6 +348,30 @@ async fn wait_nav(
         if let Some(rev) = ctx.wifi_watch_rev {
             if crate::radio::wifi_state_rev() != rev {
                 return Some(Nav::Refresh);
+            }
+        }
+
+        #[cfg(feature = "orient")]
+        {
+            imu_since_ms = imu_since_ms.saturating_add(NAV_POLL_MS);
+            imu_report_ms = imu_report_ms.saturating_add(NAV_POLL_MS);
+            if imu_since_ms >= IMU_POLL_MS {
+                imu_since_ms = 0;
+                if let Ok(sample) = imu::read_accel(i2c) {
+                    let pose = imu::classify(sample.x, sample.y, sample.z);
+                    let pose_token = pose.map_or("none", imu::Orientation::as_str);
+                    if imu_report_ms >= IMU_REPORT_MS {
+                        imu_report_ms = 0;
+                        cdc::imu(pose_token, sample.x, sample.y, sample.z);
+                    }
+                    if let Some(page) = pose.and_then(imu::Orientation::page_rotation) {
+                        if page != *rotation {
+                            cdc::imu(pose_token, sample.x, sample.y, sample.z);
+                            *rotation = page;
+                            return Some(Nav::Refresh);
+                        }
+                    }
+                }
             }
         }
 
@@ -346,9 +435,13 @@ async fn wait_nav(
         }
         let _ = lamp.feed(i2c, &sample);
 
-        // Detect touch tap inside on-screen action button (x: 50..430, y: 650..740)
-        let in_button =
-            sample.n >= 1 && (50..=430).contains(&sample.x) && (650..=740).contains(&sample.y);
+        // Wi-Fi action button is laid out in page space; map physical touch → page.
+        let in_button = if sample.n >= 1 {
+            display::framebuffer_to_page(sample.x, sample.y, ctx.rotation)
+                .is_some_and(|(px, py)| draw::wifi_action_hit(px, py, ctx.rotation))
+        } else {
+            false
+        };
         if in_button {
             if !button_touch_down {
                 button_touch_down = true;
@@ -398,9 +491,10 @@ async fn enter_sleep(
     btn_a: &mut Input<'static>,
     btn_b: &mut Input<'static>,
     lpwr: &mut LowPower<'static>,
+    rotation: PageRotation,
 ) {
     // 1. Draw and paint the sleep notice to the e-paper panel.
-    draw::draw_sleeping(&mut planes.bw, &mut planes.red);
+    draw::draw_sleeping(&mut planes.bw, &mut planes.red, rotation);
     panel
         .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, false)
         .await;
