@@ -86,9 +86,9 @@ embassy-debug`.
 
 Short-press BUTTON B. The glass should walk splash → shapes (procedural
 3-degree Koch snowflake with on-screen and CDC microsecond benchmark) →
-legend (pinout, touch rails, and sleep/wake instructions) → tones → targets,
-then wrap. BUTTON A walks the other way. CDC prints `scene=` and
-`snowflake us=`.
+legend (pinout, touch rails, sleep/wake instructions, and live battery gauge
+with 60 s auto-refresh) → tones → targets, then wrap. BUTTON A walks the other
+way. CDC prints `scene=` and `snowflake us=`.
 
 ### Step 5: Slide the lamp
 

@@ -54,11 +54,12 @@ Do not start a new waveform while BUSY is high.
 
 Five cards: splash Ferris + `papermono-rs`, shapes (procedural
 3-degree Koch snowflake with microsecond benchmark), legend
-(A / B / sleep / red power / right lamp), four-gray tones, target
-walk. Short A previous, short B next, wrap. Right-edge
-contact sets PWM0 from Y (top bright). Hold A 2 s triggers
-sleep notice and light sleep; hold A or B 1 s wakes. Hold A
-~1 s dumps PCM only when `mic` is on. GPIO42 chirp stays parked.
+(A / B / sleep / red power / right lamp / live battery % gauge with
+60 s auto-refresh), four-gray tones, target walk. Short A previous,
+short B next, wrap. Right-edge contact sets PWM0 from Y (top bright).
+Hold A 2 s triggers sleep notice and light sleep; hold A or B 1 s
+wakes. Hold A ~1 s dumps PCM only when `mic` is on. GPIO42 chirp
+stays parked.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png).

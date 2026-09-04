@@ -243,6 +243,32 @@ fn read_adc_mv(i2c: &mut SysI2c, lo_reg: u8) -> Option<u16> {
     Some(pmic::adc_mv(lo, hi))
 }
 
+/// Reads fresh battery and voltage telemetry from M5PM1 and updates stored charge state.
+///
+/// Leaves IP2315 parked off the system I2C bus to eliminate bus lockup hazards.
+#[cfg(feature = "panel")]
+pub fn refresh_battery(i2c: &mut SysI2c) -> ChargeSample {
+    let vbat = read_adc_mv(i2c, pmic::VBAT_L).unwrap_or(0);
+    let vin = read_adc_mv(i2c, pmic::VIN_L).unwrap_or(0);
+    let (src, cfg) = {
+        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
+        (
+            pm1.read_at(pmic::PWR_SRC).unwrap_or(0),
+            pm1.read_at(pmic::PWR_CFG).unwrap_or(0),
+        )
+    };
+    let sample = ChargeSample {
+        vbat,
+        vin,
+        src,
+        chg_en: cfg & pmic::CHG_EN != 0,
+        ip: false,
+        then: false,
+    };
+    store_charge(sample);
+    sample
+}
+
 /// Executes a gated IP2315 charge transaction: reads M5PM1 telemetry while ensuring IP2315 remains parked.
 async fn charge_once(i2c: &mut SysI2c, can_gate: bool) -> ChargeSample {
     let vbat = read_adc_mv(i2c, pmic::VBAT_L).unwrap_or(0);

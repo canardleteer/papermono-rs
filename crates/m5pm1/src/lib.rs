@@ -107,6 +107,29 @@ pub const fn adc_mv(lo: u8, hi: u8) -> u16 {
     u16::from_le_bytes([lo, hi])
 }
 
+/// Minimum battery voltage in millivolts corresponding to 0% remaining charge (cutoff).
+pub const BATTERY_EMPTY_MV: u16 = 3300;
+
+/// Maximum battery voltage in millivolts corresponding to 100% full charge for 1S LiPo.
+pub const BATTERY_FULL_MV: u16 = 4150;
+
+/// Calculates estimated battery state of charge (percentage 0..=100) from terminal voltage in mV.
+///
+/// Uses standard 1S LiPo linear discharge approximation matching official M5Stack / M5Unified curve:
+/// 3300 mV -> 0%, 4150 mV -> 100%.
+#[must_use]
+pub const fn battery_percent(vbat_mv: u16) -> u8 {
+    if vbat_mv <= BATTERY_EMPTY_MV {
+        0
+    } else if vbat_mv >= BATTERY_FULL_MV {
+        100
+    } else {
+        let span = (BATTERY_FULL_MV - BATTERY_EMPTY_MV) as u32;
+        let delta = (vbat_mv - BATTERY_EMPTY_MV) as u32;
+        ((delta * 100) / span) as u8
+    }
+}
+
 /// Pack PWM0 duty into [`PWM0_L`] / [`PWM0_HC`].
 #[must_use]
 pub const fn pwm0_bytes(duty: u16) -> (u8, u8) {
@@ -235,6 +258,16 @@ mod tests {
         let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
         pm1.set_pwm0_duty(FRONTLIGHT_DUTY).unwrap();
         pm1.release().done();
+    }
+
+    #[test]
+    fn battery_percent_mapping() {
+        assert_eq!(battery_percent(3200), 0);
+        assert_eq!(battery_percent(3300), 0);
+        assert_eq!(battery_percent(4150), 100);
+        assert_eq!(battery_percent(4200), 100);
+        assert_eq!(battery_percent(3725), 50);
+        assert_eq!(battery_percent(3921), 73);
     }
 
     #[test]

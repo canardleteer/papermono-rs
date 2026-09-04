@@ -14,6 +14,9 @@
 //! - **Touch Gutter Gesture**:
 //!   - Swiping along the far-right edge of the screen dynamically adjusts the display
 //!     frontlight LED brightness via PWM without advancing cards.
+//! - **Automatic Telemetry Refresh**:
+//!   - When stationary on the `Legend` card, the UI automatically refreshes the display
+//!     every 60 seconds with updated battery state-of-charge, voltage, and USB power status.
 //! - **Zero Heap Allocation**: Framebuffers are statically allocated using
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
@@ -49,12 +52,14 @@ static PLANES: ConstStaticCell<Planes> = ConstStaticCell::new(Planes {
     red: [0u8; display::PLANE_BYTES],
 });
 
-/// Navigation intent decoded from button presses.
+/// Navigation intent decoded from button presses or auto-refresh timer.
 enum Nav {
     /// Navigate to previous card.
     Prev,
     /// Navigate to next card.
     Next,
+    /// Auto-refresh the current card with live telemetry.
+    Refresh,
     /// Enter low-power sleep mode.
     #[cfg(feature = "sleep")]
     Sleep,
@@ -62,6 +67,9 @@ enum Nav {
 
 /// Button and touch polling interval (10 ms) for high-responsiveness gesture tracking.
 const NAV_POLL_MS: u32 = 10;
+
+/// Automatic refresh interval for the Legend card (60 seconds) to update live battery telemetry.
+const LEGEND_AUTO_REFRESH_MS: u32 = 60_000;
 
 /// Button A hold duration (2 seconds) to trigger sleep.
 #[cfg(feature = "sleep")]
@@ -90,10 +98,13 @@ pub async fn run(
             panel.enter_mono(&mut i2c, &busy).await;
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
-                    if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp).await {
+                    if let Some(nav) =
+                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None).await
+                    {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
                             Nav::Next => scene = scene.next(),
+                            Nav::Refresh => {}
                             #[cfg(feature = "sleep")]
                             Nav::Sleep => {
                                 enter_sleep(
@@ -108,16 +119,22 @@ pub async fn run(
                 WalkEnd::AbortPrev => scene = scene.prev(),
                 WalkEnd::AbortNext => scene = scene.next(),
             }
-        } else if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp).await {
-            match nav {
-                Nav::Prev => scene = scene.prev(),
-                Nav::Next => scene = scene.next(),
-                #[cfg(feature = "sleep")]
-                Nav::Sleep => {
-                    enter_sleep(
-                        &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b, &mut lpwr,
-                    )
-                    .await;
+        } else {
+            let auto_refresh_ms = (scene == Scene::Legend).then_some(LEGEND_AUTO_REFRESH_MS);
+            if let Some(nav) =
+                wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, auto_refresh_ms).await
+            {
+                match nav {
+                    Nav::Prev => scene = scene.prev(),
+                    Nav::Next => scene = scene.next(),
+                    Nav::Refresh => {}
+                    #[cfg(feature = "sleep")]
+                    Nav::Sleep => {
+                        enter_sleep(
+                            &mut i2c, &mut panel, &busy, planes, &mut btn_a, &mut btn_b, &mut lpwr,
+                        )
+                        .await;
+                    }
                 }
             }
         }
@@ -137,7 +154,12 @@ async fn paint(
     if scene == Scene::Targets {
         return;
     }
-    if let Some(us) = draw::render(scene, &mut planes.bw, &mut planes.red) {
+    let charge = if scene == Scene::Legend {
+        Some(touch_bus::refresh_battery(i2c))
+    } else {
+        touch_bus::last_charge()
+    };
+    if let Some(us) = draw::render(scene, &mut planes.bw, &mut planes.red, charge) {
         cdc::snowflake(us);
     }
     if scene.uses_gray() {
@@ -149,13 +171,14 @@ async fn paint(
     }
 }
 
-/// Waits for tactile button presses or right-edge touch slider gestures.
+/// Waits for tactile button presses, right-edge touch slider gestures, or an optional auto-refresh timeout.
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
     lamp: &mut LampSlide,
+    auto_refresh_ms: Option<u32>,
 ) -> Option<Nav> {
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
@@ -223,6 +246,11 @@ async fn wait_nav(
         let _ = lamp.feed(i2c, &sample);
 
         t_ms = t_ms.saturating_add(NAV_POLL_MS);
+        if let Some(timeout) = auto_refresh_ms {
+            if t_ms >= timeout {
+                return Some(Nav::Refresh);
+            }
+        }
         Timer::after(Duration::from_millis(NAV_POLL_MS.into())).await;
     }
 }

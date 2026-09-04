@@ -27,8 +27,8 @@ use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::text::{Alignment, Text};
-use m5stack_papermono_lite::display;
-use papermono_log::Scene;
+use m5stack_papermono_lite::{display, pmic};
+use papermono_log::{ChargeSample, Scene};
 
 /// 360×240 packed 1bpp bitmap of Ferris the Rust mascot.
 /// Provenance: Generated from SVG via `cargo xtask encode-assets` (see `assets/SOURCE.md`).
@@ -42,7 +42,12 @@ const _: () = assert!(FERRIS_W.is_multiple_of(8));
 
 /// Renders the requested interactive card scene into dual-plane framebuffers.
 /// Returns the benchmark render duration in microseconds if the scene computes one.
-pub fn render(scene: Scene, bw: &mut [u8], red: &mut [u8]) -> Option<u32> {
+pub fn render(
+    scene: Scene,
+    bw: &mut [u8],
+    red: &mut [u8],
+    charge: Option<ChargeSample>,
+) -> Option<u32> {
     match scene {
         Scene::Splash => {
             draw_splash(bw, red);
@@ -50,7 +55,7 @@ pub fn render(scene: Scene, bw: &mut [u8], red: &mut [u8]) -> Option<u32> {
         }
         Scene::Shapes => Some(draw_shapes(bw, red)),
         Scene::Legend => {
-            draw_legend(bw, red);
+            draw_legend(bw, red, charge);
             None
         }
         Scene::Tones => {
@@ -184,19 +189,10 @@ fn draw_shapes(bw: &mut [u8], red: &mut [u8]) -> u32 {
     elapsed_us
 }
 
-/// Renders Card 3: Legend displaying hardware pinout, button functions, and sleep controls.
-fn draw_legend(bw: &mut [u8], red: &mut [u8]) {
+/// Renders Card 3: Legend displaying hardware pinout, button functions, sleep controls, and battery telemetry.
+fn draw_legend(bw: &mut [u8], red: &mut [u8], charge: Option<ChargeSample>) {
     clear(bw, red, display::GRAY_WHITE);
     let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
-    let mut ink = GrayInk::new(bw, red);
-
-    let _ = Text::with_alignment(
-        "HARDWARE LEGEND",
-        Point::new(240, 50),
-        style,
-        Alignment::Center,
-    )
-    .draw(&mut ink);
 
     let items = [
         ("BUTTON A (GPIO2)", "Previous card / hold 2s sleep"),
@@ -209,16 +205,89 @@ fn draw_legend(bw: &mut [u8], red: &mut [u8]) {
         ("POWER BUTTON", "Short press reset / hold download"),
     ];
 
-    let mut y = 90;
-    for (k, v) in items {
-        let _ = Text::new(k, Point::new(30, y), style).draw(&mut ink);
-        let _ = Text::new(v, Point::new(50, y + 25), style).draw(&mut ink);
-        y += 70;
-        // The power button item is placed about 10 pixels lower.
-        if k == "EXPANDER (M5IOE1)" {
-            y += 10;
+    {
+        let mut ink = GrayInk::new(bw, red);
+        let _ = Text::with_alignment(
+            "HARDWARE LEGEND",
+            Point::new(240, 50),
+            style,
+            Alignment::Center,
+        )
+        .draw(&mut ink);
+
+        let mut y = 90;
+        for (k, v) in items {
+            let _ = Text::new(k, Point::new(30, y), style).draw(&mut ink);
+            let _ = Text::new(v, Point::new(50, y + 25), style).draw(&mut ink);
+            y += 70;
+            if k == "EXPANDER (M5IOE1)" {
+                y += 10;
+            }
         }
     }
+
+    // Status section separator
+    fill_rect(bw, red, 30, 638, 420, 2, display::GRAY_BLACK);
+
+    let (pct, vbat, vin, usb) = match charge {
+        Some(c) => {
+            let pct = pmic::battery_percent(c.vbat);
+            let usb = (c.src & pmic::PWR_SRC_VIN != 0) || (c.vin >= pmic::VIN_PRESENT_MV);
+            (Some(pct), c.vbat, c.vin, usb)
+        }
+        None => (None, 0, 0, false),
+    };
+
+    // Battery gauge outline: 104x20 at (30, 680)
+    stroke_rect(bw, red, 30, 680, 104, 20, display::GRAY_BLACK);
+    // Positive terminal cap: 4x10 at (134, 685)
+    fill_rect(bw, red, 134, 685, 4, 10, display::GRAY_BLACK);
+
+    if let Some(p) = pct {
+        let fill_w = u16::from(p.min(100));
+        fill_rect(bw, red, 32, 682, fill_w, 16, display::GRAY_BLACK);
+    }
+
+    let mut ink = GrayInk::new(bw, red);
+    let _ = Text::new("BATTERY & POWER STATUS", Point::new(30, 665), style).draw(&mut ink);
+
+    // Text metrics next to gauge (vertically aligned with gauge):
+    let mut buf = [0u8; 64];
+    let mut writer = BufWriter {
+        buf: &mut buf,
+        pos: 0,
+    };
+    if let Some(p) = pct {
+        let _ = write!(writer, "{p}%  [ {vbat} mV ]");
+    } else {
+        let _ = write!(writer, "--%  [ ---- mV ]");
+    }
+    if let Ok(label) = core::str::from_utf8(&writer.buf[..writer.pos]) {
+        let _ = Text::new(label, Point::new(150, 697), style).draw(&mut ink);
+    }
+
+    // Line 2: Power supply details
+    let mut buf_pwr = [0u8; 64];
+    let mut writer_pwr = BufWriter {
+        buf: &mut buf_pwr,
+        pos: 0,
+    };
+    if usb {
+        let _ = write!(writer_pwr, "Power: USB connected (VIN: {vin} mV)");
+    } else {
+        let _ = write!(writer_pwr, "Power: Running on battery");
+    }
+    if let Ok(label) = core::str::from_utf8(&writer_pwr.buf[..writer_pwr.pos]) {
+        let _ = Text::new(label, Point::new(30, 727), style).draw(&mut ink);
+    }
+
+    // Line 3: 1S LiPo specifications
+    let _ = Text::new(
+        "1S LiPo: 3300 mV (0%) - 4150 mV (100%)",
+        Point::new(30, 755),
+        style,
+    )
+    .draw(&mut ink);
 }
 
 /// Renders Card 4: 4-level grayscale horizontal tone bands.
