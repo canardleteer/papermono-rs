@@ -139,9 +139,15 @@ fn set_pair_status(status: BlePairStatus) {
 use core::sync::atomic::{AtomicBool, AtomicU16};
 
 #[cfg(feature = "radio")]
-use bt_hci::controller::ExternalController;
+use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvEnable, LeSetAdvParams, LeSetScanResponseData};
+#[cfg(feature = "radio")]
+use bt_hci::controller::{ControllerCmdSync, ExternalController};
+#[cfg(feature = "radio")]
+use embassy_futures::join::join;
 #[cfg(feature = "radio")]
 use embassy_futures::select::{select, Either};
+#[cfg(feature = "radio")]
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 #[cfg(feature = "radio")]
 use embassy_time::{Duration, Timer};
 #[cfg(feature = "radio")]
@@ -159,6 +165,28 @@ use trouble_host::prelude::*;
 
 #[cfg(feature = "radio")]
 use crate::cdc;
+
+#[cfg(feature = "radio")]
+#[gatt_server(
+    connections_max = 1,
+    mutex_type = CriticalSectionRawMutex,
+    attribute_table_size = 32
+)]
+struct Server {
+    pair: PairService,
+}
+
+#[cfg(feature = "radio")]
+#[gatt_service(uuid = "6b1d0001-5c8a-4f0e-9c3a-2e7b1a0d4f11")]
+struct PairService {
+    #[characteristic(
+        uuid = "6b1d0002-5c8a-4f0e-9c3a-2e7b1a0d4f11",
+        read,
+        value = 1,
+        permissions(encrypted)
+    )]
+    token: u8,
+}
 
 #[cfg(feature = "radio")]
 const WIFI_TIMEOUT_S: u64 = 20;
@@ -198,6 +226,113 @@ pub fn last_ble() -> Option<u16> {
     None
 }
 
+#[cfg(feature = "radio")]
+fn map_host_error(err: trouble_host::Error) -> BleFailReason {
+    match err {
+        trouble_host::Error::Timeout => BleFailReason::Timeout,
+        trouble_host::Error::Security(PairingFailedReason::PasskeyEntryFailed) => {
+            BleFailReason::PasskeyEntryFailed
+        }
+        trouble_host::Error::Security(PairingFailedReason::ConfirmValueFailed)
+        | trouble_host::Error::Security(PairingFailedReason::DHKeyCheckFailed) => {
+            BleFailReason::ConfirmValueFailed
+        }
+        trouble_host::Error::Security(PairingFailedReason::AuthenticationRequirements) => {
+            BleFailReason::AuthenticationRequirements
+        }
+        trouble_host::Error::Security(PairingFailedReason::RepeatedAttempts) => {
+            BleFailReason::RepeatedAttempts
+        }
+        _ => BleFailReason::Other,
+    }
+}
+
+#[cfg(feature = "radio")]
+async fn drive_connection<P: PacketPool>(
+    gatt: &GattConnection<'_, '_, P>,
+) -> Result<(), BleFailReason> {
+    loop {
+        match gatt.next().await {
+            GattConnectionEvent::PassKeyDisplay(key) => {
+                set_pair_status(BlePairStatus::Pairing(key.value() % 1_000_000));
+            }
+            GattConnectionEvent::PairingComplete { .. } => {
+                set_pair_status(BlePairStatus::Success);
+            }
+            GattConnectionEvent::PairingFailed(err) => {
+                return Err(map_host_error(err));
+            }
+            GattConnectionEvent::BondLost => {
+                return Err(BleFailReason::Other);
+            }
+            GattConnectionEvent::Disconnected { .. } => {
+                if matches!(pair_status(), BlePairStatus::Pairing(_)) {
+                    return Err(BleFailReason::Timeout);
+                }
+                return Ok(());
+            }
+            GattConnectionEvent::Gatt { event } => {
+                if let Ok(reply) = event.accept() {
+                    reply.send().await;
+                }
+            }
+            GattConnectionEvent::PassKeyConfirm(_)
+            | GattConnectionEvent::PassKeyInput
+            | GattConnectionEvent::OobRequest => {}
+            _ => {}
+        }
+    }
+}
+
+#[cfg(feature = "radio")]
+async fn advertise_once<C>(
+    peripheral: &mut Peripheral<'_, C, DefaultPacketPool>,
+    server: &Server<'_>,
+) -> Result<(), BleFailReason>
+where
+    C: Controller
+        + ControllerCmdSync<LeSetAdvData>
+        + ControllerCmdSync<LeSetAdvEnable>
+        + ControllerCmdSync<LeSetAdvParams>
+        + ControllerCmdSync<LeSetScanResponseData>,
+{
+    let mut adv_data = [0u8; 31];
+    let Ok(adv_len) = AdStructure::encode_slice(
+        &[
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::CompleteLocalName(b"PaperMono"),
+        ],
+        &mut adv_data,
+    ) else {
+        return Err(BleFailReason::Other);
+    };
+
+    let advertiser = peripheral
+        .advertise(
+            &Default::default(),
+            Advertisement::ConnectableScannableUndirected {
+                adv_data: &adv_data[..adv_len],
+                scan_data: &[],
+            },
+        )
+        .await
+        .map_err(|_| BleFailReason::Other)?;
+
+    let conn = advertiser
+        .accept()
+        .await
+        .map_err(|_| BleFailReason::Other)?;
+
+    set_pair_status(BlePairStatus::Connected);
+    let _ = conn.set_bondable(true);
+    let _ = conn.request_security();
+    let gatt = conn
+        .with_attribute_server(server)
+        .map_err(|_| BleFailReason::Other)?;
+
+    drive_connection(&gatt).await
+}
+
 /// Asynchronous Embassy task driving Bluetooth Low Energy peripheral advertising and passkey pairing.
 #[cfg(feature = "radio")]
 #[embassy_executor::task]
@@ -205,10 +340,10 @@ pub async fn ble_run(bt: BT<'static>) {
     let Ok(connector) = BleConnector::new(bt, Default::default()) else {
         return;
     };
-    let controller: ExternalController<_, 1> = ExternalController::new(connector);
+    let ble_controller: ExternalController<_, 10> = ExternalController::new(connector);
     let address = Address::random([0xF5, 0x42, 0x11, 0x22, 0x33, 0xF1]);
     let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources)
+    let stack = trouble_host::new(ble_controller, &mut resources)
         .set_random_address(address)
         .set_io_capabilities(IoCapabilities::DisplayOnly)
         .build();
@@ -216,94 +351,30 @@ pub async fn ble_run(bt: BT<'static>) {
     let mut runner = stack.runner();
     let mut peripheral = stack.peripheral();
 
-    let mut adv_data = [0u8; 31];
-    let adv_len = AdStructure::encode_slice(
-        &[
-            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::CompleteLocalName(b"PaperMono"),
-        ],
-        &mut adv_data[..],
-    )
-    .unwrap_or(0);
+    let Ok(server) = Server::new_with_config(GapConfig::default("PaperMono")) else {
+        set_pair_status(BlePairStatus::Failed(BleFailReason::Other));
+        return;
+    };
+    // Keep the derived service in the binary; Settings pairing reads it.
+    let _ = &server.pair;
 
-    let _ = select(runner.run(), async {
+    set_pair_status(BlePairStatus::Advertising);
+
+    let pair_loop = async {
         loop {
             let current = pair_status();
             if !matches!(current, BlePairStatus::Success | BlePairStatus::Failed(_)) {
                 set_pair_status(BlePairStatus::Advertising);
             }
 
-            let adv_data_slice = &adv_data[..adv_len];
-            let acceptor = match peripheral
-                .advertise(
-                    &Default::default(),
-                    Advertisement::ConnectableScannableUndirected {
-                        adv_data: adv_data_slice,
-                        scan_data: &[],
-                    },
-                )
-                .await
-            {
-                Ok(a) => a,
-                Err(_) => {
-                    Timer::after(Duration::from_millis(500)).await;
-                    continue;
-                }
-            };
-
-            let conn = match acceptor.accept().await {
-                Ok(c) => c,
-                Err(_) => {
-                    Timer::after(Duration::from_millis(500)).await;
-                    continue;
-                }
-            };
-
-            set_pair_status(BlePairStatus::Connected);
-            let _ = conn.request_security();
-
-            loop {
-                match conn.next().await {
-                    ConnectionEvent::Disconnected { .. } => {
-                        if matches!(pair_status(), BlePairStatus::Pairing(_)) {
-                            set_pair_status(BlePairStatus::Failed(BleFailReason::Timeout));
-                        }
-                        break;
-                    }
-                    ConnectionEvent::PassKeyDisplay(key) => {
-                        set_pair_status(BlePairStatus::Pairing(key.value()));
-                    }
-                    ConnectionEvent::PairingComplete { .. } => {
-                        set_pair_status(BlePairStatus::Success);
-                    }
-                    ConnectionEvent::PairingFailed(err) => {
-                        let reason = match err {
-                            Error::Security(r) => match r {
-                                PairingFailedReason::PasskeyEntryFailed => {
-                                    BleFailReason::PasskeyEntryFailed
-                                }
-                                PairingFailedReason::ConfirmValueFailed
-                                | PairingFailedReason::DHKeyCheckFailed => {
-                                    BleFailReason::ConfirmValueFailed
-                                }
-                                PairingFailedReason::AuthenticationRequirements => {
-                                    BleFailReason::AuthenticationRequirements
-                                }
-                                PairingFailedReason::RepeatedAttempts => {
-                                    BleFailReason::RepeatedAttempts
-                                }
-                                _ => BleFailReason::Other,
-                            },
-                            _ => BleFailReason::Other,
-                        };
-                        set_pair_status(BlePairStatus::Failed(reason));
-                    }
-                    _ => {}
-                }
+            if let Err(why) = advertise_once(&mut peripheral, &server).await {
+                set_pair_status(BlePairStatus::Failed(why));
+                Timer::after(Duration::from_millis(5000)).await;
             }
         }
-    })
-    .await;
+    };
+
+    let _ = join(runner.run(), pair_loop).await;
 }
 
 /// Asynchronous Embassy task driving Wi-Fi passive channel sweeping.
