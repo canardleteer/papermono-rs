@@ -4,7 +4,7 @@
 //! PinMap omits NFC; leftover pads: hardware skill `nyc-lite-nfc-pads`.
 //! UserDemo probes this address at runtime on one ELF.
 
-/// NFC IRQ (GPIO6). Full SKU HTML PinMap.
+/// NFC IRQ (GPIO6). PaperMono (`C153`) HTML PinMap.
 pub const IRQ: u8 = 6;
 
 /// 7-bit I2C address. Sheet `50h`. Schematic `I2C_EN=VDD`.

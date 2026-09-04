@@ -29,8 +29,8 @@ pub const M5IOE1_UM: u8 = 0x6F;
 pub const IP2315: u8 = 0x75;
 /// ST25R3916 leftover on Lite. Probe for NAK only. Do not init the chip.
 ///
-/// Full-SKU address is `m5stack-papermono::nfc::ADDRESS`. Hardware skill
-/// Lite leftover: `0x50` must NAK. Full SKU: `nyc-i2c-ack`.
+/// PaperMono (`C153`) address is `m5stack-papermono::nfc::ADDRESS`. Hardware skill
+/// Lite leftover: `0x50` must NAK. PaperMono (`C153`): `nyc-i2c-ack`.
 pub const ST25R3916_LEFTOVER: u8 = 0x50;
 /// Catalog id `st25r3916`, Device_ID (read-only). Leftover probe only.
 ///

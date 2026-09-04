@@ -193,7 +193,7 @@ pub struct GpioSample {
     pub busy: bool,
 }
 
-/// Lite leftover MCU inputs. Full-SKU NFC/LoRa nets. Do not drive.
+/// Lite leftover MCU inputs. PaperMono (`C153`) NFC/LoRa nets. Do not drive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LeftoverSample {
     /// GPIO5 LoRa IRQ net. High means high.
@@ -206,8 +206,8 @@ pub struct LeftoverSample {
 
 /// One gated M5PM1 / IP2315 charge sample. Millivolts only.
 ///
-/// `ip` is ACK while the gate is on. `then` is ACK after park
-/// (expect `false`). No IP2315 register payload.
+/// `ip` is ACK while the gate is on (expect `false` under permanent bus
+/// isolation). `then` is ACK after park (expect `false`). No IP2315 register payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChargeSample {
     /// M5PM1 `VBAT` millivolts, or `0` if the read NAKed.
@@ -218,7 +218,7 @@ pub struct ChargeSample {
     pub src: u8,
     /// M5PM1 `PWR_CFG` `CHG_EN`.
     pub chg_en: bool,
-    /// IP2315 ACK while `PYG11` is high.
+    /// IP2315 ACK while `PYG11` is high (parked off-bus, expect `false`).
     pub ip: bool,
     /// IP2315 ACK after `PYG11` is low again.
     pub then: bool,

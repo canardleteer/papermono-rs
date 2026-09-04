@@ -40,8 +40,8 @@ pub const OTP_FAST_TITLE: &str = "otp_fast";
 /// Catalog default for “partials then one Mode 1 full”.
 ///
 /// Official: after about ten. Firmware policy lives on the image
-/// (`embassy-debug` `PARTIALS_BEFORE_FULL`), not this number.
-pub const PARTIALS_BEFORE_FULL: u8 = 7;
+/// (`embassy-debug` `PARTIALS_BEFORE_FULL`), aligning with this default.
+pub const PARTIALS_BEFORE_FULL: u8 = 6;
 
 /// Official HTML **M5GFX LUT Refresh Speed** titles.
 ///
