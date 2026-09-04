@@ -298,32 +298,54 @@ fn draw_legend(bw: &mut [u8], red: &mut [u8], charge: Option<ChargeSample>) {
 }
 
 /// Renders Card 4: Bluetooth Low Energy peripheral pairing with PIN display and status.
+///
+/// # Visual Hierarchy & Layout Geometry (480x800 Portrait)
+/// - **Header (y = 50..70)**: Centered title "BLUETOOTH PAIRING" with black dividing bar.
+/// - **Device Info & Instruction (y = 110..145)**: Shows local name "Device: PaperMono"
+///   and contextual instruction based on [`BlePairStatus`].
+/// - **Passkey PIN Display (y = 175..265)**:
+///   - Outer bordered container (360x90 px) centered at x = 60.
+///   - Six individual digit boxes (40x50 px each, 52 px pitch) when displaying a passkey or hyphens.
+///   - Single wide box (300x50 px) displaying "P A I R E D" upon successful pairing.
+/// - **Status / Result Frame (y = 295..480)**:
+///   - Highlighted status outline box (280x45 px) for terminal states ("SUCCESS" or "FAILED").
+///   - Descriptive explanation line (e.g. "Why: Passkey entry failed / canceled").
+///   - Contextual troubleshooting guidance for the user.
+/// - **Tutorial Walkthrough (y = 510..680)**: Step-by-step instructions for pairing from a phone.
+/// - **Footer (y = 720..800)**: Dividing rule and button navigation prompts (Button A / B).
+///
+/// # Rendering Architecture
+/// Primitives (lines, boxes) are drawn first to avoid overdrawing text ink. All typography
+/// is rendered via a single [`GrayInk`] rasterizer using [`FONT_10X20`]. Metric text strings
+/// are formatted into small stack buffers via [`BufWriter`] without heap allocation.
 fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
+    // Fill the entire 480x800 canvas with paper white before drawing.
     clear(bw, red, display::GRAY_WHITE);
     let status = crate::radio::pair_status();
 
     // 1. Draw structural lines and frames
-    // Header separator
+    // Header separator bar (420 px wide, 2 px high).
     fill_rect(bw, red, 30, 70, 420, 2, display::GRAY_BLACK);
 
-    // PIN Outer Box
+    // Outer double-bordered frame for the 6-digit PIN code container.
     stroke_rect(bw, red, 60, 175, 360, 90, display::GRAY_BLACK);
     stroke_rect(bw, red, 63, 178, 354, 84, display::GRAY_BLACK);
 
-    // 6 digit boxes or single box
+    // Draw either a consolidated "PAIRED" banner box or six discrete digit boxes.
     if status == BlePairStatus::Success {
         stroke_rect(bw, red, 90, 195, 300, 50, display::GRAY_BLACK);
     } else {
+        // Six 40x50 px boxes spaced at 52 px intervals (x = 90, 142, 194, 246, 298, 350).
         for i in 0..6 {
             let x = 90 + i * 52;
             stroke_rect(bw, red, x, 195, 40, 50, display::GRAY_BLACK);
         }
     }
 
-    // Status separator
+    // Horizontal separator separating PIN container from status messages.
     fill_rect(bw, red, 30, 295, 420, 2, display::GRAY_BLACK);
 
-    // Status outline box for Success / Failed
+    // Prominent double-line status outline box for terminal states (Success / Failed).
     match status {
         BlePairStatus::Success | BlePairStatus::Failed(_) => {
             stroke_rect(bw, red, 100, 315, 280, 45, display::GRAY_BLACK);
@@ -332,17 +354,17 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
         _ => {}
     }
 
-    // Info separator
+    // Light gray dividing line above the tutorial walkthrough steps.
     fill_rect(bw, red, 30, 480, 420, 1, display::GRAY_LIGHT);
 
-    // Footer separator
+    // Footer navigation dividing bar.
     fill_rect(bw, red, 30, 720, 420, 2, display::GRAY_BLACK);
 
-    // 2. Draw all text with a single GrayInk
+    // 2. Draw all text with a single GrayInk to avoid multiple mutable borrow conflicts.
     let mut ink = GrayInk::new(bw, red);
     let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
 
-    // Header
+    // Card Header
     let _ = Text::with_alignment(
         "BLUETOOTH PAIRING",
         Point::new(240, 50),
@@ -351,7 +373,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
     )
     .draw(&mut ink);
 
-    // Device info
+    // BLE Local Name
     let _ = Text::with_alignment(
         "Device: PaperMono",
         Point::new(240, 110),
@@ -360,6 +382,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
     )
     .draw(&mut ink);
 
+    // Contextual instruction string above the PIN boxes.
     let instruction = match status {
         BlePairStatus::Pairing(_) => "Enter this PIN code on your phone:",
         BlePairStatus::Success => "Device paired and connected!",
@@ -371,9 +394,10 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
     let _ = Text::with_alignment(instruction, Point::new(240, 145), style, Alignment::Center)
         .draw(&mut ink);
 
-    // PIN Content
+    // PIN Content: render individual digits, "P A I R E D", or idle placeholder hyphens.
     match status {
         BlePairStatus::Pairing(pin) => {
+            // Decompose 6-digit numeric passkey into individual ASCII digits.
             let digits = [
                 (((pin / 100_000) % 10) as u8 + b'0'),
                 (((pin / 10_000) % 10) as u8 + b'0'),
@@ -384,6 +408,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
             ];
             for (i, &d) in digits.iter().enumerate() {
                 let char_str = core::str::from_utf8(core::slice::from_ref(&d)).unwrap_or("-");
+                // Center each digit within its 40x50 px box (box left = 90 + i*52, box center = +20).
                 let x = 90 + (i as i32) * 52 + 20;
                 let _ =
                     Text::with_alignment(char_str, Point::new(x, 227), style, Alignment::Center)
@@ -400,6 +425,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
             .draw(&mut ink);
         }
         _ => {
+            // Placeholder hyphens when no active passkey is generated.
             for i in 0..6 {
                 let x = 90 + i * 52 + 20;
                 let _ = Text::with_alignment("-", Point::new(x, 227), style, Alignment::Center)
@@ -408,7 +434,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
         }
     }
 
-    // Result section
+    // Result section: display status label, details, and actionable guidance.
     match status {
         BlePairStatus::Success => {
             let _ = Text::with_alignment("SUCCESS", Point::new(240, 345), style, Alignment::Center)
@@ -424,6 +450,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
         BlePairStatus::Failed(reason) => {
             let _ = Text::with_alignment("FAILED", Point::new(240, 345), style, Alignment::Center)
                 .draw(&mut ink);
+            // Format failure reason into stack buffer without dynamic allocation.
             let mut buf = [0u8; 64];
             let mut writer = BufWriter {
                 buf: &mut buf,
@@ -501,7 +528,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
         }
     }
 
-    // How to pair guide
+    // Step-by-step phone pairing tutorial instructions.
     let _ = Text::with_alignment(
         "HOW TO PAIR",
         Point::new(240, 510),
@@ -684,12 +711,19 @@ fn draw_line(bw: &mut [u8], red: &mut [u8], mut x0: i32, mut y0: i32, x1: i32, y
 }
 
 /// Minimal non-allocating string buffer writer for on-screen metrics formatting.
+///
+/// Implements [`core::fmt::Write`] to enable standard string formatting macros like
+/// [`core::fmt::write!`] directly into a caller-supplied fixed-size stack byte slice (`&mut [u8]`)
+/// without triggering heap allocation or panic risks in `no_std` environments.
 struct BufWriter<'a> {
+    /// Destination byte buffer holding formatted ASCII characters.
     buf: &'a mut [u8],
+    /// Current write offset into `buf`.
     pos: usize,
 }
 
 impl<'a> core::fmt::Write for BufWriter<'a> {
+    /// Copies as many bytes of string slice `s` into `buf` as remaining capacity permits.
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         let bytes = s.as_bytes();
         let remain = self.buf.len().saturating_sub(self.pos);

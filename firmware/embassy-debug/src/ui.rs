@@ -184,7 +184,23 @@ async fn paint(
     }
 }
 
-/// Waits for tactile button presses, right-edge touch slider gestures, or an optional auto-refresh timeout.
+/// Waits for tactile button presses, right-edge touch slider gestures, auto-refresh timeouts, or BLE state changes.
+///
+/// # Parameters
+/// - `i2c`: System I2C bus driver for sampling the FT6336G capacitive touch controller.
+/// - `btn_a`: Input pin driver for Button A (`GPIO2` / UP).
+/// - `btn_b`: Input pin driver for Button B (`GPIO3` / DOWN).
+/// - `tp`: Touch interrupt line (`GPIO4` / `TOUCH_INT`).
+/// - `lamp`: Frontlight slider tracker updating M5PM1 PWM0 duty from capacitive Y coordinates.
+/// - `auto_refresh_ms`: Optional timeout triggering periodic automatic card refresh (e.g. 60 s for battery).
+/// - `watch_ble`: When `true`, monitors [`crate::radio::state_rev()`] for BLE pairing state transitions
+///   and returns [`Some(Nav::Refresh)`] immediately to repaint the e-paper glass.
+///
+/// # Returns
+/// - `Some(Nav::Prev)` on short press of Button A.
+/// - `Some(Nav::Next)` on short press of Button B.
+/// - `Some(Nav::Sleep)` on 2-second hold of Button A (when `sleep` feature is active).
+/// - `Some(Nav::Refresh)` on auto-refresh timeout or BLE status revision change.
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,

@@ -38,6 +38,18 @@ Live-ask, never-erase, and flash I/O: root
 [AGENTS.md](../../AGENTS.md). Envelope: parent
 [AGENTS.md](../AGENTS.md).
 
+## Firmware examples as tutorial code
+
+Firmware under `simple-debug/` serves as an educational reference
+and walkthrough for bare-metal blocking `esp-hal`. Every function,
+method, struct, enum, and constant (public or private) must have
+comprehensive rustdoc explaining what it does, hardware nets/buses
+involved, expectations, and error handling. Include abundant in-line
+comments explaining hardware register sequencing, GPIO electrical
+configurations (pull-ups, input modes), stack buffer usage, and
+reset cycles. Ground descriptions in authoritative terminology from
+*The Embedded Rust Book* and *The Rust on ESP Book*.
+
 ## Agent Documentation Standards
 
 Maintain this file according to the [AGENTS.md standard](https://agents.md/),

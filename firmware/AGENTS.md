@@ -46,6 +46,19 @@ Packing (one flash, many safe probes) is a root rule:
 [AGENTS.md](../AGENTS.md#pack-one-flash). Do not treat this
 file as the only copy.
 
+## Firmware examples as tutorial code
+
+Firmware under `firmware/` (`simple-debug-fw` and `embassy-debug-fw`)
+must serve as educational reference code. Every function, method,
+struct, enum, and constant (public or private) must have comprehensive
+rustdoc explaining what it does, hardware nets/buses involved,
+expectations, and error handling. Include abundant in-line comments
+explaining hardware register sequencing, GPIO electrical configurations
+(pull-ups, input modes), bus arbitration, Embassy task scheduling,
+stack buffer usage, and reset/wake-up cycles. Ground descriptions
+in authoritative terminology from *The Embedded Rust Book*,
+*The Rust on ESP Book*, and *The Embassy Book*.
+
 ## Named constants and datasheets
 
 Do not put magic numbers or bytes in firmware. Use grouped

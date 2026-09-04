@@ -86,6 +86,19 @@ cargo xtask build-fw embassy-debug
 Parent contract: [AGENTS.md](../AGENTS.md). Live-ask:
 root [AGENTS.md](../../AGENTS.md).
 
+## Firmware examples as tutorial code
+
+Firmware under `embassy-debug/` serves as an educational reference
+and walkthrough for async Embassy on ESP32-S3. Every function,
+method, struct, enum, and constant (public or private) must have
+comprehensive rustdoc explaining what it does, hardware nets/buses
+involved, expectations, and error handling. Include abundant in-line
+comments explaining hardware register sequencing, GPIO electrical
+configurations (pull-ups, input modes), bus arbitration, Embassy task
+scheduling, stack buffer usage, and reset/wake-up cycles. Ground
+descriptions in authoritative terminology from *The Embedded Rust Book*,
+*The Rust on ESP Book*, and *The Embassy Book*.
+
 ## Agent Documentation Standards
 
 Maintain this file according to the [AGENTS.md standard](https://agents.md/),
