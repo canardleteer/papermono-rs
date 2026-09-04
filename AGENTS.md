@@ -81,11 +81,14 @@ Safe unattended (no extra hands on the unit): I2C roster,
 `FLAG`, `CHIP_ID`, lamp + `EPD_VDD`, leftover **input**
 levels. Host-only captures that need no button (USB
 interfaces, `probe-rs list` without reset) run in the same
-session. Radio (`wifi n=` / `ble n=`, no MAC/BSSID/IRK, no
-NVS write) stays default-off until they ask; then it rides
-**that** listen, not a second image. Sleep (`wake src=` /
-`sleep rtc=`) is the same: default-off, one image when
-they ask. Do not pack a current-meter step.
+session. Packed listen-only radio (`wifi n=` / `ble n=`, no
+MAC/BSSID/IRK, no NVS write) stays default-off until they
+ask; then it rides **that** listen, not a second image. The
+landing `embassy-debug` image already defaults `--features
+radio` for BLE pairing + Wi-Fi survey / SoftAP cards (idle
+until touch). Sleep (`wake src=` / `sleep rtc=`) is the same:
+default-off for packed probes, one image when they ask. Do
+not pack a current-meter step.
 
 Do not add OTP, SDMMC, buzzer, IP2315 hang, or RGB sweep
 unless they asked (those need eyes, a card, or parked
@@ -104,6 +107,16 @@ CDC stream (`pair pin=`), submitting it to complete authentication, and
 asking the human to visually confirm that the identical PIN was rendered
 on the e-paper panel. This host-driven pathway enables fast agent
 self-diagnostics while preserving manual testing flexibility.
+
+## Wi-Fi SoftAP testing options
+
+When testing SoftAP in `embassy-debug-fw`, offer the human a
+phone/PC join to `PaperMono-AP` / `mono2026` and
+`curl http://192.168.4.1/`. If a spare host Wi-Fi adapter is
+available, agents may run the host SoftAP check in
+[firmware/embassy-debug/AGENTS.md](firmware/embassy-debug/AGENTS.md)
+(scan / connect / curl / CDC `wifi_http`). Survey and SoftAP are
+mutually exclusive. WPA2 only (no WPA3 in the `esp-radio` blob).
 
 ## Keep skills updated
 

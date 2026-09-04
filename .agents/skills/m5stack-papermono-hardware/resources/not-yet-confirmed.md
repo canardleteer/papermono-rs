@@ -37,9 +37,11 @@ When a human accepts a firmware flash, pack every safe
 unattended probe into that image (root `AGENTS.md`,
 **Pack one flash**). Do not spend a boot on I2C alone
 if lamp, `FLAG`, leftover inputs, or (when asked)
-`wifi n=` / `ble n=` can ride along. Radio stays
-default-off until asked. No MAC / BSSID / IRK. No NVS
-write.
+`wifi n=` / `ble n=` can ride along. Packed listen-only
+radio stays default-off until asked. Landing
+`embassy-debug` already defaults `--features radio` for
+interactive BLE / Wi-Fi cards (idle until touch). No
+foreign MAC / BSSID / IRK. No NVS write.
 
 Rule: a new named part in the SKILL product snapshot gets an
 NYC row in the same change.
@@ -199,6 +201,19 @@ DisplayOnly passkey generated and displayed on card / CDC:
 `pair pin=413590`. Panel fast partial refreshes. Passkey entered on phone:
 pairing completes with `pair ok`, panel displays paired banner.
 Bonds held in RAM. `C153` still open.
+
+**Lite SoftAP / survey cards (2026-09-04):** `embassy-debug`
+live SoftAP confirmed on `C153-Lite`. Touch `[ START HOTSPOT ]`:
+CDC `wifi_ap state=active ssid=PaperMono-AP pass=mono2026
+ip=192.168.4.1`. Host `wlx9cefd5f6363b` saw WPA2 ch1, connected,
+DHCP `192.168.4.50`. `curl http://192.168.4.1/` JSON included
+battery and `wifi.requests`. CDC `client=connected` and
+`wifi_http req=`. Survey card + mutual exclusion written
+(channels 1–13, top 4 APs on glass, CDC counts only); SoftAP
+path host-verified. WPA3/SAE unavailable in precompiled
+`esp-radio` blob (not a future NYC close — use WPA2). No
+foreign MAC/BSSID/IRK. `C153` still open.
+[measure.md](../references/measure.md).
 
 ### nyc-gpio0-strap
 

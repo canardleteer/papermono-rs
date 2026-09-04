@@ -59,6 +59,9 @@ before treating a command as verified on target hardware.
   <img src="docs/assets/battery.png"
        alt="embassy-debug Legend card with battery gauge on PaperMono-Lite"
        height="360">
+  <img src="docs/assets/pm-wifi.png"
+       alt="embassy-debug Wi-Fi Hotspot and Server card on PaperMono-Lite"
+       height="360">
 </div>
 
 - [plain](./firmware/simple-debug)

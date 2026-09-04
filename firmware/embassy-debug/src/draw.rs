@@ -13,13 +13,15 @@
 //! - **Embedded Graphics Integration**: Implements the [`embedded_graphics::draw_target::DrawTarget`]
 //!   trait via [`GrayInk`], allowing standard text, shapes, and primitives to be rendered directly
 //!   into the dual-plane framebuffers.
-//! - **Six-Card Walkthrough**:
+//! - **Eight-Card Walkthrough**:
 //!   1. `Splash`: Displays the Rust Ferris mascot and navigation hints.
 //!   2. `Shapes`: Verifies geometry rendering (procedural 3-degree Koch snowflake with microsecond benchmark, triangles, boxes).
 //!   3. `Legend`: Provides an on-device quick-reference visual guide for physical buttons, sleep/wake, and touch rails.
 //!   4. `Bluetooth`: Displays 6-digit BLE passkey PIN for phone pairing and reports success or failure reason.
-//!   5. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
-//!   6. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
+//!   5. `WifiSurvey`: Scans 2.4 GHz 802.11 channels, displays channel distribution and top discovered APs.
+//!   6. `WifiAp`: Runs WPA2-Personal SoftAP with DHCP and serves JSON system stats over HTTP.
+//!   7. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
+//!   8. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
 
 use core::fmt::Write;
 use embassy_time::Instant;
@@ -31,7 +33,7 @@ use embedded_graphics::text::{Alignment, Text};
 use m5stack_papermono_lite::{display, pmic};
 use papermono_log::{ChargeSample, Scene};
 
-use crate::radio::BlePairStatus;
+use crate::radio::{BlePairStatus, WifiMode};
 
 /// 360×240 packed 1bpp bitmap of Ferris the Rust mascot.
 /// Provenance: Generated from SVG via `cargo xtask encode-assets` (see `assets/SOURCE.md`).
@@ -63,6 +65,14 @@ pub fn render(
         }
         Scene::Bluetooth => {
             draw_bluetooth(bw, red);
+            None
+        }
+        Scene::WifiSurvey => {
+            draw_wifi_survey(bw, red);
+            None
+        }
+        Scene::WifiAp => {
+            draw_wifi_ap(bw, red);
             None
         }
         Scene::Tones => {
@@ -559,7 +569,395 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
     .draw(&mut ink);
 }
 
-/// Renders Card 5: 4-level grayscale horizontal tone bands.
+/// Renders Card 5: 2.4 GHz Wi-Fi channel survey with channel saturation histogram and top AP table.
+///
+/// # Visual Hierarchy & Layout Geometry (480x800 Portrait)
+/// - **Header (y = 50..70)**: Centered title "WI-FI CHANNEL SURVEY" with black dividing bar.
+/// - **Status Banner (y = 85..130)**:
+///   - Outlined double-border box (380x45 px) indicating active scan or idle state.
+/// - **Channel Distribution (y = 150..250)**:
+///   - Section header "2.4 GHz CHANNEL OCCUPANCY" and divider rule.
+///   - Aggregated count of total networks discovered.
+///   - Non-overlapping primary channels (1, 6, 11) and secondary channel counts.
+/// - **Strongest Access Points (y = 265..485)**:
+///   - Section header "STRONGEST ACCESS POINTS" with table column headers.
+///   - Up to 5 strongest AP records showing SSID, channel, RSSI (dBm), and security method.
+/// - **Operational Walkthrough (y = 505..645)**:
+///   - Explanatory notes on passive beacon sniffing, channel occupancy, and mutual exclusion with SoftAP.
+///     Guide lines stay within ~40 glyphs (FONT_10X20 at x = 40) so they do not clip the right edge.
+/// - **Touch Button Box (y = 660..716)**:
+///   - Prominent double-line border `[ START SURVEY ]` or `[ STOP SURVEY ]` responsive to touch taps.
+/// - **Footer (y = 740..780)**: Navigation guide for Button A / Button B.
+fn draw_wifi_survey(bw: &mut [u8], red: &mut [u8]) {
+    // Fill canvas with paper white before rendering card elements.
+    clear(bw, red, display::GRAY_WHITE);
+    let mode = crate::radio::wifi_mode();
+    let survey = crate::radio::wifi_survey_data();
+
+    // 1. Draw structural lines, dividers, and bounding boxes.
+    // Header separator bar (420 px wide, 2 px high).
+    fill_rect(bw, red, 30, 70, 420, 2, display::GRAY_BLACK);
+
+    // Status banner double-line container.
+    stroke_rect(bw, red, 50, 85, 380, 45, display::GRAY_BLACK);
+    stroke_rect(bw, red, 52, 87, 376, 41, display::GRAY_BLACK);
+
+    // Light divider below channel distribution metrics.
+    fill_rect(bw, red, 40, 255, 400, 1, display::GRAY_LIGHT);
+
+    // Divider separating channel distribution from AP table.
+    fill_rect(bw, red, 30, 265, 420, 2, display::GRAY_BLACK);
+
+    // Light divider separating AP table from operation guide.
+    fill_rect(bw, red, 30, 495, 420, 1, display::GRAY_LIGHT);
+
+    // Touch button bounding box (x = 60..420, y = 660..716).
+    stroke_rect(bw, red, 60, 660, 360, 56, display::GRAY_BLACK);
+    stroke_rect(bw, red, 62, 662, 356, 52, display::GRAY_BLACK);
+
+    // Footer navigation dividing rule.
+    fill_rect(bw, red, 30, 740, 420, 2, display::GRAY_BLACK);
+
+    // 2. Render all typography using GrayInk rasterizer.
+    let mut ink = GrayInk::new(bw, red);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    // Title header
+    let _ = Text::with_alignment(
+        "WI-FI CHANNEL SURVEY",
+        Point::new(240, 50),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Status banner text
+    let status_str = match mode {
+        WifiMode::SurveyScanning => "STATUS: SCANNING CHANNELS...",
+        WifiMode::SurveyComplete => "STATUS: SCAN COMPLETE",
+        WifiMode::Hotspot => "STATUS: HOTSPOT ACTIVE",
+        WifiMode::Idle => "STATUS: IDLE (READY TO SCAN)",
+    };
+    let _ = Text::with_alignment(status_str, Point::new(240, 115), style, Alignment::Center)
+        .draw(&mut ink);
+
+    // 2.4 GHz channel distribution section
+    let _ = Text::with_alignment(
+        "2.4 GHz CHANNEL OCCUPANCY",
+        Point::new(240, 155),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let (total, ch1, ch6, ch11, other) = if let Some(ref data) = survey {
+        (
+            data.total_aps,
+            data.ch1_count,
+            data.ch6_count,
+            data.ch11_count,
+            data.other_count,
+        )
+    } else {
+        (0, 0, 0, 0, 0)
+    };
+
+    let mut buf_tot = [0u8; 48];
+    let mut w_tot = BufWriter {
+        buf: &mut buf_tot,
+        pos: 0,
+    };
+    let _ = write!(w_tot, "Total Networks Discovered: {total}");
+    if let Ok(label) = core::str::from_utf8(&w_tot.buf[..w_tot.pos]) {
+        let _ = Text::new(label, Point::new(45, 182), style).draw(&mut ink);
+    }
+
+    let mut buf_ch = [0u8; 64];
+    let mut w_ch = BufWriter {
+        buf: &mut buf_ch,
+        pos: 0,
+    };
+    let _ = write!(w_ch, "Ch 1: {:>2}   |   Ch 6: {:>2}", ch1, ch6);
+    if let Ok(label) = core::str::from_utf8(&w_ch.buf[..w_ch.pos]) {
+        let _ = Text::new(label, Point::new(45, 210), style).draw(&mut ink);
+    }
+
+    let mut buf_ch2 = [0u8; 64];
+    let mut w_ch2 = BufWriter {
+        buf: &mut buf_ch2,
+        pos: 0,
+    };
+    let _ = write!(w_ch2, "Ch 11: {:>2}  |   Other: {:>2}", ch11, other);
+    if let Ok(label) = core::str::from_utf8(&w_ch2.buf[..w_ch2.pos]) {
+        let _ = Text::new(label, Point::new(45, 238), style).draw(&mut ink);
+    }
+
+    // Strongest access points table
+    let _ = Text::with_alignment(
+        "STRONGEST ACCESS POINTS",
+        Point::new(240, 285),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let _ = Text::new(
+        "SSID           CH     RSSI     AUTH     ",
+        Point::new(35, 312),
+        style,
+    )
+    .draw(&mut ink);
+
+    let has_entries = survey.as_ref().is_some_and(|s| s.top_aps[0].is_some());
+    if has_entries {
+        if let Some(ref data) = survey {
+            let mut row_y = 338;
+            for ap in data.top_aps.iter().flatten() {
+                let ssid_slice = &ap.ssid[..usize::from(ap.ssid_len).min(18)];
+                let ssid_clean = core::str::from_utf8(ssid_slice).unwrap_or("<hidden>");
+                let mut row_buf = [0u8; 64];
+                let mut w_row = BufWriter {
+                    buf: &mut row_buf,
+                    pos: 0,
+                };
+                let _ = write!(
+                    w_row,
+                    "{:<14} {:>2} {:>4}dBm {:>8}",
+                    ssid_clean, ap.channel, ap.rssi, ap.auth
+                );
+                if let Ok(label) = core::str::from_utf8(&w_row.buf[..w_row.pos]) {
+                    let _ = Text::new(label, Point::new(35, row_y), style).draw(&mut ink);
+                }
+                row_y += 28;
+            }
+        }
+    } else {
+        let _ = Text::with_alignment(
+            "No networks scanned yet",
+            Point::new(240, 375),
+            style,
+            Alignment::Center,
+        )
+        .draw(&mut ink);
+    }
+
+    // Survey operation walkthrough
+    let _ = Text::with_alignment(
+        "SURVEY OPERATION",
+        Point::new(240, 520),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let guide_lines = [
+        "1. Tap below to scan channels 1-13.",
+        "2. Identifies 2.4 GHz channel saturation.",
+        "3. Top 4 APs listed by signal (RSSI).",
+        "4. Starting survey halts SoftAP if running.",
+    ];
+    let mut guide_y = 550;
+    for line in guide_lines {
+        let _ = Text::new(line, Point::new(40, guide_y), style).draw(&mut ink);
+        guide_y += 26;
+    }
+
+    // Touch button label
+    let button_label = if mode == WifiMode::SurveyScanning {
+        "[ STOP SURVEY ]"
+    } else {
+        "[ START SURVEY ]"
+    };
+    let _ = Text::with_alignment(button_label, Point::new(240, 696), style, Alignment::Center)
+        .draw(&mut ink);
+
+    // Navigation footer
+    let _ = Text::with_alignment(
+        "BUTTON A: Prev   |   BUTTON B: Next",
+        Point::new(240, 770),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 6: WPA2-Personal Wi-Fi SoftAP and embedded HTTP web server status.
+///
+/// # Visual Hierarchy & Layout Geometry (480x800 Portrait)
+/// - **Header (y = 50..70)**: Centered title "WI-FI HOTSPOT & SERVER" with black dividing bar.
+/// - **Status Banner (y = 85..130)**:
+///   - Outlined double-border box (380x45 px) indicating whether the SoftAP is Stopped or Active.
+/// - **SoftAP Access Credentials (y = 145..355)**:
+///   - Bordered box (400x205 px) displaying SSID ("PaperMono-AP").
+///   - 8 individual segmented digit boxes (36x44 px each) displaying WPA2 passkey "mono2026".
+///   - Web server URL endpoint ("http://192.168.4.1/").
+/// - **Live Server Telemetry (y = 370..495)**:
+///   - Real-time DHCP client count, HTTP requests served, and gateway network subnet.
+/// - **Tutorial Walkthrough (y = 515..645)**:
+///   - Step-by-step connection guide for phones, tablets, and host PCs.
+/// - **Touch Button Box (y = 660..716)**:
+///   - Prominent double-line border `[ START HOTSPOT ]` or `[ STOP HOTSPOT ]` responsive to touch taps.
+/// - **Footer (y = 740..780)**: Navigation guide for Button A / Button B.
+fn draw_wifi_ap(bw: &mut [u8], red: &mut [u8]) {
+    // Fill canvas with paper white before rendering card elements.
+    clear(bw, red, display::GRAY_WHITE);
+    let status = crate::radio::wifi_ap_status();
+
+    // 1. Draw structural lines, dividers, and credential containers.
+    // Header separator bar (420 px wide, 2 px high).
+    fill_rect(bw, red, 30, 70, 420, 2, display::GRAY_BLACK);
+
+    // Status banner double-line container.
+    stroke_rect(bw, red, 50, 85, 380, 45, display::GRAY_BLACK);
+    stroke_rect(bw, red, 52, 87, 376, 41, display::GRAY_BLACK);
+
+    // SoftAP access credentials container box.
+    stroke_rect(bw, red, 40, 145, 400, 205, display::GRAY_BLACK);
+    stroke_rect(bw, red, 42, 147, 396, 201, display::GRAY_BLACK);
+
+    // 8 segmented password digit boxes for "mono2026".
+    for i in 0..8 {
+        let bx = 72 + (i as u16) * 42;
+        stroke_rect(bw, red, bx, 230, 36, 44, display::GRAY_BLACK);
+    }
+
+    // Telemetry divider.
+    fill_rect(bw, red, 40, 365, 400, 1, display::GRAY_LIGHT);
+
+    // Tutorial guide divider.
+    fill_rect(bw, red, 30, 505, 420, 1, display::GRAY_LIGHT);
+
+    // Touch button bounding box (x = 60..420, y = 660..716).
+    stroke_rect(bw, red, 60, 660, 360, 56, display::GRAY_BLACK);
+    stroke_rect(bw, red, 62, 662, 356, 52, display::GRAY_BLACK);
+
+    // Footer navigation dividing rule.
+    fill_rect(bw, red, 30, 740, 420, 2, display::GRAY_BLACK);
+
+    // 2. Render all typography using GrayInk rasterizer.
+    let mut ink = GrayInk::new(bw, red);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    // Title header
+    let _ = Text::with_alignment(
+        "WI-FI HOTSPOT & SERVER",
+        Point::new(240, 50),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Status banner text
+    let status_str = if status.active {
+        "STATUS: ACTIVE (HOTSPOT RUNNING)"
+    } else {
+        "STATUS: STOPPED (OFFLINE)"
+    };
+    let _ = Text::with_alignment(status_str, Point::new(240, 115), style, Alignment::Center)
+        .draw(&mut ink);
+
+    // Credentials container content
+    let _ = Text::with_alignment(
+        "SOFTAP ACCESS CREDENTIALS",
+        Point::new(240, 170),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let _ = Text::new("Network (SSID): PaperMono-AP", Point::new(60, 198), style).draw(&mut ink);
+
+    let _ = Text::new("WPA2 Password:", Point::new(60, 222), style).draw(&mut ink);
+
+    // Segmented password characters
+    const PASS: &[u8] = b"mono2026";
+    for (i, &ch) in PASS.iter().enumerate() {
+        let ch_str = core::str::from_utf8(core::slice::from_ref(&ch)).unwrap_or("-");
+        let bx = 72 + (i as i32) * 42 + 18;
+        let _ = Text::with_alignment(ch_str, Point::new(bx, 260), style, Alignment::Center)
+            .draw(&mut ink);
+    }
+
+    let _ = Text::new("Web Server URL:", Point::new(60, 302), style).draw(&mut ink);
+    let _ = Text::new("http://192.168.4.1/", Point::new(60, 328), style).draw(&mut ink);
+
+    // Live telemetry section
+    let _ = Text::with_alignment(
+        "LIVE SERVER TELEMETRY",
+        Point::new(240, 388),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let mut buf_cli = [0u8; 48];
+    let mut w_cli = BufWriter {
+        buf: &mut buf_cli,
+        pos: 0,
+    };
+    let _ = write!(w_cli, "Connected Clients (DHCP):  {}", status.clients);
+    if let Ok(label) = core::str::from_utf8(&w_cli.buf[..w_cli.pos]) {
+        let _ = Text::new(label, Point::new(50, 416), style).draw(&mut ink);
+    }
+
+    let mut buf_req = [0u8; 48];
+    let mut w_req = BufWriter {
+        buf: &mut buf_req,
+        pos: 0,
+    };
+    let _ = write!(w_req, "HTTP Requests Served:      {}", status.http_requests);
+    if let Ok(label) = core::str::from_utf8(&w_req.buf[..w_req.pos]) {
+        let _ = Text::new(label, Point::new(50, 444), style).draw(&mut ink);
+    }
+
+    let _ = Text::new(
+        "Gateway IP: 192.168.4.1   | Subnet: /24",
+        Point::new(50, 472),
+        style,
+    )
+    .draw(&mut ink);
+
+    // Tutorial walkthrough
+    let _ = Text::with_alignment(
+        "HOW TO CONNECT & TEST",
+        Point::new(240, 528),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let tut_steps = [
+        "1. Tap [ START HOTSPOT ] button below.",
+        "2. Connect phone/PC to 'PaperMono-AP'.",
+        "3. Enter WPA2 password 'mono2026'.",
+        "4. Fetch http://192.168.4.1/ for status.",
+    ];
+    let mut tut_y = 556;
+    for step in tut_steps {
+        let _ = Text::new(step, Point::new(40, tut_y), style).draw(&mut ink);
+        tut_y += 26;
+    }
+
+    // Touch button label
+    let button_label = if status.active {
+        "[ STOP HOTSPOT ]"
+    } else {
+        "[ START HOTSPOT ]"
+    };
+    let _ = Text::with_alignment(button_label, Point::new(240, 696), style, Alignment::Center)
+        .draw(&mut ink);
+
+    // Navigation footer
+    let _ = Text::with_alignment(
+        "BUTTON A: Prev   |   BUTTON B: Next",
+        Point::new(240, 770),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 7: 4-level grayscale horizontal tone bands.
 fn draw_tones(bw: &mut [u8], red: &mut [u8]) {
     const BOX_X: u16 = 40;
     const BOX_W: u16 = display::WIDTH - 80;

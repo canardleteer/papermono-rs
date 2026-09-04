@@ -50,6 +50,12 @@ pub enum LineKind {
     Snowflake,
     /// BLE pairing event (`pair`).
     Pair,
+    /// Wi-Fi channel survey report (`wifi_survey`).
+    WifiSurvey,
+    /// Wi-Fi SoftAP event (`wifi_ap`).
+    WifiAp,
+    /// Wi-Fi HTTP request log (`wifi_http`).
+    WifiHttp,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -151,6 +157,9 @@ pub fn classify(body: &str) -> LineKind {
         "wake" => LineKind::Wake,
         "snowflake" => LineKind::Snowflake,
         "pair" => LineKind::Pair,
+        "wifi_survey" => LineKind::WifiSurvey,
+        "wifi_ap" => LineKind::WifiAp,
+        "wifi_http" => LineKind::WifiHttp,
         _ => LineKind::Unknown,
     }
 }
@@ -300,6 +309,27 @@ mod tests {
                 .unwrap()
                 .kind,
             LineKind::Snowflake
+        );
+        assert_eq!(
+            records("simple-debug: wifi_survey count=10\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::WifiSurvey
+        );
+        assert_eq!(
+            records("simple-debug: wifi_ap state=active\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::WifiAp
+        );
+        assert_eq!(
+            records("simple-debug: wifi_http req=1 path=/\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::WifiHttp
         );
     }
 

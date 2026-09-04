@@ -250,6 +250,9 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::Wake => "wake",
         LineKind::Snowflake => "snowflake",
         LineKind::Pair => "pair",
+        LineKind::WifiSurvey => "wifi_survey",
+        LineKind::WifiAp => "wifi_ap",
+        LineKind::WifiHttp => "wifi_http",
         LineKind::Unknown => "unknown",
     }
 }

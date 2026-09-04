@@ -68,10 +68,13 @@ When they accept `flash-app`, pack every **safe unattended**
 probe into that image (I2C roster, `FLAG`, `CHIP_ID`, lamp +
 `EPD_VDD`, leftover input levels). Do not split those across
 downloads. Host-only captures that need no button run in the
-same session. Radio stays default-off until asked; then
-`wifi n=` / `ble n=` (no MAC/BSSID/IRK, no NVS write) ride
-that listen. Sleep (`wake src=` / `sleep rtc=`) is the
-same: default-off until asked. The always-on copy is root `AGENTS.md`
+same session. Packed listen-only radio (`wifi n=` / `ble n=`,
+no MAC/BSSID/IRK, no NVS write) stays ask-first; then those
+counts ride that listen. The landing `embassy-debug` image
+already defaults `--features radio` for BLE pairing + Wi-Fi
+survey / SoftAP cards (idle until touch). Sleep
+(`wake src=` / `sleep rtc=`) is the same ask-first rule for
+packed probes. The always-on copy is root `AGENTS.md`
 (**Pack one flash**).
 
 Implemented is not proven. Read the

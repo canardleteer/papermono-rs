@@ -28,10 +28,18 @@ simple-debug: ble n=4
 simple-debug: charge vbat=3921 vin=5080 src=05 chg_en=1 ip=1 then=0
 simple-debug: snowflake us=450
 simple-debug: pair pin=123456
+simple-debug: wifi_survey count=10 ch1=2 ch6=5 ch11=2 other=1
+simple-debug: wifi_ap state=active ssid=PaperMono-AP pass=mono2026 ip=192.168.4.1
+simple-debug: wifi_http req=1 path=/ src=192.168.4.2
 ```
 
 `hello image=` is `simple-debug` or `embassy-debug`. Split glued
 CDC lines on `simple-debug:` as well as newline.
+
+`Scene` carousel (embassy-debug buttons A/B): `splash` →
+`shapes` → `legend` → `bluetooth` → `wifi_survey` → `wifi_ap` →
+`tones` → `targets`. SoftAP CDC may include the fixed demo
+SSID/password; do not add foreign MAC/BSSID/IRK fields.
 
 `hello` / `git` / `gpio` repeat every 10 s so a late CDC attach
 still sees identity. Heartbeat is 1 Hz. Edges are 50 ms polls.

@@ -184,7 +184,7 @@ async fn main(spawner: Spawner) -> ! {
     #[cfg(feature = "radio")]
     {
         spawner.spawn(radio::ble_run(peripherals.BT).unwrap());
-        spawner.spawn(radio::wifi_run(peripherals.WIFI).unwrap());
+        radio::init_wifi(peripherals.WIFI, spawner);
     }
 
     // Capture boot identification metadata for telemetry.

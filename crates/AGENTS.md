@@ -6,7 +6,7 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 
 | Path | SKU | Role |
 | --- | --- | --- |
-| `papermono-log/` | — | Host-tested USB-Serial/JTAG lines for `simple-debug-fw` and `embassy-debug-fw` |
+| `papermono-log/` | — | Host-tested USB-Serial/JTAG lines for `simple-debug-fw` and `embassy-debug-fw`. Scene carousel includes `wifi_survey` / `wifi_ap`; line kinds `wifi_survey` / `wifi_ap` / `wifi_http` |
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
 | `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |

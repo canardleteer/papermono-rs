@@ -24,7 +24,7 @@ excludes `simple-debug-fw` and `embassy-debug-fw`.
 | Path | Stack | First SKU | Status |
 | --- | --- | --- | --- |
 | `simple-debug/` | blocking `esp-hal` | Lite (`m5stack-papermono-lite`) | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
-| `embassy-debug/` | `esp-hal` + Embassy | Lite (`m5stack-papermono-lite`) | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep` + `radio`. `mic` opt-in. Six OTP cards, no LUT |
+| `embassy-debug/` | `esp-hal` + Embassy | Lite (`m5stack-papermono-lite`) | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep` + `radio`. `mic` opt-in. Eight OTP cards (BLE + Wi-Fi survey/SoftAP), no LUT |
 
 `esp-idf-hal` remains a valid stack (hardware skill `rust.md`); it
 is not a first image. Default images depend on
@@ -115,8 +115,14 @@ Speed** catalog only (PaperMono lab, reference only). Not a
 timeout and not a `0x22` map.
 
 embassy-debug: tones use `GrayFull`. Splash / shapes /
-legend use `paint_mono_fast` (`MonoFull` then `Partial`).
-Target enter uses `enter_mono` (`MonoFull`). Marks use
-`Partial`. After `PARTIALS_BEFORE_FULL` (6) partials, the
-next mono path is `MonoFull`. Deep sleep after each
-refresh; hardware reset to wake. No `otp_fast` stamp.
+legend / bluetooth / wifi_survey / wifi_ap use
+`paint_mono_fast` (`MonoFull` then `Partial`). Same-card
+Legend / Bluetooth / Wi-Fi status redraws pass `soft =
+true` so they stay on `Partial` even after the budget
+(avoids flashing `MonoFull` on every PIN / client /
+survey update). Card navigation passes `soft = false` and
+still takes `MonoFull` when `PARTIALS_BEFORE_FULL` (6) is
+due. Target enter uses `enter_mono` (`MonoFull`). Marks use
+`Partial`. Deep sleep after each refresh; hardware reset to
+wake. No `otp_fast` stamp. Soft-refresh contract:
+[display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md).

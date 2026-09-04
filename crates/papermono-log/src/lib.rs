@@ -91,6 +91,15 @@ pub const SNOWFLAKE_CAPACITY: usize = 48;
 /// Bytes reserved for a BLE pairing line (`pair pin=123456`).
 pub const PAIR_CAPACITY: usize = 64;
 
+/// Bytes reserved for a Wi-Fi channel survey line (`wifi_survey count=...`).
+pub const WIFI_SURVEY_CAPACITY: usize = 96;
+
+/// Bytes reserved for a Wi-Fi SoftAP line (`wifi_ap state=...`).
+pub const WIFI_AP_CAPACITY: usize = 96;
+
+/// Bytes reserved for a Wi-Fi HTTP line (`wifi_http req=...`).
+pub const WIFI_HTTP_CAPACITY: usize = 96;
+
 /// How long BUTTON A must stay low to dump PCM (page-prev is a tap).
 pub const BUTTON_HOLD_PCM_MS: u32 = 1_000;
 
@@ -301,6 +310,10 @@ pub enum Scene {
     Legend,
     /// BLE peripheral pairing card with 6-digit passkey display and status.
     Bluetooth,
+    /// 2.4 GHz channel survey with AP counts and channel histogram.
+    WifiSurvey,
+    /// WPA2-Personal SoftAP with embedded JSON status web server.
+    WifiAp,
     /// Four OTP gray boxes.
     Tones,
     /// Dots + midline slides + mono-full white clear.
@@ -309,11 +322,13 @@ pub enum Scene {
 
 impl Scene {
     /// Walk order for BUTTON B (next).
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::Splash,
         Self::Shapes,
         Self::Legend,
         Self::Bluetooth,
+        Self::WifiSurvey,
+        Self::WifiAp,
         Self::Tones,
         Self::Targets,
     ];
@@ -326,6 +341,8 @@ impl Scene {
             Self::Shapes => "shapes",
             Self::Legend => "legend",
             Self::Bluetooth => "bluetooth",
+            Self::WifiSurvey => "wifi_survey",
+            Self::WifiAp => "wifi_ap",
             Self::Tones => "tones",
             Self::Targets => "targets",
         }
@@ -338,7 +355,9 @@ impl Scene {
             Self::Splash => Self::Shapes,
             Self::Shapes => Self::Legend,
             Self::Legend => Self::Bluetooth,
-            Self::Bluetooth => Self::Tones,
+            Self::Bluetooth => Self::WifiSurvey,
+            Self::WifiSurvey => Self::WifiAp,
+            Self::WifiAp => Self::Tones,
             Self::Tones => Self::Targets,
             Self::Targets => Self::Splash,
         }
@@ -352,7 +371,9 @@ impl Scene {
             Self::Shapes => Self::Splash,
             Self::Legend => Self::Shapes,
             Self::Bluetooth => Self::Legend,
-            Self::Tones => Self::Bluetooth,
+            Self::WifiSurvey => Self::Bluetooth,
+            Self::WifiAp => Self::WifiSurvey,
+            Self::Tones => Self::WifiAp,
             Self::Targets => Self::Tones,
         }
     }
@@ -771,6 +792,28 @@ pub fn format_pair_state<'a>(state: &str, buf: &'a mut [u8]) -> Result<&'a str, 
     write_into(buf, format_args!("{}: pair state={state}", LOG_PREFIX))
 }
 
+/// Writes `simple-debug: wifi_survey <summary>` without a trailing newline.
+pub fn format_wifi_survey<'a>(summary: &str, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
+    write_into(buf, format_args!("{}: wifi_survey {summary}", LOG_PREFIX))
+}
+
+/// Writes `simple-debug: wifi_ap <event>` without a trailing newline.
+pub fn format_wifi_ap<'a>(event: &str, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
+    write_into(buf, format_args!("{}: wifi_ap {event}", LOG_PREFIX))
+}
+
+/// Writes `simple-debug: wifi_http req=<req> path=<path>` without a trailing newline.
+pub fn format_wifi_http<'a>(
+    req: u32,
+    path: &str,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!("{}: wifi_http req={req} path={path}", LOG_PREFIX),
+    )
+}
+
 /// Writes a panel stamp without a trailing newline.
 pub fn format_panel<'a>(stamp: &PanelStamp, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
     write_into(
@@ -1136,20 +1179,26 @@ mod tests {
         assert_eq!(Scene::Splash.next(), Scene::Shapes);
         assert_eq!(Scene::Shapes.next(), Scene::Legend);
         assert_eq!(Scene::Legend.next(), Scene::Bluetooth);
-        assert_eq!(Scene::Bluetooth.next(), Scene::Tones);
+        assert_eq!(Scene::Bluetooth.next(), Scene::WifiSurvey);
+        assert_eq!(Scene::WifiSurvey.next(), Scene::WifiAp);
+        assert_eq!(Scene::WifiAp.next(), Scene::Tones);
         assert_eq!(Scene::Tones.next(), Scene::Targets);
         assert_eq!(Scene::Targets.next(), Scene::Splash);
         assert_eq!(Scene::Splash.prev(), Scene::Targets);
         assert_eq!(Scene::Targets.prev(), Scene::Tones);
-        assert_eq!(Scene::Tones.prev(), Scene::Bluetooth);
+        assert_eq!(Scene::Tones.prev(), Scene::WifiAp);
+        assert_eq!(Scene::WifiAp.prev(), Scene::WifiSurvey);
+        assert_eq!(Scene::WifiSurvey.prev(), Scene::Bluetooth);
         assert_eq!(Scene::Bluetooth.prev(), Scene::Legend);
         assert!(Scene::Tones.uses_gray());
         assert!(!Scene::Splash.uses_gray());
         assert!(!Scene::Legend.uses_gray());
         assert!(!Scene::Bluetooth.uses_gray());
+        assert!(!Scene::WifiSurvey.uses_gray());
+        assert!(!Scene::WifiAp.uses_gray());
         assert!(!Scene::Shapes.uses_gray());
         assert!(!Scene::Targets.uses_gray());
-        assert_eq!(Scene::ALL.len(), 6);
+        assert_eq!(Scene::ALL.len(), 8);
         let mut buf = [0u8; SCENE_CAPACITY];
         assert_eq!(
             format_scene(Scene::Splash, &mut buf).unwrap(),
@@ -1158,6 +1207,14 @@ mod tests {
         assert_eq!(
             format_scene(Scene::Bluetooth, &mut buf).unwrap(),
             "simple-debug: scene=bluetooth"
+        );
+        assert_eq!(
+            format_scene(Scene::WifiSurvey, &mut buf).unwrap(),
+            "simple-debug: scene=wifi_survey"
+        );
+        assert_eq!(
+            format_scene(Scene::WifiAp, &mut buf).unwrap(),
+            "simple-debug: scene=wifi_ap"
         );
         let mut lamp = [0u8; LAMP_CAPACITY];
         assert_eq!(
@@ -1186,6 +1243,21 @@ mod tests {
         assert_eq!(
             format_pair_state("connected", &mut pair).unwrap(),
             "simple-debug: pair state=connected"
+        );
+        let mut survey_buf = [0u8; WIFI_SURVEY_CAPACITY];
+        assert_eq!(
+            format_wifi_survey("count=5", &mut survey_buf).unwrap(),
+            "simple-debug: wifi_survey count=5"
+        );
+        let mut ap_buf = [0u8; WIFI_AP_CAPACITY];
+        assert_eq!(
+            format_wifi_ap("state=active", &mut ap_buf).unwrap(),
+            "simple-debug: wifi_ap state=active"
+        );
+        let mut http_buf = [0u8; WIFI_HTTP_CAPACITY];
+        assert_eq!(
+            format_wifi_http(1, "/", &mut http_buf).unwrap(),
+            "simple-debug: wifi_http req=1 path=/"
         );
         assert_eq!(BUTTON_HOLD_PCM_MS, 1_000);
     }

@@ -15,7 +15,9 @@ On the unit:
 - BUTTON A previous card, BUTTON B next. The walk is splash →
   shapes (procedural 3-degree Koch snowflake benchmark) →
   legend (pinout, touch rails, sleep/wake instructions) →
-  four-gray tones → touch targets.
+  bluetooth (BLE passkey pairing) → wifi survey (channel scan) →
+  wifi hotspot (WPA2 SoftAP + JSON HTTP) → four-gray tones →
+  touch targets.
 - Slide the right edge for the lamp (top bright, USB-C dim).
 - Hold BUTTON A about 2 s to enter low-power sleep; hold BUTTON A
   or B about 1 s to wake up.
@@ -88,8 +90,12 @@ Short-press BUTTON B. The glass should walk splash → shapes (procedural
 3-degree Koch snowflake with on-screen and CDC microsecond benchmark) →
 legend (pinout, touch rails, sleep/wake instructions, and live battery gauge
 with 60 s auto-refresh) → bluetooth (BLE peripheral pairing with 6-digit PIN
-passkey and success/fail status) → tones → targets, then wrap. BUTTON A
-walks the other way. CDC prints `scene=` and `snowflake us=`.
+passkey and success/fail status) → wifi survey (tap `[ START SURVEY ]` for
+2.4 GHz channel occupancy) → wifi hotspot (tap `[ START HOTSPOT ]` for
+SSID `PaperMono-AP`, password `mono2026`, URL `http://192.168.4.1/`) →
+tones → targets, then wrap. Survey and hotspot cannot run together:
+starting one stops the other. BUTTON A walks the other way. CDC prints
+`scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`, and `wifi_http`.
 
 ### Step 5: Slide the lamp
 

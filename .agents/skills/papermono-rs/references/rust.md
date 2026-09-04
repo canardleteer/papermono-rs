@@ -92,3 +92,16 @@ offsets or 32 MB geometry.
 | M5PM1 | `m5pm1` | PWM0 is G3. PWM1 is unused on this SKU |
 | M5IOE1 | `m5ioe1` | Board `0x4F`. Park IP2315 on `PYG11` |
 | CDC lines | `papermono-log` | Host-tested grammar for both images |
+
+## Wi-Fi / BLE in embassy-debug
+
+Landing image defaults `--features radio`. Cards: BLE
+passkey (`PaperMono`), Wi-Fi channel survey, WPA2 SoftAP
+(`PaperMono-AP` / `mono2026`, `192.168.4.1`, DHCP + JSON
+HTTP). Survey ↔ SoftAP mutually exclusive. Soft status
+redraws use OTP Partial past the usual budget; card change
+still honors `PARTIALS_BEFORE_FULL`. Agent workflows:
+[firmware/embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md).
+Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
+(**Radio**). Silicon: hardware
+[measure.md](../../m5stack-papermono-hardware/references/measure.md).

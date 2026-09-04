@@ -250,3 +250,30 @@ pub fn pair_state(state: &str) {
         emit(line);
     }
 }
+
+/// Emits Wi-Fi channel survey report.
+#[cfg(feature = "radio")]
+pub fn wifi_survey(summary: &str) {
+    let mut buf = [0u8; papermono_log::WIFI_SURVEY_CAPACITY];
+    if let Ok(line) = papermono_log::format_wifi_survey(summary, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits Wi-Fi SoftAP event.
+#[cfg(feature = "radio")]
+pub fn wifi_ap(event: &str) {
+    let mut buf = [0u8; papermono_log::WIFI_AP_CAPACITY];
+    if let Ok(line) = papermono_log::format_wifi_ap(event, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits Wi-Fi HTTP request log.
+#[cfg(feature = "radio")]
+pub fn wifi_http(req: u32, path: &str) {
+    let mut buf = [0u8; papermono_log::WIFI_HTTP_CAPACITY];
+    if let Ok(line) = papermono_log::format_wifi_http(req, path, &mut buf) {
+        emit(line);
+    }
+}

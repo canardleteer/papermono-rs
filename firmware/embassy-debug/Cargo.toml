@@ -20,13 +20,20 @@ mic = ["touch"]
 panel = ["touch"]
 # Interactive button sleep & wake: Button A hold 2 s to sleep, 1 s A/B hold to wake.
 sleep = ["touch", "panel"]
-# Scan counts only (`wifi n=` / `ble n=`). Default off.
+# BLE pairing + Wi-Fi survey / SoftAP cards (+ optional wifi/ble counts).
+# Landing default-on; survey and SoftAP stay idle until touch. No NVS.
+# No foreign MAC/BSSID/IRK on CDC. SoftAP prints fixed demo SSID/pass only.
 radio = [
   "dep:esp-alloc",
   "dep:esp-radio",
   "dep:embassy-futures",
   "dep:trouble-host",
   "dep:bt-hci",
+  "dep:embassy-net",
+  "dep:edge-dhcp",
+  "dep:edge-nal",
+  "dep:edge-nal-embassy",
+  "dep:embedded-io-async",
   "esp-rtos/esp-radio",
   "esp-rtos/esp-alloc",
 ]
@@ -78,6 +85,16 @@ trouble-host = { version = "0.7.0", optional = true, default-features = false, f
   "central",
 ] }
 bt-hci = { version = "0.9.0", optional = true }
+embassy-net = { version = "0.9.0", optional = true, features = [
+  "dhcpv4",
+  "medium-ethernet",
+  "tcp",
+  "udp",
+] }
+edge-dhcp = { version = "0.8.0", optional = true }
+edge-nal = { version = "0.7.0", optional = true }
+edge-nal-embassy = { version = "0.9.0", optional = true }
+embedded-io-async = { version = "0.7", optional = true }
 
 m5stack-papermono-lite = { path = "../../crates/m5stack-papermono-lite" }
 papermono-log = { path = "../../crates/papermono-log" }

@@ -52,19 +52,30 @@ IP2315 crates.
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |
 | [`papermono-log`](../crates/papermono-log) | CDC line format for **both** `simple-debug-fw` and `embassy-debug-fw` |
 
-## Radio (default off)
+## Radio
 
-Do not enable these in firmware until a human asks for a radio
-image. No NVS writes. No MAC / BSSID / IRK in CDC.
-[nyc-wifi-ble](not-yet-confirmed.md#nyc-wifi-ble).
+`embassy-debug-fw` lands with `--features radio` **on**
+(BLE pairing card + Wi-Fi survey / SoftAP cards). Survey and
+SoftAP stay **idle until touch**. Packed listen-only
+`wifi n=` / `ble n=` counts still wait for an explicit human
+ask (root **Pack one flash**). No NVS writes. No foreign
+MAC / BSSID / IRK in CDC. SoftAP CDC may print the fixed
+demo SSID / password (`PaperMono-AP` / `mono2026`). Survey
+glass may show truncated nearby SSIDs; do not echo those on
+CDC. [nyc-wifi-ble](not-yet-confirmed.md#nyc-wifi-ble).
 
-| Crate | Later use |
+| Crate | Use |
 | --- | --- |
-| `esp-radio` (esp-hal git tag, same as the images) | `embassy-debug-fw --features radio` (`wifi` + `ble` + `coex`) |
-| [`trouble-host`](https://crates.io/crates/trouble-host) 0.7 / [`bt-hci`](https://crates.io/crates/bt-hci) | BLE scan count. Do not print addresses |
+| `esp-radio` (esp-hal git tag, same as the images) | `wifi` + `ble` + `coex`. WPA2 SoftAP only: precompiled ESP32-S3 blob does not enable WPA3/SAE |
+| [`trouble-host`](https://crates.io/crates/trouble-host) 0.7 / [`bt-hci`](https://crates.io/crates/bt-hci) | BLE peripheral passkey pairing (and listen-only scan counts). No addresses on CDC |
+| [`embassy-net`](https://crates.io/crates/embassy-net) 0.9 | SoftAP IPv4 stack (`192.168.4.1/24`) |
+| [`edge-dhcp`](https://crates.io/crates/edge-dhcp) 0.8 / [`edge-nal`](https://crates.io/crates/edge-nal) / [`edge-nal-embassy`](https://crates.io/crates/edge-nal-embassy) | DHCP server + tiny HTTP JSON on port 80 |
 
-Official HTML advertises 2.4 GHz Wi-Fi only. Silicon BLE in
-board-info does not close the NYC item.
+Survey and SoftAP are mutually exclusive in firmware (one
+Wi-Fi mode at a time). Official HTML advertises 2.4 GHz
+Wi-Fi; silicon BLE in board-info does not close the NYC
+item alone. Lite SoftAP host-verified 2026-09-04:
+[measure.md](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## Infrastructure
 

@@ -215,15 +215,29 @@ impl Panel {
         self.partials = 0;
     }
 
-    /// Renders a monochromatic frame using fast partial updates when a valid baseline exists.
+    /// Renders a monochromatic frame using OTP waveforms.
+    ///
+    /// - When no mono baseline exists (`mono_ready` is false), always runs
+    ///   [`Self::refresh_mono_full`].
+    /// - When `soft` is true (same-card status/telemetry redraw: Bluetooth PIN,
+    ///   Wi-Fi survey/hotspot counters, Legend battery), prefers
+    ///   [`Self::refresh_partial_official`] even after the partial budget so a
+    ///   black-and-white→black-and-white update does not flash a full mono wipe.
+    ///   The next non-soft paint (card navigation) still takes a mono full refresh once
+    ///   [`PARTIALS_BEFORE_FULL`] is reached, preserving the DC-balance contract.
+    /// - When `soft` is false (card change), runs a full mono refresh after
+    ///   [`PARTIALS_BEFORE_FULL`] partials since the last full.
     pub async fn paint_mono_fast(
         &mut self,
         i2c: &mut SysI2c,
         bw: &[u8],
         red: &[u8],
         busy: &Input<'static>,
+        soft: bool,
     ) {
-        if !self.mono_ready {
+        let budget_exhausted =
+            PARTIALS_BEFORE_FULL > 0 && self.partials >= PARTIALS_BEFORE_FULL;
+        if !self.mono_ready || (!soft && budget_exhausted) {
             self.refresh_mono_full(i2c, Some((bw, red)), busy).await;
             return;
         }
@@ -390,10 +404,11 @@ impl Panel {
     }
 
     fn note_partial(&mut self) {
+        // Count partials toward the DC-balance full-refresh budget. Clearing
+        // `mono_ready` is deferred to [`Self::paint_mono_fast`] for non-soft
+        // paints so live Bluetooth / Wi-Fi / Legend status redraws can stay on
+        // OTP Partial instead of flashing MonoFull mid-card.
         self.partials = self.partials.saturating_add(1);
-        if PARTIALS_BEFORE_FULL > 0 && self.partials >= PARTIALS_BEFORE_FULL {
-            self.mono_ready = false;
-        }
     }
 }
 

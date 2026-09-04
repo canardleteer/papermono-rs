@@ -1,10 +1,10 @@
-//! Six-card interactive UI state machine and navigation controller.
+//! Eight-card interactive UI state machine and navigation controller.
 //!
 //! # Architecture & Navigation Model
 //! This module coordinates the high-level interactive user experience:
 //!
-//! - **Six-Card Finite State Machine**: Cycles sequentially through the UI scenes:
-//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Bluetooth` ↔ `Tones` ↔ `Targets`.
+//! - **Eight-Card Finite State Machine**: Cycles sequentially through the UI scenes:
+//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Bluetooth` ↔ `WifiSurvey` ↔ `WifiAp` ↔ `Tones` ↔ `Targets`.
 //! - **Physical Button Controls**:
 //!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>2 s)
 //!     triggers low-power sleep; long press (~1 s) triggers an audio recording / tone test
@@ -21,6 +21,17 @@
 //!   - When stationary on the `Bluetooth` card, any pairing state transition (e.g. phone
 //!     connection, passkey display, pairing success, or failure) immediately triggers a fast
 //!     monochromatic refresh to update the PIN and status on screen.
+//! - **Interactive On-Screen Touch Buttons**:
+//!   - On `WifiSurvey`, tapping `[ START SURVEY ]` / `[ STOP SURVEY ]` triggers or halts 2.4 GHz channel scanning.
+//!   - On `WifiAp`, tapping `[ START HOTSPOT ]` / `[ STOP HOTSPOT ]` activates or disables the WPA2-Personal AP.
+//! - **Dynamic Wi-Fi Telemetry Refresh**:
+//!   - When stationary on `WifiSurvey` or `WifiAp`, any state transition (scan completion, client connection,
+//!     or HTTP GET request) immediately triggers a fast refresh to update the display.
+//! - **Soft same-card redraws**: Bluetooth, Wi-Fi survey/hotspot, and Legend
+//!   status updates reuse OTP Partial when a mono baseline exists, even after
+//!   the usual partial budget, so PIN / AP / battery telemetry does not flash a
+//!   full mono wipe. Card navigation still takes `MonoFull` once the budget is
+//!   reached (DC-balance).
 //! - **Zero Heap Allocation**: Framebuffers are statically allocated using
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
@@ -95,15 +106,23 @@ pub async fn run(
 
     let planes = PLANES.take();
     let mut scene = Scene::Splash;
+    let mut last_painted: Option<Scene> = None;
     let mut lamp = LampSlide::new();
     loop {
-        let drawn_ble_rev = paint(&mut i2c, &mut panel, &busy, scene, planes).await;
+        let soft = last_painted == Some(scene) && scene_allows_soft_refresh(scene);
+        let drawn_revs = paint(&mut i2c, &mut panel, &busy, scene, planes, soft).await;
+        last_painted = Some(scene);
         if scene == Scene::Targets {
             panel.enter_mono(&mut i2c, &busy).await;
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
-                    if let Some(nav) =
-                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None, None).await
+                    let ctx = NavContext {
+                        scene,
+                        auto_refresh_ms: None,
+                        ble_watch_rev: None,
+                        wifi_watch_rev: None,
+                    };
+                    if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx).await
                     {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
@@ -125,18 +144,16 @@ pub async fn run(
             }
         } else {
             let auto_refresh_ms = (scene == Scene::Legend).then_some(LEGEND_AUTO_REFRESH_MS);
-            let ble_watch_rev = (scene == Scene::Bluetooth).then_some(drawn_ble_rev);
-            if let Some(nav) = wait_nav(
-                &mut i2c,
-                &btn_a,
-                &btn_b,
-                &tp,
-                &mut lamp,
+            let ble_watch_rev = (scene == Scene::Bluetooth).then_some(drawn_revs.ble);
+            let wifi_watch_rev =
+                (scene == Scene::WifiSurvey || scene == Scene::WifiAp).then_some(drawn_revs.wifi);
+            let ctx = NavContext {
+                scene,
                 auto_refresh_ms,
                 ble_watch_rev,
-            )
-            .await
-            {
+                wifi_watch_rev,
+            };
+            if let Some(nav) = wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx).await {
                 match nav {
                     Nav::Prev => scene = scene.prev(),
                     Nav::Next => scene = scene.next(),
@@ -154,22 +171,53 @@ pub async fn run(
     }
 }
 
+/// Contextual configuration and dynamic telemetry watch revisions for card navigation polling.
+struct NavContext {
+    scene: Scene,
+    auto_refresh_ms: Option<u32>,
+    ble_watch_rev: Option<u32>,
+    wifi_watch_rev: Option<u32>,
+}
+
+/// State revision snapshot observed before rendering begins, tracking asynchronous radio events.
+struct DrawnRevs {
+    ble: u32,
+    wifi: u32,
+}
+
+/// Same-card telemetry scenes that should stay on OTP Partial for live redraws.
+const fn scene_allows_soft_refresh(scene: Scene) -> bool {
+    matches!(
+        scene,
+        Scene::Legend | Scene::Bluetooth | Scene::WifiSurvey | Scene::WifiAp
+    )
+}
+
 /// Renders a card into framebuffers and triggers an e-paper refresh waveform.
 ///
-/// Returns the BLE state revision observed before rendering began, allowing
-/// caller tasks to detect if asynchronous BLE events arrived during the panel refresh.
+/// Returns the BLE and Wi-Fi state revisions observed before rendering began, allowing
+/// caller tasks to detect if asynchronous radio events arrived during the panel refresh.
+///
+/// When `soft` is true (same-card Bluetooth / Wi-Fi / Legend status update), the mono
+/// path prefers OTP Partial even after the usual partial budget so a black-and-white
+/// redraw does not flash `MonoFull`. Card navigation passes `soft = false`.
 async fn paint(
     i2c: &mut SysI2c,
     panel: &mut Panel,
     busy: &Input<'static>,
     scene: Scene,
     planes: &mut Planes,
-) -> u32 {
+    soft: bool,
+) -> DrawnRevs {
     let ble_rev = crate::radio::state_rev();
+    let wifi_rev = crate::radio::wifi_state_rev();
     share::store_scene(scene);
     cdc::scene(scene);
     if scene == Scene::Targets {
-        return ble_rev;
+        return DrawnRevs {
+            ble: ble_rev,
+            wifi: wifi_rev,
+        };
     }
     let charge = if scene == Scene::Legend {
         Some(touch_bus::refresh_battery(i2c))
@@ -183,13 +231,16 @@ async fn paint(
         panel.paint_gray(i2c, &planes.bw, &planes.red, busy).await;
     } else {
         panel
-            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
+            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, soft)
             .await;
     }
-    ble_rev
+    DrawnRevs {
+        ble: ble_rev,
+        wifi: wifi_rev,
+    }
 }
 
-/// Waits for tactile button presses, right-edge touch slider gestures, auto-refresh timeouts, or BLE state changes.
+/// Waits for tactile button presses, right-edge touch slider gestures, auto-refresh timeouts, BLE/Wi-Fi state changes, or on-screen touch buttons.
 ///
 /// # Parameters
 /// - `i2c`: System I2C bus driver for sampling the FT6336G capacitive touch controller.
@@ -197,35 +248,40 @@ async fn paint(
 /// - `btn_b`: Input pin driver for Button B (`GPIO3` / DOWN).
 /// - `tp`: Touch interrupt line (`GPIO4` / `TOUCH_INT`).
 /// - `lamp`: Frontlight slider tracker updating M5PM1 PWM0 duty from capacitive Y coordinates.
-/// - `auto_refresh_ms`: Optional timeout triggering periodic automatic card refresh (e.g. 60 s for battery).
-/// - `ble_watch_rev`: When `Some(rev)`, monitors [`crate::radio::state_rev()`]. If the current BLE
-///   revision differs from `rev` (including transitions that arrived while `paint` was busy refreshing
-///   the e-paper glass), returns [`Some(Nav::Refresh)`] immediately to repaint without delay.
+/// - `ctx`: Polling context holding scene and watched telemetry revisions.
 ///
 /// # Returns
 /// - `Some(Nav::Prev)` on short press of Button A.
 /// - `Some(Nav::Next)` on short press of Button B.
 /// - `Some(Nav::Sleep)` on 2-second hold of Button A (when `sleep` feature is active).
-/// - `Some(Nav::Refresh)` on auto-refresh timeout or BLE status revision change.
+/// - `Some(Nav::Refresh)` on auto-refresh timeout, BLE/Wi-Fi status revision change, or touch button toggle.
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
     lamp: &mut LampSlide,
-    auto_refresh_ms: Option<u32>,
-    ble_watch_rev: Option<u32>,
+    ctx: NavContext,
 ) -> Option<Nav> {
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
     let mut a_down: Option<Instant> = None;
     let mut a_held = false;
     let mut t_ms = 0_u32;
+    let mut button_touch_down = false;
     loop {
         // If a BLE state transition occurred (before wait_nav began, during paint, or during this loop),
         // refresh immediately so the e-paper glass reflects the new pairing status without delay.
-        if let Some(rev) = ble_watch_rev {
+        if let Some(rev) = ctx.ble_watch_rev {
             if crate::radio::state_rev() != rev {
+                return Some(Nav::Refresh);
+            }
+        }
+
+        // If a Wi-Fi state transition occurred (before wait_nav began, during paint, or during this loop),
+        // refresh immediately so the e-paper glass reflects the new Wi-Fi telemetry without delay.
+        if let Some(rev) = ctx.wifi_watch_rev {
+            if crate::radio::wifi_state_rev() != rev {
                 return Some(Nav::Refresh);
             }
         }
@@ -282,7 +338,7 @@ async fn wait_nav(
         }
         prev_b = now_b;
 
-        // Poll touch digitizer for right-gutter frontlight brightness slider.
+        // Poll touch digitizer for right-gutter frontlight brightness slider and on-screen buttons.
         let int_high = tp.is_high();
         let sample = touch_bus::read_points(i2c, int_high, true);
         if sample.n >= 1 {
@@ -290,8 +346,40 @@ async fn wait_nav(
         }
         let _ = lamp.feed(i2c, &sample);
 
+        // Detect touch tap inside on-screen action button (x: 50..430, y: 650..740)
+        let in_button =
+            sample.n >= 1 && (50..=430).contains(&sample.x) && (650..=740).contains(&sample.y);
+        if in_button {
+            if !button_touch_down {
+                button_touch_down = true;
+                match ctx.scene {
+                    Scene::WifiSurvey => {
+                        let mode = crate::radio::wifi_mode();
+                        if mode == crate::radio::WifiMode::SurveyScanning {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
+                        } else {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StartSurvey);
+                        }
+                        return Some(Nav::Refresh);
+                    }
+                    Scene::WifiAp => {
+                        let ap_status = crate::radio::wifi_ap_status();
+                        if ap_status.active {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopHotspot);
+                        } else {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StartHotspot);
+                        }
+                        return Some(Nav::Refresh);
+                    }
+                    _ => {}
+                }
+            }
+        } else if sample.n == 0 {
+            button_touch_down = false;
+        }
+
         t_ms = t_ms.saturating_add(NAV_POLL_MS);
-        if let Some(timeout) = auto_refresh_ms {
+        if let Some(timeout) = ctx.auto_refresh_ms {
             if t_ms >= timeout {
                 return Some(Nav::Refresh);
             }
@@ -314,7 +402,7 @@ async fn enter_sleep(
     // 1. Draw and paint the sleep notice to the e-paper panel.
     draw::draw_sleeping(&mut planes.bw, &mut planes.red);
     panel
-        .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
+        .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, false)
         .await;
 
     // 2. Wait until Button A (and Button B) are fully released before arming sleep.
