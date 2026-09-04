@@ -92,6 +92,19 @@ unless they asked (those need eyes, a card, or parked
 pins). Do not init NFC or LoRa on Lite. Recipes:
 [not-yet-confirmed.md](docs/not-yet-confirmed.md).
 
+## Bluetooth testing options
+
+When testing Bluetooth pairing in firmware (such as `embassy-debug-fw`),
+always offer the human the option to test with their own personal
+devices (e.g., smartphone). If the host environment has an available,
+unblocked Bluetooth controller (e.g., via BlueZ `bluetoothctl`), agents
+may also offer an automated host self-diagnostic workflow: initiating
+pairing via host Bluetooth, extracting the generated PIN from the active
+CDC stream (`pair pin=`), submitting it to complete authentication, and
+asking the human to visually confirm that the identical PIN was rendered
+on the e-paper panel. This host-driven pathway enables fast agent
+self-diagnostics while preserving manual testing flexibility.
+
 ## Keep skills updated
 
 Project-local skills must stay aligned with the tree. When you

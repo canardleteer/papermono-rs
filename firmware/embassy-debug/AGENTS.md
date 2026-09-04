@@ -13,20 +13,20 @@ Same CDC prefix as Path A (`simple-debug:`). Identity is
 `hello image=embassy-debug`. Host-tested lines live in
 `crates/papermono-log`.
 
-Landing image: **`touch` + `panel` + `sleep`** (Ferris, cards, lamp, sleep).
-`mic` / `radio` are opt-in. `simple-debug-fw` stays
-featureless.
+Landing image: **`touch` + `panel` + `sleep` + `radio`** (Ferris,
+cards, lamp, sleep, BLE pairing). `mic` is opt-in.
+`simple-debug-fw` stays featureless.
 
 | Feature | Default | Role |
 | --- | --- | --- |
 | (none) | — | Async 50 ms poll, 1 Hz `hb`, 10 s `hello`/`git`/`gpio` |
 | `touch` | on | I2C roster, park IP2315, FT rails, gated `charge` |
-| `panel` | on | Five-card OTP walk + PWM0 lamp |
+| `panel` | on | Six-card OTP walk + PWM0 lamp |
 | `mic` | **off** | PDM energy + hold-A PCM dump |
-| `radio` | off | `wifi n=` / `ble n=` only. No MAC/BSSID/IRK. No NVS |
+| `radio` | on | BLE peripheral pairing card + wifi/ble counts. No MAC/BSSID/IRK. No NVS |
 | `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
 
-`mic` and `panel` depend on `touch` (expander). `sleep` depends on `panel`.
+`mic`, `panel`, and `sleep` depend on `touch` (expander). `sleep` depends on `panel`.
 
 ```shell
 cargo xtask build-fw embassy-debug
@@ -85,6 +85,34 @@ cargo xtask build-fw embassy-debug
 
 Parent contract: [AGENTS.md](../AGENTS.md). Live-ask:
 root [AGENTS.md](../../AGENTS.md).
+
+## Bluetooth pairing verification workflow
+
+When testing the `bluetooth` card pairing functionality, two
+verification pathways are supported:
+
+1. **Manual external device pairing**: The human navigates to the
+   `bluetooth` card, searches for `PaperMono` from their phone or
+   central device, initiates pairing, reads the 6-digit numeric passkey
+   rendered on the e-paper glass, enters it into the phone, and observes
+   the success banner on the display.
+2. **Host-agent self-diagnostic pairing (faster for agents)**: If the
+   host system has an available, unblocked Bluetooth controller (e.g.
+   via BlueZ `bluetoothctl`), the agent can perform an automated
+   self-diagnostic when explicitly requested by the user:
+   - Monitor the device CDC stream (`cargo xtask monitor`) to capture
+     live pairing events.
+   - Scan and discover `PaperMono` (`F1:33:22:11:42:F5`).
+   - Initiate pairing to provoke the passkey exchange.
+   - Extract the 6-digit passkey from the CDC stream (`pair pin=XXXXXX`).
+   - Submit the extracted PIN to `bluetoothctl` to complete bonding and
+     verify `pair ok`.
+   - Ask the user to visually confirm that the same PIN and success
+     banner appeared on the e-paper glass.
+
+Always offer the human the option to test with their own devices; the
+automated host pathway provides fast, reproducible self-diagnostics when
+available.
 
 ## Firmware examples as tutorial code
 
