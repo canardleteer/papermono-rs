@@ -214,3 +214,39 @@ pub fn panel(stamp: &papermono_log::PanelStamp) {
         emit(line);
     }
 }
+
+/// Emits BLE pairing 6-digit numeric passkey.
+#[cfg(feature = "radio")]
+pub fn pair_pin(pin: u32) {
+    let mut buf = [0u8; papermono_log::PAIR_CAPACITY];
+    if let Ok(line) = papermono_log::format_pair_pin(pin, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits BLE pairing successful completion event.
+#[cfg(feature = "radio")]
+pub fn pair_ok() {
+    let mut buf = [0u8; papermono_log::PAIR_CAPACITY];
+    if let Ok(line) = papermono_log::format_pair_ok(&mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits BLE pairing failure reason event.
+#[cfg(feature = "radio")]
+pub fn pair_fail(why: &str) {
+    let mut buf = [0u8; papermono_log::PAIR_CAPACITY];
+    if let Ok(line) = papermono_log::format_pair_fail(why, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits BLE peripheral state transition event.
+#[cfg(feature = "radio")]
+pub fn pair_state(state: &str) {
+    let mut buf = [0u8; papermono_log::PAIR_CAPACITY];
+    if let Ok(line) = papermono_log::format_pair_state(state, &mut buf) {
+        emit(line);
+    }
+}

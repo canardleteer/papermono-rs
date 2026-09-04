@@ -48,6 +48,8 @@ pub enum LineKind {
     Wake,
     /// Snowflake render benchmark (`snowflake us=`).
     Snowflake,
+    /// BLE pairing event (`pair`).
+    Pair,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -148,6 +150,7 @@ pub fn classify(body: &str) -> LineKind {
         "sleep" => LineKind::Sleep,
         "wake" => LineKind::Wake,
         "snowflake" => LineKind::Snowflake,
+        "pair" => LineKind::Pair,
         _ => LineKind::Unknown,
     }
 }

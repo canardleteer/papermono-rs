@@ -97,13 +97,13 @@ pub async fn run(
     let mut scene = Scene::Splash;
     let mut lamp = LampSlide::new();
     loop {
-        paint(&mut i2c, &mut panel, &busy, scene, planes).await;
+        let drawn_ble_rev = paint(&mut i2c, &mut panel, &busy, scene, planes).await;
         if scene == Scene::Targets {
             panel.enter_mono(&mut i2c, &busy).await;
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
                     if let Some(nav) =
-                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None, false).await
+                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None, None).await
                     {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
@@ -125,7 +125,7 @@ pub async fn run(
             }
         } else {
             let auto_refresh_ms = (scene == Scene::Legend).then_some(LEGEND_AUTO_REFRESH_MS);
-            let watch_ble = scene == Scene::Bluetooth;
+            let ble_watch_rev = (scene == Scene::Bluetooth).then_some(drawn_ble_rev);
             if let Some(nav) = wait_nav(
                 &mut i2c,
                 &btn_a,
@@ -133,7 +133,7 @@ pub async fn run(
                 &tp,
                 &mut lamp,
                 auto_refresh_ms,
-                watch_ble,
+                ble_watch_rev,
             )
             .await
             {
@@ -155,17 +155,21 @@ pub async fn run(
 }
 
 /// Renders a card into framebuffers and triggers an e-paper refresh waveform.
+///
+/// Returns the BLE state revision observed before rendering began, allowing
+/// caller tasks to detect if asynchronous BLE events arrived during the panel refresh.
 async fn paint(
     i2c: &mut SysI2c,
     panel: &mut Panel,
     busy: &Input<'static>,
     scene: Scene,
     planes: &mut Planes,
-) {
+) -> u32 {
+    let ble_rev = crate::radio::state_rev();
     share::store_scene(scene);
     cdc::scene(scene);
     if scene == Scene::Targets {
-        return;
+        return ble_rev;
     }
     let charge = if scene == Scene::Legend {
         Some(touch_bus::refresh_battery(i2c))
@@ -182,6 +186,7 @@ async fn paint(
             .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
             .await;
     }
+    ble_rev
 }
 
 /// Waits for tactile button presses, right-edge touch slider gestures, auto-refresh timeouts, or BLE state changes.
@@ -193,8 +198,9 @@ async fn paint(
 /// - `tp`: Touch interrupt line (`GPIO4` / `TOUCH_INT`).
 /// - `lamp`: Frontlight slider tracker updating M5PM1 PWM0 duty from capacitive Y coordinates.
 /// - `auto_refresh_ms`: Optional timeout triggering periodic automatic card refresh (e.g. 60 s for battery).
-/// - `watch_ble`: When `true`, monitors [`crate::radio::state_rev()`] for BLE pairing state transitions
-///   and returns [`Some(Nav::Refresh)`] immediately to repaint the e-paper glass.
+/// - `ble_watch_rev`: When `Some(rev)`, monitors [`crate::radio::state_rev()`]. If the current BLE
+///   revision differs from `rev` (including transitions that arrived while `paint` was busy refreshing
+///   the e-paper glass), returns [`Some(Nav::Refresh)`] immediately to repaint without delay.
 ///
 /// # Returns
 /// - `Some(Nav::Prev)` on short press of Button A.
@@ -208,15 +214,22 @@ async fn wait_nav(
     tp: &Input<'static>,
     lamp: &mut LampSlide,
     auto_refresh_ms: Option<u32>,
-    watch_ble: bool,
+    ble_watch_rev: Option<u32>,
 ) -> Option<Nav> {
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
     let mut a_down: Option<Instant> = None;
     let mut a_held = false;
     let mut t_ms = 0_u32;
-    let initial_ble_rev = crate::radio::state_rev();
     loop {
+        // If a BLE state transition occurred (before wait_nav began, during paint, or during this loop),
+        // refresh immediately so the e-paper glass reflects the new pairing status without delay.
+        if let Some(rev) = ble_watch_rev {
+            if crate::radio::state_rev() != rev {
+                return Some(Nav::Refresh);
+            }
+        }
+
         let now_a = btn_a.is_high();
         let now_b = btn_b.is_high();
         share::BTN_A.store(now_a, core::sync::atomic::Ordering::Relaxed);
@@ -276,10 +289,6 @@ async fn wait_nav(
             cdc::touch(&sample);
         }
         let _ = lamp.feed(i2c, &sample);
-
-        if watch_ble && crate::radio::state_rev() != initial_ble_rev {
-            return Some(Nav::Refresh);
-        }
 
         t_ms = t_ms.saturating_add(NAV_POLL_MS);
         if let Some(timeout) = auto_refresh_ms {

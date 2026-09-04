@@ -88,6 +88,9 @@ pub const LAMP_CAPACITY: usize = 40;
 /// Bytes reserved for a snowflake render timing line (`snowflake us=12345`).
 pub const SNOWFLAKE_CAPACITY: usize = 48;
 
+/// Bytes reserved for a BLE pairing line (`pair pin=123456`).
+pub const PAIR_CAPACITY: usize = 64;
+
 /// How long BUTTON A must stay low to dump PCM (page-prev is a tap).
 pub const BUTTON_HOLD_PCM_MS: u32 = 1_000;
 
@@ -748,6 +751,26 @@ pub fn format_snowflake(us: u32, buf: &mut [u8]) -> Result<&str, FormatError> {
     write_into(buf, format_args!("{}: snowflake us={us}", LOG_PREFIX))
 }
 
+/// Writes `simple-debug: pair pin=<pin:06>` without a trailing newline.
+pub fn format_pair_pin(pin: u32, buf: &mut [u8]) -> Result<&str, FormatError> {
+    write_into(buf, format_args!("{}: pair pin={pin:06}", LOG_PREFIX))
+}
+
+/// Writes `simple-debug: pair ok` without a trailing newline.
+pub fn format_pair_ok(buf: &mut [u8]) -> Result<&str, FormatError> {
+    write_into(buf, format_args!("{}: pair ok", LOG_PREFIX))
+}
+
+/// Writes `simple-debug: pair fail=<why>` without a trailing newline.
+pub fn format_pair_fail<'a>(why: &str, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
+    write_into(buf, format_args!("{}: pair fail={why}", LOG_PREFIX))
+}
+
+/// Writes `simple-debug: pair state=<state>` without a trailing newline.
+pub fn format_pair_state<'a>(state: &str, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
+    write_into(buf, format_args!("{}: pair state={state}", LOG_PREFIX))
+}
+
 /// Writes a panel stamp without a trailing newline.
 pub fn format_panel<'a>(stamp: &PanelStamp, buf: &'a mut [u8]) -> Result<&'a str, FormatError> {
     write_into(
@@ -1145,6 +1168,24 @@ mod tests {
         assert_eq!(
             format_snowflake(1234, &mut snowflake).unwrap(),
             "simple-debug: snowflake us=1234"
+        );
+        let mut pair = [0u8; PAIR_CAPACITY];
+        assert_eq!(
+            format_pair_pin(123456, &mut pair).unwrap(),
+            "simple-debug: pair pin=123456"
+        );
+        assert_eq!(
+            format_pair_pin(789, &mut pair).unwrap(),
+            "simple-debug: pair pin=000789"
+        );
+        assert_eq!(format_pair_ok(&mut pair).unwrap(), "simple-debug: pair ok");
+        assert_eq!(
+            format_pair_fail("timeout", &mut pair).unwrap(),
+            "simple-debug: pair fail=timeout"
+        );
+        assert_eq!(
+            format_pair_state("connected", &mut pair).unwrap(),
+            "simple-debug: pair state=connected"
         );
         assert_eq!(BUTTON_HOLD_PCM_MS, 1_000);
     }

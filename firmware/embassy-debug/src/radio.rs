@@ -146,26 +146,33 @@ pub fn state_rev() -> u32 {
     BLE_STATE_REV.load(Ordering::Relaxed)
 }
 
-/// Stores a new [`BlePairStatus`] into the shared atomic registers and increments [`BLE_STATE_REV`].
+/// Stores a new [`BlePairStatus`] into the shared atomic registers, emits CDC telemetry, and increments [`BLE_STATE_REV`].
 ///
 /// Updates [`BLE_PAIR_STATUS`] and [`BLE_PAIR_PIN`] using [`Ordering::Relaxed`], followed by
 /// a [`Ordering::Release`] fetch-add on [`BLE_STATE_REV`] to establish a happens-before relationship
-/// for consumer tasks observing revision counter changes.
+/// for consumer tasks observing revision counter changes. Emits wire telemetry via [`cdc`].
 #[cfg(feature = "radio")]
 fn set_pair_status(status: BlePairStatus) {
+    if pair_status() == status {
+        return;
+    }
     match status {
         BlePairStatus::Advertising => {
             BLE_PAIR_STATUS.store(0, Ordering::Relaxed);
+            cdc::pair_state("advertising");
         }
         BlePairStatus::Connected => {
             BLE_PAIR_STATUS.store(1, Ordering::Relaxed);
+            cdc::pair_state("connected");
         }
         BlePairStatus::Pairing(pin) => {
             BLE_PAIR_PIN.store(pin, Ordering::Relaxed);
             BLE_PAIR_STATUS.store(2, Ordering::Relaxed);
+            cdc::pair_pin(pin);
         }
         BlePairStatus::Success => {
             BLE_PAIR_STATUS.store(3, Ordering::Relaxed);
+            cdc::pair_ok();
         }
         BlePairStatus::Failed(reason) => {
             let code = match reason {
@@ -178,6 +185,7 @@ fn set_pair_status(status: BlePairStatus) {
             };
             BLE_PAIR_PIN.store(code, Ordering::Relaxed);
             BLE_PAIR_STATUS.store(4, Ordering::Relaxed);
+            cdc::pair_fail(reason.as_str());
         }
         BlePairStatus::Disabled => {
             BLE_PAIR_STATUS.store(5, Ordering::Relaxed);
@@ -522,8 +530,10 @@ pub async fn ble_run(bt: BT<'static>) {
 
             if let Err(why) = advertise_once(&mut peripheral, &server).await {
                 set_pair_status(BlePairStatus::Failed(why));
-                // Back off for 5 seconds on pairing failure before returning to advertising.
+                // Hold failure status for 5 seconds so the user can read the failure reason.
                 Timer::after(Duration::from_millis(5000)).await;
+                // Return to advertising so a subsequent pairing attempt can begin cleanly.
+                set_pair_status(BlePairStatus::Advertising);
             }
         }
     };
