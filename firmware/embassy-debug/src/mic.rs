@@ -115,7 +115,7 @@ pub async fn run(
 
 /// Parses DMA byte chunks into signed 16-bit PCM samples and emits energy telemetry.
 fn emit_window(bytes: &[u8], dump_pcm: bool) {
-    let n = bytes.len() / 2;
+    let n = (bytes.len() / 2).min(PCM_WINDOW_SAMPLES);
     if n == 0 {
         return;
     }
@@ -123,7 +123,7 @@ fn emit_window(bytes: &[u8], dump_pcm: bool) {
     for (i, chunk) in bytes.chunks_exact(2).take(n).enumerate() {
         samples[i] = i16::from_le_bytes([chunk[0], chunk[1]]);
     }
-    let samples = &samples[..n.min(PCM_WINDOW_SAMPLES)];
+    let samples = &samples[..n];
     let (rms, peak) = pcm_energy(samples);
     store(MicSample { rms, peak });
     if dump_pcm {
