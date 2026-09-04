@@ -87,11 +87,12 @@ const _: () = {
 /// 2. Configures hardware cycle-counter delay provider (`esp_hal::delay::Delay`).
 /// 3. Instantiates `Input` pin drivers with appropriate electrical pull configurations:
 ///    - Pushbuttons (`GPIO2`, `GPIO3`): Configured with internal weak pull-ups (`Pull::Up`).
-///    - Board status lines (`GPIO0`, `GPIO1`, `GPIO4`, `GPIO7`, `GPIO18`): Configured with
+///    - Board status lines (`GPIO0`, `GPIO1`, `GPIO4`, `GPIO7`): Configured with
 ///      `Pull::None` to sample external logic states without back-powering uninitialized rails.
+///    - E-paper BUSY signal (`GPIO18`): Configured with `Pull::Up` per SSD1677 datasheet and OTP-Demo.
 /// 4. Queries SoC clock speeds and reset reason from the Real-Time Clock Controller (RTC_CNTL).
 /// 5. Enters the non-terminating polling loop:
-///    - 10 ms: Polls tactile button states; emits instantaneous transition telemetry on edge.
+///    - 50 ms: Polls tactile button states; emits instantaneous transition telemetry on edge.
 ///    - 1000 ms: Emits periodic button status heartbeat (`heartbeat` line).
 ///    - 10000 ms: Emits board metadata (`hello`), git revision (`git`), and GPIO bus states (`gpio`).
 #[main]
@@ -113,7 +114,7 @@ fn main() -> ! {
 
     // Board status and interrupt lines:
     // Left floating (`Pull::None`) because these lines either have dedicated external pull-ups
-    // on the PCB or are driven by peripheral chips (PMIC, expander, touch digitizer, display).
+    // on the PCB or are driven by peripheral chips (PMIC, expander, touch digitizer).
     // Adding internal pull resistors here could cause leakage current into unpowered domains.
     let boot = Input::new(
         peripherals.GPIO0,
@@ -131,9 +132,10 @@ fn main() -> ! {
         peripherals.GPIO7,
         InputConfig::default().with_pull(Pull::None),
     );
+    // E-paper BUSY signal: SSD1677 datasheet and official OTP-Demo use pull-up.
     let busy = Input::new(
         peripherals.GPIO18,
-        InputConfig::default().with_pull(Pull::None),
+        InputConfig::default().with_pull(Pull::Up),
     );
 
     // Construct immutable identification record with boot-time telemetry.
@@ -193,7 +195,7 @@ fn main() -> ! {
             });
         }
 
-        // Advance simulated time tick and delay for poll interval (10 ms).
+        // Advance simulated time tick and delay for poll interval (50 ms).
         t_ms = t_ms.saturating_add(POLL_PERIOD_MS);
         delay.delay_ms(POLL_PERIOD_MS);
     }
