@@ -43,8 +43,15 @@ day after glass showed landscape upside-down.
 
 Init uses the Bosch standard 8 KiB `bmi270_config_file`
 (`bmi270_config.SOURCE.md`) with `INIT_ADDR_0`/`INIT_ADDR_1`
-addressing — not the maximum-FIFO variant blob. `INTERNAL_STATUS`
-is register `0x21`.
+addressing — not the maximum-FIFO variant blob (that upload
+leaves raw XYZ at zero). `INTERNAL_STATUS` is register `0x21`
+(not `0x19`). Soft-reset → disable adv power-save → load
+config → check status bit0 → enable accel.
+
+Embassy-debug `orient` nav: three consecutive IMU polls must
+agree on a new page before remapping (`IMU_STABLE_POLLS`), and
+button edges are handled before IMU so a hold flip does not
+steal Prev/Next.
 
 ## RX8130CE
 

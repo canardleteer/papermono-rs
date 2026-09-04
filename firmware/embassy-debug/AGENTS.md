@@ -25,7 +25,7 @@ opt-in. `simple-debug-fw` stays featureless.
 | `mic` | **off** | PDM energy + hold-A PCM dump |
 | `radio` | on | BLE pairing + Wi-Fi survey / SoftAP cards + wifi/ble counts. No MAC/BSSID/IRK. No NVS |
 | `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
-| `orient` | **off** | BMI270 page rotation (sticky-rs style). Provisional axis map until glass-confirmed |
+| `orient` | **off** | BMI270 page rotation (sticky-rs style). Lite axis map glass-confirmed 2026-09-04 |
 
 `mic`, `panel`, `sleep`, and `orient` depend on `touch`
 (expander). `sleep` / `orient` depend on `panel`.
@@ -187,10 +187,26 @@ Opt-in Cargo feature. Sticky-rs policy ported to BMI270:
 - CDC `imu pose=… x=… y=… z=…` every 5 s and on page change.
 - Axis→pose (Lite 2026-09-04): −X `Portrait0`, +X `Portrait180`,
   +Y `Landscape0`, −Y `Landscape180`. `C153` still unconfirmed.
+- Same-card remaps are **soft** `Partial` (no `MonoFull` budget hit).
+- Bring-up: Bosch standard **8 KiB** `bmi270_config_file` with
+  `INIT_ADDR_*` chunking; `INTERNAL_STATUS` is `0x21`. Do **not**
+  use the maximum-FIFO config blob (wrong variant; XYZ stay zero).
+- Nav: arm after both buttons released; A/B short-press on
+  **release**; handle buttons before IMU; require
+  `IMU_STABLE_POLLS` (3) agreeing samples before remapping.
+  Press-on-down for B ate the next edge after slow Shapes paint.
 
 ```shell
 cargo xtask build-fw embassy-debug --features orient
 ```
+
+## Card navigation edges
+
+`wait_nav` drains Button A/B until both are high before arming.
+Short Prev/Next fire on release. That avoids a hold through a
+long paint (Shapes snowflake + panel) leaving B stuck low so the
+operator must press twice. Soft orientation / radio refreshes
+run after button handling so a same-tick press wins.
 
 ## Firmware examples as tutorial code
 

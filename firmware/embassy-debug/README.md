@@ -12,7 +12,8 @@ On the unit:
   (USB-C down). Original Ferris: Karen Rustad Tölva
   ([rustacean.net](https://rustacean.net/)). Line-art
   monification details in [assets/SOURCE.md](assets/SOURCE.md).
-- BUTTON A previous card, BUTTON B next. The walk is splash →
+- BUTTON A previous card, BUTTON B next (both on **release**
+  after the previous paint finishes). The walk is splash →
   shapes (procedural 3-degree Koch snowflake benchmark) →
   legend (pinout, touch rails, sleep/wake instructions) →
   bluetooth (BLE passkey pairing) → wifi survey (channel scan) →
@@ -29,9 +30,10 @@ Default features are `touch`, `panel`, `sleep`, and `radio`.
 The `mic` and `orient` features are opt-in. First SKU is Lite.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
-and 180° flips). Cards redraw upright for the hold; CDC prints
-`imu pose=` with raw XYZ so the axis map can be confirmed on glass.
-Without `orient`, the UI stays USB-C-down portrait.
+and 180° flips). Cards redraw upright for the hold via soft
+OTP Partial; CDC prints `imu pose=` with raw XYZ. Lite axis map
+(2026-09-04): USB-C down = −X. Without `orient`, the UI stays
+USB-C-down portrait.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).

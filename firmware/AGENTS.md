@@ -123,7 +123,9 @@ orientation remaps pass `soft = true` so they stay on
 on every PIN / client / survey update or hold flip). Card
 navigation passes `soft = false` and
 still takes `MonoFull` when `PARTIALS_BEFORE_FULL` (18) is
-due. Target enter uses `enter_mono` (`MonoFull`). Marks use
+due. Embassy-debug Prev/Next arm after both buttons release
+(release edges) so a hold through Shapes paint does not require
+a second press. Target enter uses `enter_mono` (`MonoFull`). Marks use
 `Partial`. Deep sleep after each refresh; hardware reset to
 wake. No `otp_fast` stamp. Soft-refresh contract:
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md).

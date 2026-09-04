@@ -6,11 +6,13 @@
 //! - **Eight-Card Finite State Machine**: Cycles sequentially through the UI scenes:
 //!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Bluetooth` ↔ `WifiSurvey` ↔ `WifiAp` ↔ `Tones` ↔ `Targets`.
 //! - **Physical Button Controls**:
-//!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>2 s)
-//!     triggers low-power sleep; long press (~1 s) triggers an audio recording / tone test
-//!     when the `mic` feature is enabled.
-//!   - `BUTTON B` (`GPIO3`): Short press advances to the next card. During sleep, holding
-//!     either `BUTTON A` or `BUTTON B` for 1 s wakes the device.
+//!   - `BUTTON A` (`GPIO2`): Short press (release edge) switches to previous card.
+//!     Long press (>2 s) triggers low-power sleep; long press (~1 s) triggers an
+//!     audio recording / tone test when the `mic` feature is enabled.
+//!   - `BUTTON B` (`GPIO3`): Short press (release edge) advances to the next card.
+//!     During sleep, holding either `BUTTON A` or `BUTTON B` for 1 s wakes the device.
+//!   - After each paint, `wait_nav` waits until both buttons are high before arming
+//!     edges (holds through slow Shapes paint must not eat the next card).
 //! - **Touch Gutter Gesture**:
 //!   - Swiping along the far-right edge of the screen dynamically adjusts the display
 //!     frontlight LED brightness via PWM without advancing cards.
@@ -99,6 +101,13 @@ const IMU_POLL_MS: u32 = 250;
 /// How often to print `imu pose=` while holding still (sticky-rs uses 5 s).
 #[cfg(feature = "orient")]
 const IMU_REPORT_MS: u32 = 5_000;
+
+/// Consecutive IMU polls that must agree on a new page before remapping.
+///
+/// Avoids a one-sample chatter (hand torque on a button press) from stealing
+/// the next card edge as a soft orientation refresh.
+#[cfg(feature = "orient")]
+const IMU_STABLE_POLLS: u8 = 3;
 
 /// Button A hold duration (2 seconds) to trigger sleep.
 #[cfg(feature = "sleep")]
@@ -311,10 +320,15 @@ async fn paint(
 /// - `ctx`: Polling context holding scene and watched telemetry revisions.
 ///
 /// # Returns
-/// - `Some(Nav::Prev)` on short press of Button A.
-/// - `Some(Nav::Next)` on short press of Button B.
+/// - `Some(Nav::Prev)` on short press of Button A (release edge).
+/// - `Some(Nav::Next)` on short press of Button B (release edge).
 /// - `Some(Nav::Sleep)` on 2-second hold of Button A (when `sleep` feature is active).
-/// - `Some(Nav::Refresh)` on auto-refresh timeout, BLE/Wi-Fi status revision change, or touch button toggle.
+/// - `Some(Nav::Refresh)` on auto-refresh timeout, BLE/Wi-Fi status revision change,
+///   stable orientation change, or touch button toggle.
+///
+/// Both buttons must be released before edges are armed. That drops a hold that
+/// started during the previous paint (Shapes is slow) so the first post-paint
+/// release is not mistaken for a missing press.
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
@@ -324,8 +338,21 @@ async fn wait_nav(
     ctx: NavContext,
     #[cfg_attr(not(feature = "orient"), allow(unused_variables))] rotation: &mut PageRotation,
 ) -> Option<Nav> {
-    let mut prev_a = btn_a.is_high();
-    let mut prev_b = btn_b.is_high();
+    // Drain holds that overlapped the previous EPD paint / snowflake work.
+    loop {
+        let a = btn_a.is_high();
+        let b = btn_b.is_high();
+        share::BTN_A.store(a, core::sync::atomic::Ordering::Relaxed);
+        share::BTN_B.store(b, core::sync::atomic::Ordering::Relaxed);
+        share::TP.store(tp.is_high(), core::sync::atomic::Ordering::Relaxed);
+        if a && b {
+            break;
+        }
+        Timer::after(Duration::from_millis(NAV_POLL_MS.into())).await;
+    }
+
+    let mut prev_a = true;
+    let mut prev_b = true;
     let mut a_down: Option<Instant> = None;
     let mut a_held = false;
     let mut t_ms = 0_u32;
@@ -334,47 +361,11 @@ async fn wait_nav(
     let mut imu_since_ms = 0_u32;
     #[cfg(feature = "orient")]
     let mut imu_report_ms = 0_u32;
+    #[cfg(feature = "orient")]
+    let mut pending_page: Option<PageRotation> = None;
+    #[cfg(feature = "orient")]
+    let mut pending_count = 0_u8;
     loop {
-        // If a BLE state transition occurred (before wait_nav began, during paint, or during this loop),
-        // refresh immediately so the e-paper glass reflects the new pairing status without delay.
-        if let Some(rev) = ctx.ble_watch_rev {
-            if crate::radio::state_rev() != rev {
-                return Some(Nav::Refresh);
-            }
-        }
-
-        // If a Wi-Fi state transition occurred (before wait_nav began, during paint, or during this loop),
-        // refresh immediately so the e-paper glass reflects the new Wi-Fi telemetry without delay.
-        if let Some(rev) = ctx.wifi_watch_rev {
-            if crate::radio::wifi_state_rev() != rev {
-                return Some(Nav::Refresh);
-            }
-        }
-
-        #[cfg(feature = "orient")]
-        {
-            imu_since_ms = imu_since_ms.saturating_add(NAV_POLL_MS);
-            imu_report_ms = imu_report_ms.saturating_add(NAV_POLL_MS);
-            if imu_since_ms >= IMU_POLL_MS {
-                imu_since_ms = 0;
-                if let Ok(sample) = imu::read_accel(i2c) {
-                    let pose = imu::classify(sample.x, sample.y, sample.z);
-                    let pose_token = pose.map_or("none", imu::Orientation::as_str);
-                    if imu_report_ms >= IMU_REPORT_MS {
-                        imu_report_ms = 0;
-                        cdc::imu(pose_token, sample.x, sample.y, sample.z);
-                    }
-                    if let Some(page) = pose.and_then(imu::Orientation::page_rotation) {
-                        if page != *rotation {
-                            cdc::imu(pose_token, sample.x, sample.y, sample.z);
-                            *rotation = page;
-                            return Some(Nav::Refresh);
-                        }
-                    }
-                }
-            }
-        }
-
         let now_a = btn_a.is_high();
         let now_b = btn_b.is_high();
         share::BTN_A.store(now_a, core::sync::atomic::Ordering::Relaxed);
@@ -408,12 +399,13 @@ async fn wait_nav(
                 }
             }
         }
+        // Short press BUTTON A / B on release so a hold through paint cannot
+        // leave the next wait armed on a stuck low and eat the first press.
         if !prev_a && now_a {
             let held = a_held;
             a_down = None;
             a_held = false;
             prev_a = now_a;
-            // Short press BUTTON A: previous card.
             if !held {
                 return Some(Nav::Prev);
             }
@@ -421,8 +413,7 @@ async fn wait_nav(
             prev_a = now_a;
         }
 
-        // BUTTON B short press: next card.
-        if prev_b && !now_b {
+        if !prev_b && now_b {
             return Some(Nav::Next);
         }
         prev_b = now_b;
@@ -469,6 +460,53 @@ async fn wait_nav(
             }
         } else if sample.n == 0 {
             button_touch_down = false;
+        }
+
+        // Radio / orientation refresh after buttons so a same-tick edge wins.
+        if let Some(rev) = ctx.ble_watch_rev {
+            if crate::radio::state_rev() != rev {
+                return Some(Nav::Refresh);
+            }
+        }
+        if let Some(rev) = ctx.wifi_watch_rev {
+            if crate::radio::wifi_state_rev() != rev {
+                return Some(Nav::Refresh);
+            }
+        }
+
+        #[cfg(feature = "orient")]
+        {
+            imu_since_ms = imu_since_ms.saturating_add(NAV_POLL_MS);
+            imu_report_ms = imu_report_ms.saturating_add(NAV_POLL_MS);
+            if imu_since_ms >= IMU_POLL_MS {
+                imu_since_ms = 0;
+                if let Ok(sample) = imu::read_accel(i2c) {
+                    let pose = imu::classify(sample.x, sample.y, sample.z);
+                    let pose_token = pose.map_or("none", imu::Orientation::as_str);
+                    if imu_report_ms >= IMU_REPORT_MS {
+                        imu_report_ms = 0;
+                        cdc::imu(pose_token, sample.x, sample.y, sample.z);
+                    }
+                    if let Some(page) = pose.and_then(imu::Orientation::page_rotation) {
+                        if page != *rotation {
+                            if pending_page == Some(page) {
+                                pending_count = pending_count.saturating_add(1);
+                            } else {
+                                pending_page = Some(page);
+                                pending_count = 1;
+                            }
+                            if pending_count >= IMU_STABLE_POLLS {
+                                cdc::imu(pose_token, sample.x, sample.y, sample.z);
+                                *rotation = page;
+                                return Some(Nav::Refresh);
+                            }
+                        } else {
+                            pending_page = None;
+                            pending_count = 0;
+                        }
+                    }
+                }
+            }
         }
 
         t_ms = t_ms.saturating_add(NAV_POLL_MS);

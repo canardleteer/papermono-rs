@@ -108,3 +108,6 @@ Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
 
 Opt-in `--features orient`: BMI270 page rotation (sticky-rs
 policy). Lite axis map: USB-C down = −X (see sensors.md).
+Same-card remaps soft-Partial; nav arms on button release
+with 3-sample IMU hysteresis
+([embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md)).
