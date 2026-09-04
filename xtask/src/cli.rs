@@ -619,7 +619,7 @@ mod tests {
             other => panic!("expected BuildFw, got {other:?}"),
         }
 
-        let stage_b = Cli::try_parse_from([
+        let touch_only = Cli::try_parse_from([
             "xtask",
             "build-fw",
             "embassy-debug",
@@ -627,8 +627,8 @@ mod tests {
             "--features",
             "touch",
         ])
-        .expect("stage-b");
-        match stage_b.command {
+        .expect("touch-only");
+        match touch_only.command {
             super::Command::BuildFw(args) => {
                 assert_eq!(args.features, ["touch"]);
                 assert!(args.no_default_features);
