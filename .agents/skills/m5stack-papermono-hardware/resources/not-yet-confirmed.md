@@ -193,6 +193,13 @@ BLE open under this same id. Default images stay radio-off.
 `C153` still open.
 [docs/CRATES.md](../../../../docs/CRATES.md).
 
+**Lite BLE pairing (2026-09-04):** `embassy-debug` live.
+Smartphone connects to `PaperMono`: `pair state=connected`.
+DisplayOnly passkey generated and displayed on card / CDC:
+`pair pin=413590`. Panel fast partial refreshes. Passkey entered on phone:
+pairing completes with `pair ok`, panel displays paired banner.
+Bonds held in RAM. `C153` still open.
+
 ### nyc-gpio0-strap
 
 Meter or scope GPIO0 vs `CHIP_PU` during a button reset and
