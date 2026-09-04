@@ -30,7 +30,7 @@ pub static TP: AtomicBool = AtomicBool::new(true);
 /// Mirror of SSD1677 e-paper controller `BUSY` signal (`GPIO18`). `true` indicates refreshing.
 pub static BUSY: AtomicBool = AtomicBool::new(false);
 
-/// Liveness indicator indicating whether the interactive five-card UI task is running.
+/// Liveness indicator indicating whether the interactive six-card UI task is running.
 pub static UI_LIVE: AtomicBool = AtomicBool::new(false);
 
 /// Encoded identifier of the currently displayed UI scene.
@@ -59,8 +59,9 @@ const fn scene_byte(scene: Scene) -> u8 {
         Scene::Splash => 0,
         Scene::Shapes => 1,
         Scene::Legend => 2,
-        Scene::Tones => 3,
-        Scene::Targets => 4,
+        Scene::Bluetooth => 3,
+        Scene::Tones => 4,
+        Scene::Targets => 5,
     }
 }
 
@@ -70,8 +71,9 @@ const fn from_scene_byte(byte: u8) -> Option<Scene> {
         0 => Some(Scene::Splash),
         1 => Some(Scene::Shapes),
         2 => Some(Scene::Legend),
-        3 => Some(Scene::Tones),
-        4 => Some(Scene::Targets),
+        3 => Some(Scene::Bluetooth),
+        4 => Some(Scene::Tones),
+        5 => Some(Scene::Targets),
         _ => None,
     }
 }

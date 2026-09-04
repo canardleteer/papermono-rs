@@ -296,6 +296,8 @@ pub enum Scene {
     Shapes,
     /// Physical buttons, sleep/wake controls, and right lamp gutter legend.
     Legend,
+    /// BLE peripheral pairing card with 6-digit passkey display and status.
+    Bluetooth,
     /// Four OTP gray boxes.
     Tones,
     /// Dots + midline slides + mono-full white clear.
@@ -304,10 +306,11 @@ pub enum Scene {
 
 impl Scene {
     /// Walk order for BUTTON B (next).
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Splash,
         Self::Shapes,
         Self::Legend,
+        Self::Bluetooth,
         Self::Tones,
         Self::Targets,
     ];
@@ -319,6 +322,7 @@ impl Scene {
             Self::Splash => "splash",
             Self::Shapes => "shapes",
             Self::Legend => "legend",
+            Self::Bluetooth => "bluetooth",
             Self::Tones => "tones",
             Self::Targets => "targets",
         }
@@ -330,7 +334,8 @@ impl Scene {
         match self {
             Self::Splash => Self::Shapes,
             Self::Shapes => Self::Legend,
-            Self::Legend => Self::Tones,
+            Self::Legend => Self::Bluetooth,
+            Self::Bluetooth => Self::Tones,
             Self::Tones => Self::Targets,
             Self::Targets => Self::Splash,
         }
@@ -343,7 +348,8 @@ impl Scene {
             Self::Splash => Self::Targets,
             Self::Shapes => Self::Splash,
             Self::Legend => Self::Shapes,
-            Self::Tones => Self::Legend,
+            Self::Bluetooth => Self::Legend,
+            Self::Tones => Self::Bluetooth,
             Self::Targets => Self::Tones,
         }
     }
@@ -1105,19 +1111,30 @@ mod tests {
     #[test]
     fn scene_wraps_and_formats() {
         assert_eq!(Scene::Splash.next(), Scene::Shapes);
+        assert_eq!(Scene::Shapes.next(), Scene::Legend);
+        assert_eq!(Scene::Legend.next(), Scene::Bluetooth);
+        assert_eq!(Scene::Bluetooth.next(), Scene::Tones);
+        assert_eq!(Scene::Tones.next(), Scene::Targets);
         assert_eq!(Scene::Targets.next(), Scene::Splash);
         assert_eq!(Scene::Splash.prev(), Scene::Targets);
         assert_eq!(Scene::Targets.prev(), Scene::Tones);
+        assert_eq!(Scene::Tones.prev(), Scene::Bluetooth);
+        assert_eq!(Scene::Bluetooth.prev(), Scene::Legend);
         assert!(Scene::Tones.uses_gray());
         assert!(!Scene::Splash.uses_gray());
         assert!(!Scene::Legend.uses_gray());
+        assert!(!Scene::Bluetooth.uses_gray());
         assert!(!Scene::Shapes.uses_gray());
         assert!(!Scene::Targets.uses_gray());
-        assert_eq!(Scene::ALL.len(), 5);
+        assert_eq!(Scene::ALL.len(), 6);
         let mut buf = [0u8; SCENE_CAPACITY];
         assert_eq!(
             format_scene(Scene::Splash, &mut buf).unwrap(),
             "simple-debug: scene=splash"
+        );
+        assert_eq!(
+            format_scene(Scene::Bluetooth, &mut buf).unwrap(),
+            "simple-debug: scene=bluetooth"
         );
         let mut lamp = [0u8; LAMP_CAPACITY];
         assert_eq!(

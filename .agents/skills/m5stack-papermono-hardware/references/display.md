@@ -74,7 +74,7 @@ Silicon table: [measure.md](measure.md).
   ink (copy the new frame to RAM 2 after each `Partial`).
 - OTP RAM orientation USB-C down: RAM X = physical Y,
   RAM Y = physical X.
-- Fast A/B on shapes / legend when those cards use
+- Fast A/B on shapes / legend / bluetooth when those cards use
   `Partial` after a real mono baseline.
 - Leaving gray **must** `MonoFull` before `Partial` —
   now **measured**, not only OTP-Demo policy.

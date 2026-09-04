@@ -23,8 +23,8 @@ On the unit:
   was built `--features mic` (default image leaves mic off).
 - The GPIO42 buzzer chirp is parked.
 
-Default features are `touch`, `panel`, and `sleep`. The `mic` and
-`radio` features are opt-in. First SKU is Lite.
+Default features are `touch`, `panel`, `sleep`, and `radio`.
+The `mic` feature is opt-in. First SKU is Lite.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
@@ -87,8 +87,9 @@ embassy-debug`.
 Short-press BUTTON B. The glass should walk splash → shapes (procedural
 3-degree Koch snowflake with on-screen and CDC microsecond benchmark) →
 legend (pinout, touch rails, sleep/wake instructions, and live battery gauge
-with 60 s auto-refresh) → tones → targets, then wrap. BUTTON A walks the other
-way. CDC prints `scene=` and `snowflake us=`.
+with 60 s auto-refresh) → bluetooth (BLE peripheral pairing with 6-digit PIN
+passkey and success/fail status) → tones → targets, then wrap. BUTTON A
+walks the other way. CDC prints `scene=` and `snowflake us=`.
 
 ### Step 5: Slide the lamp
 

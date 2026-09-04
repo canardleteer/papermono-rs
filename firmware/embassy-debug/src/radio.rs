@@ -1,106 +1,320 @@
-//! Passive Wi-Fi beacon listening and BLE advertisement scanning without association.
+//! Bluetooth Low Energy peripheral passkey pairing and passive Wi-Fi channel listening.
 //!
 //! # Architecture & Privacy Safety
-//! This module coordinates passive radio listening:
-//!
-//! - **No Association / Connection**: Operates purely as a passive observer; does not
-//!   attempt Wi-Fi authentication or Bluetooth pairing.
-//! - **Privacy Preservation**: Never logs or emits MAC addresses, SSIDs, BSSIDs, or
-//!   identity resolving keys (IRKs) over CDC. Only emits aggregate counts (`wifi n=`, `ble n=`).
+//! - **Privacy Preservation**: Uses an anonymous static random BLE address rather than
+//!   the hardware eFuse MAC address, preventing device tracking. Never emits MAC addresses,
+//!   SSIDs, BSSIDs, or identity resolving keys (IRKs) over CDC.
+//! - **Passkey Entry Protocol**: Operates as a BLE peripheral advertising as `PaperMono`
+//!   with `DisplayOnly` IO capabilities. When a central (e.g. smartphone) initiates pairing,
+//!   `trouble-host` generates a 6-digit passkey which is rendered on the e-paper display.
 //! - **No NVS Storage Writes**: Operates without modifying non-volatile storage flash
-//!   sectors (`nvs_enable` disabled in the driver), ensuring factory RF calibration data
-//!   remains uncorrupted.
+//!   sectors (`nvs_enable` disabled in driver), ensuring factory RF calibration data remains intact.
 //! - **Coexistence Sequencing**: BLE controller is brought up and executed before
 //!   triggering Wi-Fi scans to satisfy ESP32-S3 hardware RF coexistence scheduling.
 
-use core::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+#![allow(dead_code)]
 
-use bt_hci::cmd::le::LeSetScanParams;
-use bt_hci::controller::ControllerCmdSync;
-use embassy_futures::select::{select, Either};
-use embassy_time::{Duration, Timer};
-use esp_hal::peripherals::{BT, WIFI};
-use esp_radio::ble::controller::BleConnector;
-use esp_radio::wifi::scan::{ScanConfig as WifiScanConfig, ScanTypeConfig};
-use esp_radio::wifi::sta::StationConfig;
-use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController};
-use trouble_host::prelude::*;
+use core::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 
-use crate::cdc;
-
-/// Duration of the BLE passive advertisement listening window in seconds.
-const BLE_WINDOW_S: u64 = 8;
-
-/// Timeout after which a stalled Wi-Fi scan is aborted.
-const WIFI_TIMEOUT_S: u64 = 20;
-
-/// Maximum number of access points to buffer in memory during scan.
-const WIFI_MAX: usize = 32;
-
-/// Passive listening dwell time per Wi-Fi 2.4 GHz channel in milliseconds.
-const WIFI_PASSIVE_MS: u64 = 150;
-
-static WIFI_N: AtomicU16 = AtomicU16::new(0);
-static BLE_N: AtomicU16 = AtomicU16::new(0);
-static HAVE_WIFI: AtomicBool = AtomicBool::new(false);
-static HAVE_BLE: AtomicBool = AtomicBool::new(false);
-
-/// BLE advertisement packet handler counting valid incoming reports.
-struct CountAdv {
-    n: AtomicU16,
+/// Current pairing status of the Bluetooth Low Energy peripheral.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BlePairStatus {
+    /// Currently broadcasting BLE advertisements (`PaperMono`) and awaiting connection.
+    Advertising,
+    /// Smartphone / central device has connected, awaiting pairing negotiation.
+    Connected,
+    /// Passkey pairing in progress; displays the 6-digit PIN code to be entered on the phone.
+    Pairing(u32),
+    /// Pairing and encryption successfully established.
+    Success,
+    /// Pairing attempt failed or was canceled by user/peer.
+    Failed(BleFailReason),
+    /// Wireless radio is disabled in this firmware build.
+    Disabled,
 }
 
-impl EventHandler for CountAdv {
-    fn on_adv_reports(&self, mut it: LeAdvReportsIter<'_>) {
-        while let Some(Ok(_)) = it.next() {
-            let _ = self
-                .n
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
-                    Some(v.saturating_add(1))
-                });
+/// Reason code explaining why BLE pairing was rejected or aborted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BleFailReason {
+    /// User canceled the passkey prompt or entered an incorrect PIN.
+    PasskeyEntryFailed,
+    /// Cryptographic confirm value mismatch during key exchange.
+    ConfirmValueFailed,
+    /// Peer disconnected before completing the handshake or pairing timed out.
+    Timeout,
+    /// Authentication requirements (e.g. MITM or IO capabilities) could not be met.
+    AuthenticationRequirements,
+    /// Pairing attempt disallowed due to rate limiting or repeated failures.
+    RepeatedAttempts,
+    /// Unspecified or remote rejection.
+    Other,
+}
+
+impl BleFailReason {
+    /// Human-readable explanation string for display on the card.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PasskeyEntryFailed => "Passkey entry failed / canceled",
+            Self::ConfirmValueFailed => "Confirm value mismatch",
+            Self::Timeout => "Pairing timed out / disconnected",
+            Self::AuthenticationRequirements => "Auth requirements not met",
+            Self::RepeatedAttempts => "Too many attempts (rate limit)",
+            Self::Other => "Pairing rejected by device",
         }
     }
 }
 
+static BLE_PAIR_STATUS: AtomicU8 = AtomicU8::new(0);
+static BLE_PAIR_PIN: AtomicU32 = AtomicU32::new(0);
+static BLE_STATE_REV: AtomicU32 = AtomicU32::new(0);
+
+/// Retrieves the current pairing state of the BLE peripheral.
+pub fn pair_status() -> BlePairStatus {
+    #[cfg(feature = "radio")]
+    {
+        match BLE_PAIR_STATUS.load(Ordering::Relaxed) {
+            1 => BlePairStatus::Connected,
+            2 => BlePairStatus::Pairing(BLE_PAIR_PIN.load(Ordering::Relaxed)),
+            3 => BlePairStatus::Success,
+            4 => BlePairStatus::Failed(match BLE_PAIR_PIN.load(Ordering::Relaxed) {
+                0 => BleFailReason::PasskeyEntryFailed,
+                1 => BleFailReason::ConfirmValueFailed,
+                2 => BleFailReason::Timeout,
+                3 => BleFailReason::AuthenticationRequirements,
+                4 => BleFailReason::RepeatedAttempts,
+                _ => BleFailReason::Other,
+            }),
+            5 => BlePairStatus::Disabled,
+            _ => BlePairStatus::Advertising,
+        }
+    }
+    #[cfg(not(feature = "radio"))]
+    {
+        BlePairStatus::Disabled
+    }
+}
+
+/// Retrieves the monotonically increasing revision counter for pairing state transitions.
+pub fn state_rev() -> u32 {
+    BLE_STATE_REV.load(Ordering::Relaxed)
+}
+
+#[cfg(feature = "radio")]
+fn set_pair_status(status: BlePairStatus) {
+    match status {
+        BlePairStatus::Advertising => {
+            BLE_PAIR_STATUS.store(0, Ordering::Relaxed);
+        }
+        BlePairStatus::Connected => {
+            BLE_PAIR_STATUS.store(1, Ordering::Relaxed);
+        }
+        BlePairStatus::Pairing(pin) => {
+            BLE_PAIR_PIN.store(pin, Ordering::Relaxed);
+            BLE_PAIR_STATUS.store(2, Ordering::Relaxed);
+        }
+        BlePairStatus::Success => {
+            BLE_PAIR_STATUS.store(3, Ordering::Relaxed);
+        }
+        BlePairStatus::Failed(reason) => {
+            let code = match reason {
+                BleFailReason::PasskeyEntryFailed => 0,
+                BleFailReason::ConfirmValueFailed => 1,
+                BleFailReason::Timeout => 2,
+                BleFailReason::AuthenticationRequirements => 3,
+                BleFailReason::RepeatedAttempts => 4,
+                BleFailReason::Other => 5,
+            };
+            BLE_PAIR_PIN.store(code, Ordering::Relaxed);
+            BLE_PAIR_STATUS.store(4, Ordering::Relaxed);
+        }
+        BlePairStatus::Disabled => {
+            BLE_PAIR_STATUS.store(5, Ordering::Relaxed);
+        }
+    }
+    BLE_STATE_REV.fetch_add(1, Ordering::Release);
+}
+
+#[cfg(feature = "radio")]
+use core::sync::atomic::{AtomicBool, AtomicU16};
+
+#[cfg(feature = "radio")]
+use bt_hci::controller::ExternalController;
+#[cfg(feature = "radio")]
+use embassy_futures::select::{select, Either};
+#[cfg(feature = "radio")]
+use embassy_time::{Duration, Timer};
+#[cfg(feature = "radio")]
+use esp_hal::peripherals::{BT, WIFI};
+#[cfg(feature = "radio")]
+use esp_radio::ble::controller::BleConnector;
+#[cfg(feature = "radio")]
+use esp_radio::wifi::scan::{ScanConfig as WifiScanConfig, ScanTypeConfig};
+#[cfg(feature = "radio")]
+use esp_radio::wifi::sta::StationConfig;
+#[cfg(feature = "radio")]
+use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController};
+#[cfg(feature = "radio")]
+use trouble_host::prelude::*;
+
+#[cfg(feature = "radio")]
+use crate::cdc;
+
+#[cfg(feature = "radio")]
+const WIFI_TIMEOUT_S: u64 = 20;
+#[cfg(feature = "radio")]
+const WIFI_MAX: usize = 32;
+#[cfg(feature = "radio")]
+const WIFI_PASSIVE_MS: u64 = 150;
+
+#[cfg(feature = "radio")]
+static WIFI_N: AtomicU16 = AtomicU16::new(0);
+#[cfg(feature = "radio")]
+static HAVE_WIFI: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "radio")]
 fn store_wifi(n: u16) {
     WIFI_N.store(n, Ordering::Relaxed);
     HAVE_WIFI.store(true, Ordering::Relaxed);
     cdc::wifi(n);
 }
 
-fn store_ble(n: u16) {
-    BLE_N.store(n, Ordering::Relaxed);
-    HAVE_BLE.store(true, Ordering::Relaxed);
-    cdc::ble(n);
-}
-
 /// Retrieves the count of observed Wi-Fi beacons for periodic banner reporting.
 pub fn last_wifi() -> Option<u16> {
-    HAVE_WIFI
-        .load(Ordering::Relaxed)
-        .then(|| WIFI_N.load(Ordering::Relaxed))
+    #[cfg(feature = "radio")]
+    {
+        HAVE_WIFI
+            .load(Ordering::Relaxed)
+            .then(|| WIFI_N.load(Ordering::Relaxed))
+    }
+    #[cfg(not(feature = "radio"))]
+    {
+        None
+    }
 }
 
-/// Retrieves the count of observed BLE advertisement packets for periodic banner reporting.
+/// Retrieves the count of observed BLE packets (or pairing events) for periodic banner reporting.
 pub fn last_ble() -> Option<u16> {
-    HAVE_BLE
-        .load(Ordering::Relaxed)
-        .then(|| BLE_N.load(Ordering::Relaxed))
+    None
 }
 
-/// Asynchronous Embassy task driving Bluetooth Low Energy passive scanning.
+/// Asynchronous Embassy task driving Bluetooth Low Energy peripheral advertising and passkey pairing.
+#[cfg(feature = "radio")]
 #[embassy_executor::task]
 pub async fn ble_run(bt: BT<'static>) {
-    store_ble(ble_count(bt).await);
+    let Ok(connector) = BleConnector::new(bt, Default::default()) else {
+        return;
+    };
+    let controller: ExternalController<_, 1> = ExternalController::new(connector);
+    let address = Address::random([0xF5, 0x42, 0x11, 0x22, 0x33, 0xF1]);
+    let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
+    let stack = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .set_io_capabilities(IoCapabilities::DisplayOnly)
+        .build();
+
+    let mut runner = stack.runner();
+    let mut peripheral = stack.peripheral();
+
+    let mut adv_data = [0u8; 31];
+    let adv_len = AdStructure::encode_slice(
+        &[
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::CompleteLocalName(b"PaperMono"),
+        ],
+        &mut adv_data[..],
+    )
+    .unwrap_or(0);
+
+    let _ = select(runner.run(), async {
+        loop {
+            let current = pair_status();
+            if !matches!(current, BlePairStatus::Success | BlePairStatus::Failed(_)) {
+                set_pair_status(BlePairStatus::Advertising);
+            }
+
+            let adv_data_slice = &adv_data[..adv_len];
+            let acceptor = match peripheral
+                .advertise(
+                    &Default::default(),
+                    Advertisement::ConnectableScannableUndirected {
+                        adv_data: adv_data_slice,
+                        scan_data: &[],
+                    },
+                )
+                .await
+            {
+                Ok(a) => a,
+                Err(_) => {
+                    Timer::after(Duration::from_millis(500)).await;
+                    continue;
+                }
+            };
+
+            let conn = match acceptor.accept().await {
+                Ok(c) => c,
+                Err(_) => {
+                    Timer::after(Duration::from_millis(500)).await;
+                    continue;
+                }
+            };
+
+            set_pair_status(BlePairStatus::Connected);
+            let _ = conn.request_security();
+
+            loop {
+                match conn.next().await {
+                    ConnectionEvent::Disconnected { .. } => {
+                        if matches!(pair_status(), BlePairStatus::Pairing(_)) {
+                            set_pair_status(BlePairStatus::Failed(BleFailReason::Timeout));
+                        }
+                        break;
+                    }
+                    ConnectionEvent::PassKeyDisplay(key) => {
+                        set_pair_status(BlePairStatus::Pairing(key.value()));
+                    }
+                    ConnectionEvent::PairingComplete { .. } => {
+                        set_pair_status(BlePairStatus::Success);
+                    }
+                    ConnectionEvent::PairingFailed(err) => {
+                        let reason = match err {
+                            Error::Security(r) => match r {
+                                PairingFailedReason::PasskeyEntryFailed => {
+                                    BleFailReason::PasskeyEntryFailed
+                                }
+                                PairingFailedReason::ConfirmValueFailed
+                                | PairingFailedReason::DHKeyCheckFailed => {
+                                    BleFailReason::ConfirmValueFailed
+                                }
+                                PairingFailedReason::AuthenticationRequirements => {
+                                    BleFailReason::AuthenticationRequirements
+                                }
+                                PairingFailedReason::RepeatedAttempts => {
+                                    BleFailReason::RepeatedAttempts
+                                }
+                                _ => BleFailReason::Other,
+                            },
+                            _ => BleFailReason::Other,
+                        };
+                        set_pair_status(BlePairStatus::Failed(reason));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    })
+    .await;
 }
 
 /// Asynchronous Embassy task driving Wi-Fi passive channel sweeping.
+#[cfg(feature = "radio")]
 #[embassy_executor::task]
 pub async fn wifi_run(wifi: WIFI<'static>) {
     store_wifi(wifi_count(wifi).await);
 }
 
 /// Conducts a passive Wi-Fi scan and returns the number of unique APs discovered.
+#[cfg(feature = "radio")]
 async fn wifi_count(wifi: WIFI<'static>) -> u16 {
     let _sta = Interface::station();
     let station = Config::Station(StationConfig::default());
@@ -123,44 +337,4 @@ async fn wifi_count(wifi: WIFI<'static>) -> u16 {
         Either::First(Ok(result)) => result.len().min(usize::from(u16::MAX)) as u16,
         Either::First(Err(_)) | Either::Second(()) => 0,
     }
-}
-
-/// Configures BLE controller and initiates passive scanning.
-async fn ble_count(bt: BT<'static>) -> u16 {
-    let Ok(connector) = BleConnector::new(bt, Default::default()) else {
-        return 0;
-    };
-    let controller: ExternalController<_, 1> = ExternalController::new(connector);
-    ble_window(controller).await
-}
-
-/// Runs a trouble-host BLE scan session for [`BLE_WINDOW_S`] seconds.
-async fn ble_window<C>(controller: C) -> u16
-where
-    C: Controller + ControllerCmdSync<LeSetScanParams>,
-{
-    let address = Address::random([0x42, 0x00, 0x00, 0x00, 0x00, 0x01]);
-    let mut resources: HostResources<_, DefaultPacketPool, 1, 1> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources)
-        .set_random_address(address)
-        .build();
-    let mut runner = stack.runner();
-    let central = stack.central();
-    let counter = CountAdv {
-        n: AtomicU16::new(0),
-    };
-    let mut scanner = Scanner::new(central);
-    let _ = select(runner.run_with_handler(&counter), async {
-        let config = ScanConfig {
-            active: false,
-            phys: PhySet::M1,
-            interval: Duration::from_millis(100),
-            window: Duration::from_millis(100),
-            ..Default::default()
-        };
-        let _session = scanner.scan(&config).await.ok();
-        Timer::after(Duration::from_secs(BLE_WINDOW_S)).await;
-    })
-    .await;
-    counter.n.load(Ordering::Relaxed)
 }

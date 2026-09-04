@@ -11,7 +11,7 @@ license = "MIT"
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
-default = ["touch", "panel", "sleep"]
+default = ["touch", "panel", "sleep", "radio"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
 touch = []
 # PDM audio: PDM GPIO45/46 + PYG12. Needs expander.
@@ -69,7 +69,9 @@ embassy-time = "0.5.0"
 embassy-futures = { version = "0.1", optional = true }
 trouble-host = { version = "0.7.0", optional = true, default-features = false, features = [
   "default-packet-pool-mtu-255",
-  "scan",
+  "peripheral",
+  "security",
+  "legacy-pairing",
 ] }
 bt-hci = { version = "0.9.0", optional = true }
 

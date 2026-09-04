@@ -51,7 +51,7 @@ mod ioe;
 mod mic;
 #[cfg(feature = "panel")]
 mod panel;
-#[cfg(feature = "radio")]
+#[cfg(any(feature = "radio", feature = "panel"))]
 mod radio;
 #[cfg(feature = "panel")]
 mod share;

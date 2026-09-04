@@ -1,10 +1,10 @@
-//! Five-card interactive UI state machine and navigation controller.
+//! Six-card interactive UI state machine and navigation controller.
 //!
 //! # Architecture & Navigation Model
 //! This module coordinates the high-level interactive user experience:
 //!
-//! - **Five-Card Finite State Machine**: Cycles sequentially through the UI scenes:
-//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Tones` ↔ `Targets`.
+//! - **Six-Card Finite State Machine**: Cycles sequentially through the UI scenes:
+//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Bluetooth` ↔ `Tones` ↔ `Targets`.
 //! - **Physical Button Controls**:
 //!   - `BUTTON A` (`GPIO2`): Short press switches to previous card. Long press (>2 s)
 //!     triggers low-power sleep; long press (~1 s) triggers an audio recording / tone test
@@ -17,6 +17,10 @@
 //! - **Automatic Telemetry Refresh**:
 //!   - When stationary on the `Legend` card, the UI automatically refreshes the display
 //!     every 60 seconds with updated battery state-of-charge, voltage, and USB power status.
+//! - **Dynamic Bluetooth Pairing Refresh**:
+//!   - When stationary on the `Bluetooth` card, any pairing state transition (e.g. phone
+//!     connection, passkey display, pairing success, or failure) immediately triggers a fast
+//!     monochromatic refresh to update the PIN and status on screen.
 //! - **Zero Heap Allocation**: Framebuffers are statically allocated using
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
@@ -99,7 +103,7 @@ pub async fn run(
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
                 WalkEnd::Done => {
                     if let Some(nav) =
-                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None).await
+                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, None, false).await
                     {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
@@ -121,8 +125,17 @@ pub async fn run(
             }
         } else {
             let auto_refresh_ms = (scene == Scene::Legend).then_some(LEGEND_AUTO_REFRESH_MS);
-            if let Some(nav) =
-                wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, auto_refresh_ms).await
+            let watch_ble = scene == Scene::Bluetooth;
+            if let Some(nav) = wait_nav(
+                &mut i2c,
+                &btn_a,
+                &btn_b,
+                &tp,
+                &mut lamp,
+                auto_refresh_ms,
+                watch_ble,
+            )
+            .await
             {
                 match nav {
                     Nav::Prev => scene = scene.prev(),
@@ -179,12 +192,14 @@ async fn wait_nav(
     tp: &Input<'static>,
     lamp: &mut LampSlide,
     auto_refresh_ms: Option<u32>,
+    watch_ble: bool,
 ) -> Option<Nav> {
     let mut prev_a = btn_a.is_high();
     let mut prev_b = btn_b.is_high();
     let mut a_down: Option<Instant> = None;
     let mut a_held = false;
     let mut t_ms = 0_u32;
+    let initial_ble_rev = crate::radio::state_rev();
     loop {
         let now_a = btn_a.is_high();
         let now_b = btn_b.is_high();
@@ -224,6 +239,7 @@ async fn wait_nav(
             a_down = None;
             a_held = false;
             prev_a = now_a;
+            // Short press BUTTON A: previous card.
             if !held {
                 return Some(Nav::Prev);
             }
@@ -244,6 +260,10 @@ async fn wait_nav(
             cdc::touch(&sample);
         }
         let _ = lamp.feed(i2c, &sample);
+
+        if watch_ble && crate::radio::state_rev() != initial_ble_rev {
+            return Some(Nav::Refresh);
+        }
 
         t_ms = t_ms.saturating_add(NAV_POLL_MS);
         if let Some(timeout) = auto_refresh_ms {

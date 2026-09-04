@@ -13,12 +13,13 @@
 //! - **Embedded Graphics Integration**: Implements the [`embedded_graphics::draw_target::DrawTarget`]
 //!   trait via [`GrayInk`], allowing standard text, shapes, and primitives to be rendered directly
 //!   into the dual-plane framebuffers.
-//! - **Five-Card Walkthrough**:
+//! - **Six-Card Walkthrough**:
 //!   1. `Splash`: Displays the Rust Ferris mascot and navigation hints.
 //!   2. `Shapes`: Verifies geometry rendering (procedural 3-degree Koch snowflake with microsecond benchmark, triangles, boxes).
 //!   3. `Legend`: Provides an on-device quick-reference visual guide for physical buttons, sleep/wake, and touch rails.
-//!   4. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
-//!   5. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
+//!   4. `Bluetooth`: Displays 6-digit BLE passkey PIN for phone pairing and reports success or failure reason.
+//!   5. `Tones`: 4-gray horizontal bars demonstrating OTP grayscale palette accuracy.
+//!   6. `Targets`: Monochromatic calibration points for digitizer latency and accuracy testing.
 
 use core::fmt::Write;
 use embassy_time::Instant;
@@ -29,6 +30,8 @@ use embedded_graphics::prelude::*;
 use embedded_graphics::text::{Alignment, Text};
 use m5stack_papermono_lite::{display, pmic};
 use papermono_log::{ChargeSample, Scene};
+
+use crate::radio::BlePairStatus;
 
 /// 360×240 packed 1bpp bitmap of Ferris the Rust mascot.
 /// Provenance: Generated from SVG via `cargo xtask encode-assets` (see `assets/SOURCE.md`).
@@ -56,6 +59,10 @@ pub fn render(
         Scene::Shapes => Some(draw_shapes(bw, red)),
         Scene::Legend => {
             draw_legend(bw, red, charge);
+            None
+        }
+        Scene::Bluetooth => {
+            draw_bluetooth(bw, red);
             None
         }
         Scene::Tones => {
@@ -290,7 +297,242 @@ fn draw_legend(bw: &mut [u8], red: &mut [u8], charge: Option<ChargeSample>) {
     .draw(&mut ink);
 }
 
-/// Renders Card 4: 4-level grayscale horizontal tone bands.
+/// Renders Card 4: Bluetooth Low Energy peripheral pairing with PIN display and status.
+fn draw_bluetooth(bw: &mut [u8], red: &mut [u8]) {
+    clear(bw, red, display::GRAY_WHITE);
+    let status = crate::radio::pair_status();
+
+    // 1. Draw structural lines and frames
+    // Header separator
+    fill_rect(bw, red, 30, 70, 420, 2, display::GRAY_BLACK);
+
+    // PIN Outer Box
+    stroke_rect(bw, red, 60, 175, 360, 90, display::GRAY_BLACK);
+    stroke_rect(bw, red, 63, 178, 354, 84, display::GRAY_BLACK);
+
+    // 6 digit boxes or single box
+    if status == BlePairStatus::Success {
+        stroke_rect(bw, red, 90, 195, 300, 50, display::GRAY_BLACK);
+    } else {
+        for i in 0..6 {
+            let x = 90 + i * 52;
+            stroke_rect(bw, red, x, 195, 40, 50, display::GRAY_BLACK);
+        }
+    }
+
+    // Status separator
+    fill_rect(bw, red, 30, 295, 420, 2, display::GRAY_BLACK);
+
+    // Status outline box for Success / Failed
+    match status {
+        BlePairStatus::Success | BlePairStatus::Failed(_) => {
+            stroke_rect(bw, red, 100, 315, 280, 45, display::GRAY_BLACK);
+            stroke_rect(bw, red, 102, 317, 276, 41, display::GRAY_BLACK);
+        }
+        _ => {}
+    }
+
+    // Info separator
+    fill_rect(bw, red, 30, 480, 420, 1, display::GRAY_LIGHT);
+
+    // Footer separator
+    fill_rect(bw, red, 30, 720, 420, 2, display::GRAY_BLACK);
+
+    // 2. Draw all text with a single GrayInk
+    let mut ink = GrayInk::new(bw, red);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    // Header
+    let _ = Text::with_alignment(
+        "BLUETOOTH PAIRING",
+        Point::new(240, 50),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Device info
+    let _ = Text::with_alignment(
+        "Device: PaperMono",
+        Point::new(240, 110),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let instruction = match status {
+        BlePairStatus::Pairing(_) => "Enter this PIN code on your phone:",
+        BlePairStatus::Success => "Device paired and connected!",
+        BlePairStatus::Failed(_) => "Pairing attempt failed",
+        BlePairStatus::Connected => "Connecting, negotiating pairing...",
+        BlePairStatus::Advertising => "Discoverable as 'PaperMono'",
+        BlePairStatus::Disabled => "BLE radio disabled in build",
+    };
+    let _ = Text::with_alignment(instruction, Point::new(240, 145), style, Alignment::Center)
+        .draw(&mut ink);
+
+    // PIN Content
+    match status {
+        BlePairStatus::Pairing(pin) => {
+            let digits = [
+                (((pin / 100_000) % 10) as u8 + b'0'),
+                (((pin / 10_000) % 10) as u8 + b'0'),
+                (((pin / 1_000) % 10) as u8 + b'0'),
+                (((pin / 100) % 10) as u8 + b'0'),
+                (((pin / 10) % 10) as u8 + b'0'),
+                ((pin % 10) as u8 + b'0'),
+            ];
+            for (i, &d) in digits.iter().enumerate() {
+                let char_str = core::str::from_utf8(core::slice::from_ref(&d)).unwrap_or("-");
+                let x = 90 + (i as i32) * 52 + 20;
+                let _ =
+                    Text::with_alignment(char_str, Point::new(x, 227), style, Alignment::Center)
+                        .draw(&mut ink);
+            }
+        }
+        BlePairStatus::Success => {
+            let _ = Text::with_alignment(
+                "P A I R E D",
+                Point::new(240, 227),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        _ => {
+            for i in 0..6 {
+                let x = 90 + i * 52 + 20;
+                let _ = Text::with_alignment("-", Point::new(x, 227), style, Alignment::Center)
+                    .draw(&mut ink);
+            }
+        }
+    }
+
+    // Result section
+    match status {
+        BlePairStatus::Success => {
+            let _ = Text::with_alignment("SUCCESS", Point::new(240, 345), style, Alignment::Center)
+                .draw(&mut ink);
+            let _ = Text::with_alignment(
+                "Bluetooth connection encrypted.",
+                Point::new(240, 395),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        BlePairStatus::Failed(reason) => {
+            let _ = Text::with_alignment("FAILED", Point::new(240, 345), style, Alignment::Center)
+                .draw(&mut ink);
+            let mut buf = [0u8; 64];
+            let mut writer = BufWriter {
+                buf: &mut buf,
+                pos: 0,
+            };
+            let _ = write!(writer, "Why: {}", reason.as_str());
+            if let Ok(label) = core::str::from_utf8(&writer.buf[..writer.pos]) {
+                let _ = Text::with_alignment(label, Point::new(240, 395), style, Alignment::Center)
+                    .draw(&mut ink);
+            }
+            let _ = Text::with_alignment(
+                "Retry pairing from phone settings.",
+                Point::new(240, 425),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        BlePairStatus::Connected => {
+            let _ = Text::with_alignment(
+                "Status: Phone connected",
+                Point::new(240, 345),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+            let _ = Text::with_alignment(
+                "Awaiting passkey exchange...",
+                Point::new(240, 395),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        BlePairStatus::Pairing(_) => {
+            let _ = Text::with_alignment(
+                "Status: Pairing in progress",
+                Point::new(240, 345),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+            let _ = Text::with_alignment(
+                "Enter PIN shown above on phone",
+                Point::new(240, 395),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        BlePairStatus::Advertising => {
+            let _ = Text::with_alignment(
+                "Status: Ready to pair",
+                Point::new(240, 345),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+            let _ = Text::with_alignment(
+                "Select 'PaperMono' in phone Bluetooth",
+                Point::new(240, 395),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+        BlePairStatus::Disabled => {
+            let _ = Text::with_alignment(
+                "Status: Radio disabled in build",
+                Point::new(240, 345),
+                style,
+                Alignment::Center,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // How to pair guide
+    let _ = Text::with_alignment(
+        "HOW TO PAIR",
+        Point::new(240, 510),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let steps = [
+        "1. Open Settings -> Bluetooth on phone",
+        "2. Select 'PaperMono' under devices",
+        "3. Wait for pairing passkey prompt",
+        "4. Enter the 6-digit PIN shown above",
+    ];
+    let mut step_y = 545;
+    for step in steps {
+        let _ = Text::new(step, Point::new(45, step_y), style).draw(&mut ink);
+        step_y += 35;
+    }
+
+    // Navigation footer
+    let _ = Text::with_alignment(
+        "BUTTON A: Prev   |   BUTTON B: Next",
+        Point::new(240, 755),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 5: 4-level grayscale horizontal tone bands.
 fn draw_tones(bw: &mut [u8], red: &mut [u8]) {
     const BOX_X: u16 = 40;
     const BOX_W: u16 = display::WIDTH - 80;

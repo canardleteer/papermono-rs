@@ -42,7 +42,7 @@ Panel call site is `display::OtpRefresh` only:
 | Card / step | Sequence |
 | --- | --- |
 | Tones | `GrayFull` |
-| Splash / shapes / legend | `paint_mono_fast` |
+| Splash / shapes / legend / bluetooth | `paint_mono_fast` |
 | Enter targets | `MonoFull` |
 | Marks | `Partial` |
 | After `PARTIALS_BEFORE_FULL` (6) | next mono is `MonoFull` |
@@ -52,14 +52,15 @@ SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
 Do not send `Partial` after `GrayFull` without `MonoFull`.
 Do not start a new waveform while BUSY is high.
 
-Five cards: splash Ferris + `papermono-rs`, shapes (procedural
+Six cards: splash Ferris + `papermono-rs`, shapes (procedural
 3-degree Koch snowflake with microsecond benchmark), legend
 (A / B / sleep / red power / right lamp / live battery % gauge with
-60 s auto-refresh), four-gray tones, target walk. Short A previous,
-short B next, wrap. Right-edge contact sets PWM0 from Y (top bright).
-Hold A 2 s triggers sleep notice and light sleep; hold A or B 1 s
-wakes. Hold A ~1 s dumps PCM only when `mic` is on. GPIO42 chirp
-stays parked.
+60 s auto-refresh), bluetooth (BLE peripheral pairing with 6-digit
+passkey display and success/fail reason), four-gray tones, target
+walk. Short A previous, short B next, wrap. Right-edge contact sets
+PWM0 from Y (top bright). Hold A 2 s triggers sleep notice and light
+sleep; hold A or B 1 s wakes. Hold A ~1 s dumps PCM only when `mic`
+is on. GPIO42 chirp stays parked.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png),
