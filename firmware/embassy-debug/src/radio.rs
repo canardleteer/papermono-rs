@@ -27,8 +27,9 @@
 //!   and a custom pairing service with an encrypted read-only characteristic. Modern smartphone
 //!   operating systems require encrypted characteristics or explicit security requests to
 //!   prompt the user for bonding and passkey exchange.
-//! - **No NVS Storage Writes**: Operates without modifying non-volatile storage flash
-//!   sectors (`nvs_enable` disabled in driver), ensuring factory RF calibration data remains intact.
+//! - **No NVS Storage Writes**: Pairing bonds are stored strictly in RAM (`HostResources`),
+//!   and no NVS storage partition or filesystem is initialized or mounted, ensuring factory
+//!   flash sectors and RF calibration data remain untouched.
 //! - **Coexistence Sequencing**: BLE controller is brought up and executed before
 //!   triggering Wi-Fi scans to satisfy ESP32-S3 hardware RF coexistence scheduling.
 

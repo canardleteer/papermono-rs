@@ -27,7 +27,12 @@ use crate::panel::{Mark, Panel};
 use crate::share;
 use crate::touch_bus;
 
+/// Target touch point X coordinates on official 480x800 portrait layout:
+/// Center point (240), then four peripheral corner points inset 80 px (80, 400, 80, 400).
 const DOT_X: [u16; 5] = [240, 80, 400, 80, 400];
+
+/// Target touch point Y coordinates on official 480x800 portrait layout:
+/// Center point (400), then four peripheral corner points inset 80 px (80, 80, 720, 720).
 const DOT_Y: [u16; 5] = [400, 80, 80, 720, 720];
 const SLIDE_X_ID: u8 = 5;
 const SLIDE_Y_ID: u8 = 6;

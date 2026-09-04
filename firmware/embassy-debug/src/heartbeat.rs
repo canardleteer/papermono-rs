@@ -4,7 +4,7 @@
 //! This module runs as an autonomous Embassy asynchronous task (`run`), driving the
 //! periodic telemetry streams that mirror the [`simple-debug`] protocol:
 //!
-//! - **Button Polling & Edge Telemetry (10 ms)**: If the interactive UI is disabled,
+//! - **Button Polling & Edge Telemetry (50 ms)**: If the interactive UI is disabled,
 //!   this task directly samples tactile buttons `GPIO2` and `GPIO3` and emits edge events.
 //!   When the interactive UI is active, the UI task owns those pins, and this task reads
 //!   the lock-free atomic mirrors in [`crate::share`].
@@ -125,6 +125,9 @@ pub async fn run(pins: Inputs, hello: Hello) {
                 btn_a: (now_a != prev_a).then_some((prev_a, now_a)),
                 btn_b: (now_b != prev_b).then_some((prev_b, now_b)),
             });
+            // When interactive UI is disabled, BUTTON A press edge triggers the audio tone
+            // test immediately; when UI is active, BUTTON A requires a 1 s hold to distinguish
+            // tone requests from card-previous navigation taps.
             if prev_a && !now_a {
                 #[cfg(feature = "mic")]
                 crate::mic::ask_tone();

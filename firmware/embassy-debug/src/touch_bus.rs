@@ -5,11 +5,11 @@
 //! I2C bus (`I2C0` on `GPIO47`/`GPIO48`):
 //!
 //! - **IP2315 Bus Isolation Safety Rule**: The IP2315 fast charger can hang or latch up
-//!   the system I2C bus, especially at lower battery voltages. It must remain disconnected
-//!   (parked) via M5IOE1 `PYG11_PWM3` (`ioe1::IP2315_I2C_GATE`) at all times except during
-//!   the brief active charge status reading window ([`bring_up`]).
+//!   the system I2C bus, especially at lower battery voltages. It remains permanently
+//!   disconnected (parked) via M5IOE1 `PYG11_PWM3` (`ioe1::IP2315_I2C_GATE`) off the
+//!   system I2C bus to guarantee bus stability.
 //! - **Peripheral Roster**: Probes the presence of:
-//!   - M5PM1 PMIC (`0x55` or `0x6F`)
+//!   - M5PM1 PMIC (`0x6E`)
 //!   - M5IOE1 I/O expander (`0x4F` or `0x6F`)
 //!   - RX8130CE RTC (`0x32`)
 //!   - BMI270 / QMA6100P IMU (`0x68`)
@@ -50,14 +50,6 @@ const IOE_UM: u16 = 1 << 8;
 
 /// Delay following MicroSD card power enable before sampling detect pin.
 const TF_POWER_MS: u64 = 300;
-
-/// Duration to hold the IP2315 gate switch closed during the charge transaction.
-#[allow(dead_code)]
-const CHARGE_MOUNT_MS: u64 = 50;
-
-/// Settling delay after opening the IP2315 gate switch to ensure bus lines release.
-#[allow(dead_code)]
-const CHARGE_PARK_MS: u64 = 20;
 
 const CHARGE_EN: u8 = 1 << 0;
 const CHARGE_IP: u8 = 1 << 1;

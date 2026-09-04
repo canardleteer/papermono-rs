@@ -111,6 +111,8 @@ async fn try_init_at(i2c: &mut SysI2c, addr: u8) -> bool {
         return true;
     }
 
+    // Experimental fallback probe at 400 kHz to match official M5Unified discovery sequencing;
+    // restores standard 100 kHz bus clock immediately after testing device responsiveness.
     let _ = i2c.apply_config(&hz400);
     wake(i2c, addr);
     Timer::after(Duration::from_millis(WAKE_SETTLE_MS)).await;
