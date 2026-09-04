@@ -62,7 +62,9 @@ wakes. Hold A ~1 s dumps PCM only when `mic` is on. GPIO42 chirp
 stays parked.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
-Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png).
+Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png),
+[docs/assets/koch-snowflake.png](../../docs/assets/koch-snowflake.png),
+and [docs/assets/battery.png](../../docs/assets/battery.png).
 Silicon facts: hardware
 [measure.md](../../.agents/skills/m5stack-papermono-hardware/references/measure.md)
 and [display.md](../../.agents/skills/m5stack-papermono-hardware/references/display.md).

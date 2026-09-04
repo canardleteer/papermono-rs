@@ -52,7 +52,13 @@ before treating a command as verified on target hardware.
 <div align="center">
   <img src="docs/assets/first-ferris.png"
        alt="embassy-debug splash on PaperMono-Lite, USB-C down"
-       width="360">
+       height="360">
+  <img src="docs/assets/koch-snowflake.png"
+       alt="embassy-debug 3-degree Koch snowflake card on PaperMono-Lite"
+       height="360">
+  <img src="docs/assets/battery.png"
+       alt="embassy-debug Legend card with battery gauge on PaperMono-Lite"
+       height="360">
 </div>
 
 - [plain](./firmware/simple-debug)

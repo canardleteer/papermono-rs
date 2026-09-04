@@ -146,6 +146,14 @@ vs I2C mux more than a hung bus (VBAT was not low).
 `C153` still
 [nyc-charge-stat](../resources/not-yet-confirmed.md#nyc-charge-stat).
 
+**Lite live battery telemetry (`C153-Lite`, 2026-09-03):** M5PM1 ADC
+`VBAT` 4190 mV, `VIN` 5030 mV. `m5pm1::battery_percent` maps the 1S LiPo
+linear discharge curve (3300 mV cutoff = 0%, 4150 mV full = 100%).
+The `embassy-debug-fw` Legend card displays a live proportional battery
+outline gauge, fill bar, percentage / mV readout, USB power source state
+(`PWR_SRC` / `VIN >= 4400 mV`), and auto-refreshes every 60 seconds with
+IP2315 kept safely parked off the system I2C bus.
+
 ## Frontlight
 
 Official pin map: M5PM1 G3 PWM (`BL_FB`). Schematic V0.6.2:

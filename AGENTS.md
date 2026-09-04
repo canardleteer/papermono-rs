@@ -210,7 +210,7 @@ xtask catalog a human sees, update the matching row in the
 
 | File | Audience | Keep current when |
 | --- | --- | --- |
-| [README.md](README.md) | humans | firmware-examples list, `docs/assets/first-ferris.png`, xtask summary, SKUs, safety / getting-started / NYC / CRATES links |
+| [README.md](README.md) | humans | firmware-examples list, `docs/assets/*.png` gallery, xtask summary, SKUs, safety / getting-started / NYC / CRATES links |
 | [docs/getting-started.md](docs/getting-started.md) | humans | host verify, Xtensa, snapshot, Path A / Path B, troubleshooting, NYC / CRATES |
 | [docs/firmware-snapshot-management.md](docs/firmware-snapshot-management.md) | humans | capture, confirm, restore, tool ledger, honest limits |
 | [docs/CRATES.md](docs/CRATES.md) | humans + agents | pass / fail / written-here / constants-in-BSP |

@@ -8,7 +8,7 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | --- | --- | --- |
 | `papermono-log/` | — | Host-tested USB-Serial/JTAG lines for `simple-debug-fw` and `embassy-debug-fw` |
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
-| `m5pm1/` | — | PMIC registers, PWM0, ADC, red LED |
+| `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |
 | `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |

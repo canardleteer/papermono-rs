@@ -16,7 +16,7 @@
 | `host/papermono-host/udev/` | usbfs udev rule for `monitor` |
 | `xtask/` | Clap front-end (`cargo xtask`) |
 | `developer-data/` | Gitignored. Snapshots under `backups/`; confirm JSON under `confirm-records/` |
-| `docs/` | [getting-started.md](../../../../docs/getting-started.md), [firmware-snapshot-management.md](../../../../docs/firmware-snapshot-management.md), [CRATES.md](../../../../docs/CRATES.md), [SAFETY.md](../../../../docs/SAFETY.md) (symlink), [DATASHEETS.md](../../../../docs/DATASHEETS.md) (symlink), [not-yet-confirmed.md](../../../../docs/not-yet-confirmed.md) (symlink), [assets/first-ferris.png](../../../../docs/assets/first-ferris.png) |
+| `docs/` | [getting-started.md](../../../../docs/getting-started.md), [firmware-snapshot-management.md](../../../../docs/firmware-snapshot-management.md), [CRATES.md](../../../../docs/CRATES.md), [SAFETY.md](../../../../docs/SAFETY.md) (symlink), [DATASHEETS.md](../../../../docs/DATASHEETS.md) (symlink), [not-yet-confirmed.md](../../../../docs/not-yet-confirmed.md) (symlink), [assets/first-ferris.png](../../../../docs/assets/first-ferris.png), [assets/koch-snowflake.png](../../../../docs/assets/koch-snowflake.png), [assets/battery.png](../../../../docs/assets/battery.png) |
 | `firmware/simple-debug/` | Workspace member, not a default-member. [firmware/AGENTS.md](../../../../firmware/AGENTS.md) |
 | `firmware/embassy-debug/` | Workspace member, not a default-member. Embassy staged image |
 | `firmware/embassy-debug/assets/` | Splash Ferris: line-art SVG, 1bpp + invert, encode script. [SOURCE.md](../../../../firmware/embassy-debug/assets/SOURCE.md) |

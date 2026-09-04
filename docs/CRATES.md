@@ -48,7 +48,7 @@ IP2315 crates.
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map. `C153-Lite` firmware depends on this only |
 | [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` radio add-on. Not a `lite` Cargo feature |
 | [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
-| [`m5pm1`](../crates/m5pm1) | Register map, ADC, PWM0, red LED. Board nets stay in the BSP |
+| [`m5pm1`](../crates/m5pm1) | Register map, ADC, battery %, PWM0, red LED. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |
 | [`papermono-log`](../crates/papermono-log) | CDC line format for **both** `simple-debug-fw` and `embassy-debug-fw` |
 

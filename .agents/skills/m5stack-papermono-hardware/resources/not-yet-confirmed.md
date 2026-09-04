@@ -237,7 +237,10 @@ on USB, then isolate. Record current and done indication.
 did not ACK (`ip=0`). After park: still NAK (`then=0`,
 roster `chg=0`). Human: rear charge LED stayed red, no
 color change; front lamp on. No IP2315 current or done
-register (chip stayed off the bus). `C153` open.
+register (chip stayed off the bus). Live UI telemetry
+(2026-09-03) verified on Legend card: M5PM1 `vbat=4190`, `vin=5030`,
+`battery_percent` mapping 3300..4150 mV with 60 s auto-refresh and IP2315
+parked. Battery drain rate and IP2315 registers remain open. `C153` open.
 [power-and-sleep.md](../references/power-and-sleep.md),
 [measure.md](../references/measure.md).
 
