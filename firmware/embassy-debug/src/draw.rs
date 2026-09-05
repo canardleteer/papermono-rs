@@ -855,7 +855,7 @@ fn draw_bluetooth(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
             let row = i32::try_from(i / 2).unwrap_or(0);
             let x = i32::from(layout.step_x) + col * 380;
             let y = layout.step_y0 + row * 32;
-            let _ = Text::new(*step, Point::new(x, y), style).draw(&mut ink);
+            let _ = Text::new(step, Point::new(x, y), style).draw(&mut ink);
         }
     }
 
@@ -1293,7 +1293,7 @@ fn draw_wifi_survey(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     let mut guide_y = layout.guide_y0;
     for line in guide_lines {
         let _ =
-            Text::new(*line, Point::new(i32::from(layout.guide_x), guide_y), style).draw(&mut ink);
+            Text::new(line, Point::new(i32::from(layout.guide_x), guide_y), style).draw(&mut ink);
         guide_y += layout.guide_step;
     }
 
@@ -1597,8 +1597,7 @@ fn draw_wifi_ap(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     };
     let mut tut_y = layout.guide_y0;
     for step in tut_steps {
-        let _ =
-            Text::new(*step, Point::new(i32::from(layout.guide_x), tut_y), style).draw(&mut ink);
+        let _ = Text::new(step, Point::new(i32::from(layout.guide_x), tut_y), style).draw(&mut ink);
         tut_y += layout.guide_step;
     }
 
@@ -2090,6 +2089,7 @@ fn koch_curve(
 }
 
 /// Draws a single-pixel line between two page-space integer coordinates using Bresenham's algorithm.
+#[allow(clippy::too_many_arguments)]
 fn draw_line(
     bw: &mut [u8],
     red: &mut [u8],
@@ -2151,6 +2151,7 @@ impl<'a> core::fmt::Write for BufWriter<'a> {
 }
 
 /// Draws an upward-pointing filled isosceles triangle in page coordinates.
+#[allow(clippy::too_many_arguments)]
 fn fill_triangle_up(
     bw: &mut [u8],
     red: &mut [u8],
@@ -2183,6 +2184,7 @@ fn fill_triangle_up(
 }
 
 /// Fills a rectangular region in page coordinates with the specified grayscale tone.
+#[allow(clippy::too_many_arguments)]
 fn fill_rect(
     bw: &mut [u8],
     red: &mut [u8],
@@ -2202,6 +2204,7 @@ fn fill_rect(
 }
 
 /// Draws the single-pixel outline of a rectangle in page coordinates.
+#[allow(clippy::too_many_arguments)]
 fn stroke_rect(
     bw: &mut [u8],
     red: &mut [u8],

@@ -521,6 +521,7 @@ async fn wait_nav(
 
 /// Transitions the system into light sleep after drawing the sleep screen, and waits for a 1-second hold on Button A or B to wake.
 #[cfg(feature = "sleep")]
+#[allow(clippy::too_many_arguments)]
 async fn enter_sleep(
     i2c: &mut SysI2c,
     panel: &mut Panel,
