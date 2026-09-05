@@ -185,6 +185,9 @@ pub async fn run(
                     };
                     if let Some(nav) = wait_nav(
                         &mut i2c,
+                        &mut panel,
+                        &busy,
+                        planes,
                         &btn_a,
                         &btn_b,
                         &tp,
@@ -227,6 +230,9 @@ pub async fn run(
             };
             if let Some(nav) = wait_nav(
                 &mut i2c,
+                &mut panel,
+                &busy,
+                planes,
                 &btn_a,
                 &btn_b,
                 &tp,
@@ -352,6 +358,9 @@ async fn paint(
 #[allow(clippy::too_many_arguments)]
 async fn wait_nav(
     i2c: &mut SysI2c,
+    panel: &mut Panel,
+    busy: &Input<'static>,
+    planes: &mut Planes,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
@@ -463,6 +472,38 @@ async fn wait_nav(
         if in_button {
             if !button_touch_down {
                 button_touch_down = true;
+                crate::beep::click();
+
+                // 1. Immediately highlight button box on glass:
+                let (bx, by, bw, bh) = draw::wifi_action_rect(ctx.rotation);
+                draw::invert_page_rect(
+                    &mut planes.bw,
+                    &mut planes.red,
+                    bx,
+                    by,
+                    bw,
+                    bh,
+                    ctx.rotation,
+                );
+                panel
+                    .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                    .await;
+
+                // 2. Immediately unhighlight button box on glass:
+                draw::invert_page_rect(
+                    &mut planes.bw,
+                    &mut planes.red,
+                    bx,
+                    by,
+                    bw,
+                    bh,
+                    ctx.rotation,
+                );
+                panel
+                    .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                    .await;
+
+                // 3. Dispatch backend action regardless of async completion timing:
                 match ctx.scene {
                     Scene::WifiSurvey => {
                         let mode = crate::radio::wifi_mode();

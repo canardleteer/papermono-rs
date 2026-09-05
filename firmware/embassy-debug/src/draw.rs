@@ -177,6 +177,49 @@ pub fn wifi_action_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
     px >= x0 && px < x1 && py >= y0 && py < y1
 }
 
+/// Inverts pixels within a page-space rectangle across both grayscale planes.
+///
+/// Because bitwise XOR is self-inverting (`x ^ 1 ^ 1 == x`), calling this function
+/// once highlights a button box (reversing foreground and background), and calling
+/// it a second time cleanly restores the original pixel data.
+pub fn invert_page_rect(
+    bw: &mut [u8],
+    red: &mut [u8],
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+    rotation: PageRotation,
+) {
+    let (page_w, page_h) = rotation.page_size();
+    let max_y = y.saturating_add(h).min(page_h);
+    let max_x = x.saturating_add(w).min(page_w);
+    for py in y..max_y {
+        for px in x..max_x {
+            invert_gray_page(bw, red, px, py, rotation);
+        }
+    }
+}
+
+fn invert_gray_page(bw: &mut [u8], red: &mut [u8], px: u16, py: u16, rotation: PageRotation) {
+    let Some((fx, fy)) = display::page_to_framebuffer(px, py, rotation) else {
+        return;
+    };
+    invert_pixel(bw, fx, fy);
+    invert_pixel(red, fx, fy);
+}
+
+fn invert_pixel(plane: &mut [u8], fx: u16, fy: u16) {
+    if fx >= display::WIDTH || fy >= display::HEIGHT {
+        return;
+    }
+    let idx = usize::from(fy) * display::BYTES_PER_ROW + usize::from(fx) / 8;
+    let mask = 0x80u8 >> (fx % 8);
+    if let Some(b) = plane.get_mut(idx) {
+        *b ^= mask;
+    }
+}
+
 /// Renders Card 1: Ferris mascot splash screen and user navigation guide.
 ///
 /// Portrait keeps the historical centered stack. Landscape tightens vertical
