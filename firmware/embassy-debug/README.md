@@ -23,6 +23,10 @@ On the unit:
 - Slide the right edge for the lamp (top bright, bottom dim).
 - Slide the left edge for passive buzzer volume (top loudest, bottom silent;
   audio ticks on drag). Both sliders respect screen orientation.
+- On-screen touch buttons (Wi-Fi survey and hotspot) provide immediate
+  inverted-box visual feedback and acoustic click on contact, with clear
+  starting/stopping state indications. Touch regions and sliders are scoped in
+  page space across all four screen orientations.
 - Hold BUTTON A about 2 s to enter low-power sleep; hold BUTTON A
   or B about 1 s to wake up.
 - Hold BUTTON A about 1 s for a PCM dump when the image

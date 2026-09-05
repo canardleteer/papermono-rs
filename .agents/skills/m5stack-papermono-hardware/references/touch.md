@@ -78,6 +78,15 @@ After M5IOE1 EN/RST, address-only `read` at `0x38` ACKs
 - Same space as official 480×800 / USB-C-down physical.
   Do not silently rotate.
 
+## Warm reboot and power-cycling
+
+Warm reboots or restarts exiting USB download mode without an explicit
+digitizer power-cycle can leave FT6336 held in reset, pulling `/INT`
+(GPIO4) low (`tp=0`) and NAKing address `0x38`. Power-cycling
+`TOUCH_VDD_ENABLE` (low 30 ms, high 20 ms) and releasing `TOUCH_RST` high
+with 100 ms settling restores `tp=1` and `0x38` ACK. GPIO4 requires an
+internal pull-up (`Pull::Up`) for stable idle-high signaling.
+
 ## Lamp gutter vs targets
 
 Embassy-debug right-edge strip is 80 px
@@ -99,3 +108,17 @@ not a silent rotate. UserDemo uses `M5.Touch` after
 GPIO4 low ([user-demo.md](user-demo.md)). `C153` canvas
 still
 [nyc-canvas-orient](../resources/not-yet-confirmed.md#nyc-canvas-orient).
+
+In embassy-debug, page rotation (`orient`) remaps physical 480×800 touch
+coordinates into page space via `display::framebuffer_to_page` across
+all four orientations (`Portrait0`, `Portrait180`, `Landscape0`,
+`Landscape180`). Coordinates are clamped to boundaries to prevent dropping
+extreme edge taps. In all four orientations:
+
+- Volume slider gutter is scoped to the user's visual left edge
+  (`px <= 80`).
+- Frontlight slider gutter is scoped to the user's visual right edge
+  (`px >= pw - 80`).
+- Touch action buttons (e.g. Wi-Fi survey / AP) are hit-tested in page
+  coordinates via `draw::wifi_action_hit` and instantly inverted on glass with
+  partial refresh.

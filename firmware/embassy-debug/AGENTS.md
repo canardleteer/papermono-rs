@@ -188,8 +188,9 @@ Default Cargo feature. Sticky-rs policy ported to BMI270:
 - Dominant-axis classify at 0.70 g; FaceUp/FaceDown keep last page.
 - Draw in page space (`PageRotation`); map via
   `display::page_to_framebuffer` into fixed USB-down 480×800 planes.
-- Touch Wi-Fi buttons use `framebuffer_to_page` then
-  `draw::wifi_action_hit`. Lamp gutter stays **physical** right edge.
+- Touch Wi-Fi buttons use `framebuffer_to_page` then `draw::wifi_action_hit`.
+  Volume (left edge) and frontlight (right edge) gutters are also evaluated in
+  page space across all four orientations.
 - CDC `imu pose=… x=… y=… z=…` every 5 s and on page change.
 - Axis→pose (Lite 2026-09-04): −X `Portrait0`, +X `Portrait180`,
   +Y `Landscape0`, −Y `Landscape180`. `C153` still unconfirmed.
@@ -197,22 +198,22 @@ Default Cargo feature. Sticky-rs policy ported to BMI270:
 - Bring-up: Bosch standard **8 KiB** `bmi270_config_file` with
   `INIT_ADDR_*` chunking; `INTERNAL_STATUS` is `0x21`. Do **not**
   use the maximum-FIFO config blob (wrong variant; XYZ stay zero).
-- Nav: arm after both buttons released; A/B short-press on
-  **release**; handle buttons before IMU; require
-  `IMU_STABLE_POLLS` (3) agreeing samples before remapping.
-  Press-on-down for B ate the next edge after slow Shapes paint.
+- Nav: monitor buttons concurrently during EPD paint to queue clicks;
+  handle buttons before IMU; require `IMU_STABLE_POLLS` (3) agreeing
+  samples before remapping.
 
 ```shell
-cargo xtask build-fw embassy-debug --features orient
+cargo xtask build-fw embassy-debug
 ```
 
 ## Card navigation edges
 
-`wait_nav` drains Button A/B until both are high before arming.
-Short Prev/Next fire on release. That avoids a hold through a
-long paint (Shapes snowflake + panel) leaving B stuck low so the
-operator must press twice. Soft orientation / radio refreshes
-run after button handling so a same-tick press wins.
+Button monitoring runs concurrently during long EPD paints
+(`paint_with_buttons` via `select`), queuing navigation events so rapid clicks
+are never dropped. Button A short-press fires on release (distinguishing
+long-press sleep); Button B fires immediately on press-down (falling edge).
+Audible key clicks sound on every valid button press. Soft orientation / radio
+refreshes run after button handling so a same-tick press wins.
 
 ## Firmware examples as tutorial code
 

@@ -137,7 +137,8 @@ message structure are covered in
 `embassy-debug` activates async board drivers. Standard builds enable touch
 interaction, panel rendering, orientation tracking, and button sleep/wake,
 presenting a Ferris splash on boot and allowing navigation across test cards
-with hardware buttons. The frontlight brightness adjusts via edge swipes.
+with hardware buttons. Frontlight brightness and buzzer volume adjust via edge
+swipes, and touch buttons provide immediate visual highlight feedback.
 
 ```shell
 . $HOME/export-esp.sh
