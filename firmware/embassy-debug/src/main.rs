@@ -152,9 +152,10 @@ async fn main(spawner: Spawner) -> ! {
         peripherals.GPIO1,
         InputConfig::default().with_pull(Pull::None),
     );
+    // FT6336G capacitive touch interrupt line: active-low with internal pull-up.
     let tp = Input::new(
         peripherals.GPIO4,
-        InputConfig::default().with_pull(Pull::None),
+        InputConfig::default().with_pull(Pull::Up),
     );
     let ioe_irq = Input::new(
         peripherals.GPIO7,

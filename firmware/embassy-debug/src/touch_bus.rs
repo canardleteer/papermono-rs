@@ -36,9 +36,10 @@ use papermono_log::{ChargeSample, I2cSample, TouchSample};
 use crate::cdc;
 use crate::ioe::{self, SysI2c};
 
-/// Pulse widths for resetting the FT6336G touch controller following power rail enable.
-const TOUCH_RST_LOW_MS: u64 = 10;
-const TOUCH_RST_HIGH_MS: u64 = 50;
+/// Reset hold and settle times for the FT6336G touch controller.
+const TOUCH_PWR_OFF_MS: u64 = 30;
+const TOUCH_PWR_SETTLE_MS: u64 = 20;
+const TOUCH_BOOT_MS: u64 = 100;
 
 const PM1: u16 = 1 << 0;
 const IOE: u16 = 1 << 1;
@@ -136,24 +137,34 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
         let _ = ioe::set_push_pull_output(i2c, ioe1::MICROSD_ENABLE, true);
         Timer::after(Duration::from_millis(TF_POWER_MS)).await;
 
-        // AW9967 sits on the EPD 3.3 V rail. Raise rails and pulse touch reset.
+        // AW9967 sits on the EPD 3.3 V rail. Raise rails and power-cycle touch.
         let _ = ioe::set_push_pull_output(i2c, ioe1::EPD_VDD_ENABLE, true);
-        let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_VDD_ENABLE, true);
+
+        // Power cycle FT6336G capacitive touch controller to ensure clean state machine
+        // across warm reboots and download-mode restarts:
         let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_RST, false);
-        Timer::after(Duration::from_millis(TOUCH_RST_LOW_MS)).await;
+        let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_VDD_ENABLE, false);
+        Timer::after(Duration::from_millis(TOUCH_PWR_OFF_MS)).await;
+        let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_VDD_ENABLE, true);
+        Timer::after(Duration::from_millis(TOUCH_PWR_SETTLE_MS)).await;
         let _ = ioe::set_push_pull_output(i2c, ioe1::TOUCH_RST, true);
-        Timer::after(Duration::from_millis(TOUCH_RST_HIGH_MS)).await;
+        Timer::after(Duration::from_millis(TOUCH_BOOT_MS)).await;
     }
 
     let rtc_flag = ioe::read_at(i2c, rtc::ADDRESS, rtc::FLAG);
     let rtc_ack = rtc_flag.is_some();
     let imu_id = ioe::read_at(i2c, imu::ADDRESS, imu::CHIP_ID).unwrap_or(0);
     let imu_ack = imu_id == imu::CHIP_ID_VALUE;
-    let tp = if ioe_ack {
-        ioe::probe_addr(i2c, addresses::FT6336G)
-    } else {
-        false
-    };
+    let mut tp = false;
+    if ioe_ack {
+        for _ in 0..5 {
+            if ioe::probe_addr(i2c, addresses::FT6336G) {
+                tp = true;
+                break;
+            }
+            Timer::after(Duration::from_millis(20)).await;
+        }
+    }
     let nfc = ioe::probe_read(
         i2c,
         addresses::ST25R3916_LEFTOVER,

@@ -138,12 +138,26 @@ pub fn set_push_pull_output(
     pyg: u8,
     high: bool,
 ) -> Result<(), esp_hal::i2c::master::Error> {
-    m5stack_papermono_lite::m5ioe1::set_push_pull_output(
-        i2c,
-        IOE_ADDR.load(Ordering::Relaxed),
-        pyg,
-        high,
-    )
+    let mut last_err = None;
+    for _ in 0..5 {
+        match m5stack_papermono_lite::m5ioe1::set_push_pull_output(
+            i2c,
+            IOE_ADDR.load(Ordering::Relaxed),
+            pyg,
+            high,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                embassy_time::block_for(embassy_time::Duration::from_millis(5));
+            }
+        }
+    }
+    if let Some(err) = last_err {
+        Err(err)
+    } else {
+        Ok(())
+    }
 }
 
 /// Configures an expander pin as a digital input.

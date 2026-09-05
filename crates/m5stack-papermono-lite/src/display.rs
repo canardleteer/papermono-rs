@@ -178,11 +178,14 @@ pub const fn page_to_framebuffer(px: u16, py: u16, rotation: PageRotation) -> Op
 }
 
 /// Inverse of [`page_to_framebuffer`] for touch hit-testing in page space.
+///
+/// Clamps physical edge contacts to the panel boundary so touch contacts
+/// near extreme active-area boundaries (`fx >= WIDTH` or `fy >= HEIGHT`)
+/// are not discarded.
 #[must_use]
 pub const fn framebuffer_to_page(fx: u16, fy: u16, rotation: PageRotation) -> Option<(u16, u16)> {
-    if fx >= WIDTH || fy >= HEIGHT {
-        return None;
-    }
+    let fx = if fx >= WIDTH { WIDTH - 1 } else { fx };
+    let fy = if fy >= HEIGHT { HEIGHT - 1 } else { fy };
     Some(match rotation {
         PageRotation::Portrait0 => (fx, fy),
         PageRotation::Portrait180 => (WIDTH - 1 - fx, HEIGHT - 1 - fy),
@@ -259,5 +262,39 @@ mod tests {
         assert_eq!(PageRotation::Landscape0.page_size(), (800, 480));
         assert!(PageRotation::Portrait0.is_portrait());
         assert!(!PageRotation::Landscape0.is_portrait());
+    }
+
+    #[test]
+    fn touch_regions_in_all_four_rotations() {
+        for rot in [
+            PageRotation::Portrait0,
+            PageRotation::Portrait180,
+            PageRotation::Landscape0,
+            PageRotation::Landscape180,
+        ] {
+            let (pw, ph) = rot.page_size();
+
+            // 1. Left gutter (volume slider): page (20, ph/2)
+            let (fx_left, fy_left) = page_to_framebuffer(20, ph / 2, rot).expect("in bounds");
+            assert_eq!(
+                framebuffer_to_page(fx_left, fy_left, rot),
+                Some((20, ph / 2))
+            );
+
+            // 2. Right gutter (lamp slider): page (pw - 20, ph/2)
+            let (fx_right, fy_right) =
+                page_to_framebuffer(pw - 20, ph / 2, rot).expect("in bounds");
+            assert_eq!(
+                framebuffer_to_page(fx_right, fy_right, rot),
+                Some((pw - 20, ph / 2))
+            );
+
+            // 3. Center action button: page (pw/2, ph - 70)
+            let (fx_btn, fy_btn) = page_to_framebuffer(pw / 2, ph - 70, rot).expect("in bounds");
+            assert_eq!(
+                framebuffer_to_page(fx_btn, fy_btn, rot),
+                Some((pw / 2, ph - 70))
+            );
+        }
     }
 }
