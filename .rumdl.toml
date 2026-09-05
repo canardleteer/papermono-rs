@@ -27,6 +27,7 @@ include = [
     ".agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md",
     ".agents/skills/m5stack-papermono-hardware/resources/enclosure/SOURCE.md",
     ".agents/skills/m5stack-papermono-hardware/resources/official-html/SOURCE.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md",
 ]
 
 exclude = [

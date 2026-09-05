@@ -127,7 +127,8 @@ a row that asks anyone to invent an unread register map.
 **16 MB**, secure boot and flash encryption disabled. Written
 in [measure.md](../references/measure.md). Still need JEDEC
 manufacturer bytes, PSRAM size (Features did not name it),
-eFuse flash mode/voltage, and the same row on **`C153`**.
+eFuse flash mode/voltage, and the same row on **`C153`** (prepared
+on `feat/papermono-discovery`).
 
 With the unit in download mode and a human ask, run `esptool.py
 flash-id` / `espflash board-info`. Record **SKU**, chip rev,
@@ -140,7 +141,8 @@ Do not print MAC.
 USB JTAG/serial debug unit). Lite run (2026-09-02): one
 ACM + vendor JTAG; no second CDC; no CH343;
 `probe-rs list` → `EspJtag`. Still need **PaperMono
-(`C153`)** run and download. Do not commit iSerial. Write
+(`C153`)** run and download (target `303a:1001`, prepared on
+`feat/papermono-discovery`). Do not commit iSerial. Write
 [flashing.md](../references/flashing.md).
 
 ### nyc-download-mode
@@ -384,14 +386,15 @@ How many simultaneous contacts report? Public sheet says 1–2.
 ### nyc-i2c-ack
 
 C153, system I2C scan after M5PM1/M5IOE1 init, IP2315
-isolated: expect `0x32`, `0x38`, `0x4F`, `0x50`, `0x68`,
-`0x6E`. `0x75` only while gated on.
+isolated: expect `0x32`, `0x38`, `0x4F`, `0x50` (when M5IOE1
+`PYG4` / `IOE1_ENABLE` is driven high), `0x68`, `0x6E`.
+`0x75` only while gated on via `PYG11`.
 [pin-map.md](../references/pin-map.md).
 
 **Lite written (2026-09-02):** `ack=32,38,4f,68,6e`
 `nak=50,6f,75` in [measure.md](../references/measure.md).
 Do not copy that NAK list onto `C153` (`0x50` must ACK
-there).
+when gated on).
 
 ### nyc-bmi270
 
@@ -444,11 +447,11 @@ Empty slot vs inserted: `PYG1` level. Official insert = 0.
 Stamp LoRa-1262 is the **module** (SKU S014 / S014-IF /
 S014-I). SX1262 is the **Semtech die** inside it. Do not
 flatten product HTML “SX1262 (Stamp LoRa-1262)” into one
-part.
+part. Dedicated summary: [stamp-lora-1262.md](stamp-lora-1262.md).
 
 | | SX1262 die | Stamp LoRa-1262 |
 | --- | --- | --- |
-| Sheet | catalog `sx1262` (150–960 MHz ISM) | [Stamp page](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262); catalog `stamp-lora-1262` |
+| Sheet | catalog `sx1262` (150–960 MHz ISM) | [Stamp page](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262); [stamp-lora-1262.md](stamp-lora-1262.md) |
 | PaperMono band | do not copy 150–960 MHz | **868–923 MHz**, built-in FPC |
 | Nets | SPI MOSI/MISO/CLK, NSS, BUSY, IRQ | plus `LoRa_EN` (PM1 G2), `SX_NRST` (IOE PYG10), `SX_ANT_SW` (IOE PYG2) |
 
@@ -464,24 +467,30 @@ Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) only.
 
 ### nyc-lora-ack
 
-C153 only. **Blocked until a `C153` is in hand.** After
+C153 only. **Blocked until a `C153` is in hand.** Discovery
+primitives and status decoding are implemented in `crates/m5stack-papermono`
+(`lora` module, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). After
 Stamp rails ([nyc-stamp-lora](#nyc-stamp-lora)): mux
 GPIO39–41 off JTAG, honor BUSY, SPI status of the **SX1262
 die**. Product band 868–923 MHz; UserDemo 868.0 MHz is the
 EU demo default. Crate: `lora-phy` `Sx1262` is a later
 pass-with-wrapper; rails stay in `m5stack-papermono`.
+Tracked on branch `feat/papermono-discovery`.
 [pin-map.md](../references/pin-map.md),
 [docs/CRATES.md](../../../../docs/CRATES.md).
 
 ### nyc-nfc-ack
 
-C153 only. **Blocked until a `C153` is in hand.** NFC
-rail on, `0x50` ACK, UserDemo `probeNfcIdentity` (`0x7F` /
-type `0x05`; cite those constants, not an unread register
+C153 only. **Blocked until a `C153` is in hand.** Discovery
+primitives and identity parsing are implemented in `crates/m5stack-papermono`
+(`nfc` module, `CMD_READ_IC_IDENTITY` `0x7F`, `IcIdentity`). NFC
+rail on (M5IOE1 `PYG4` high), `0x50` ACK, UserDemo `probeNfcIdentity`
+(`0x7F` / type `0x05`; cite those constants, not an unread register
 map). Park RF. Do not leave the field on in default images.
 Also closes the NFC half of [nyc-i2c-ack](#nyc-i2c-ack).
 No usable `st25r3916` crate; do not wrap `st25r95`. Lite:
 [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) and `nfc=0` only.
+Tracked on branch `feat/papermono-discovery`.
 [pin-map.md](../references/pin-map.md),
 [user-demo.md](../references/user-demo.md),
 [docs/CRATES.md](../../../../docs/CRATES.md).

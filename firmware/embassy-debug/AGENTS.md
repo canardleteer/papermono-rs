@@ -3,9 +3,12 @@
 Embassy `esp-hal` staged image. Workspace member, **not** a
 default-member: host `cargo test` must not compile this package.
 
-First SKU: PaperMono-Lite via `m5stack-papermono-lite`.
+Primary baseline: PaperMono-Lite via `m5stack-papermono-lite`.
+Safe across both SKUs for shared peripherals (display, touch, buttons,
+frontlight, buzzer, IMU, battery gauge, BLE/Wi-Fi). On PaperMono (`C153`),
+NFC and LoRa pins remain unasserted inputs / quiescent in standard builds.
 USB-Serial/JTAG (`esp-println` `jtag-serial`), not UART0. Do
-not init NFC or LoRa. No LUT. No GPIO45/46 latch (PDM). No
+not init NFC or LoRa in default images. No LUT. No GPIO45/46 latch (PDM). No
 Cargo `runner`. CPU stays `Config::default()` (80 MHz) so
 USB-Serial/JTAG PLL is unchanged.
 

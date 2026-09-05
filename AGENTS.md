@@ -299,5 +299,9 @@ Official HTML `epd_*` times (`epd_quality` / `epd_text` /
 `epd_fast` / `epd_fastest`) are PaperMono laboratory
 results under M5GFX modes, reference only
 ([display.md](.agents/skills/m5stack-papermono-hardware/references/display.md)).
-PaperMono (`C153`) USB, JEDEC, and partition table are still
-unmeasured.
+PaperMono (`C153`) discovery is tracked on branch
+`feat/papermono-discovery`. The board crate (`m5stack-papermono`) provides
+safe discovery primitives and register constants for ST25R3916 NFC and Stamp
+LoRa-1262 (SX1262). Physical `C153` USB IDs, JEDEC bytes, and partition
+tables remain unmeasured until confirmed on live hardware following the
+host-first inspection and factory snapshot safety protocol.

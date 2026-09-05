@@ -28,9 +28,9 @@ IP2315 crates.
 | BMI270 | possible later | **constants-in-BSP** (+ accel bring-up helpers) | `CHIP_ID` `0x00` / payload `0x24`. Soft-reset + Bosch standard 8 KiB config (`INIT_ADDR_*` + `INIT_DATA`) + raw `DATA_8`…`DATA_13`. Orientation classify is sticky-rs policy; Lite axis map USB-C down = −X. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
-| ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **fail / wait for C153** | I2C `0x50`, `I2C_EN=VDD`. Official stack is ST RFAL (C) and official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) M5Unit-NFC (Arduino). Do not wrap `st25r95`. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
-| SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **pass-with-wrapper, audit when C153 arrives** | Chip opcodes. Do not adopt in the lockfile yet. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
-| Stamp LoRa-1262 | none | **fail (board wrapper)** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC. Not in `lora-phy`. RadioLib is C++. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
+| ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **constants-in-BSP / discovery primitives** | I2C `0x50`, `I2C_EN=VDD`. Primitives, identity read byte (`0x7F`), and `PYG4` power-gating in `m5stack-papermono::nfc`. Do not wrap `st25r95`. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
+| SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **constants-in-BSP / discovery primitives** | Opcode constants, `RadioStatus` parser, and JTAG mux in `m5stack-papermono::lora`. Do not adopt `lora-phy` in lockfile yet. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
+| Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
 
 ## Rejected
 
@@ -46,7 +46,7 @@ IP2315 crates.
 | Crate | Why |
 | --- | --- |
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map. `C153-Lite` firmware depends on this only |
-| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` radio add-on. Not a `lite` Cargo feature |
+| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board crate with safe ST25R3916 NFC and Stamp LoRa-1262 discovery primitives. Not a `lite` Cargo feature |
 | [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
 | [`m5pm1`](../crates/m5pm1) | Register map, ADC, battery %, PWM0, red LED. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |

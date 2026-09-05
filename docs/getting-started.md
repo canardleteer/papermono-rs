@@ -186,10 +186,17 @@ cargo metadata --locked --format-version 1 --no-deps
 
 Board support crates are validated with host unit tests. Target measurements on
 physical hardware continue to be cataloged as hardware samples become
-available.
+available. PaperMono-Lite (`C153-Lite`) hardware has established the baseline
+for the display, touch controller, frontlight, buzzer, IMU, battery, and
+wireless cards.
+
+Discovery preparation for PaperMono (`C153`) is active on the
+`feat/papermono-discovery` branch, providing safe host-tested driver primitives
+for ST25R3916 NFC and Stamp LoRa-1262 (SX1262) before initiating physical
+hardware verification.
 
 `firmware/simple-debug` compiles for `xtensa-esp32s3-none-elf`, streaming
-identification and button telemetry across USB-Serial/JTAG on PaperMono-Lite.
+identification and button telemetry across USB-Serial/JTAG on PaperMono devices.
 
 `firmware/embassy-debug` targets the async Embassy runtime as a distinct
 workspace member package. The standard image includes touch digitizer and

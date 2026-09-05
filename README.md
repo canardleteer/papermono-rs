@@ -1,10 +1,10 @@
 # `papermono-rs`
 
 > [!NOTE]
-> We have not yet explored using a **PaperMono**, only a **PaperMono-Lite**.
-> We have one on hand, but early bring-up is running on easier-to-replace
-> hardware that is far less tragic to turn into a paperweight. LoRa and NFC
-> are up next.
+> PaperMono (`C153`) discovery is now underway on the `feat/papermono-discovery`
+> branch! Having vetted the shared baseline on PaperMono-Lite, safe driver
+> primitives for the ST25R3916 NFC and Stamp LoRa-1262 are in place, and we are
+> preparing for our first safe physical unit inspection and snapshot.
 
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and

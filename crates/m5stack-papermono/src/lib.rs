@@ -18,6 +18,9 @@ pub use m5stack_papermono_lite::{
 pub mod lora;
 pub mod nfc;
 
+pub use lora::{ChipMode, CommandStatus, RadioStatus, CMD_GET_STATUS};
+pub use nfc::{IcIdentity, CMD_READ_IC_IDENTITY, IC_TYPE_ST25R3916};
+
 /// Official SKU code for this crate (`C153`).
 pub const SKU: &str = "C153";
 
@@ -52,5 +55,14 @@ mod tests {
             assert_ne!(*assigned, lora::IOE1_ANTENNA_SWITCH);
             assert_ne!(*assigned, lora::IOE1_RESET);
         }
+    }
+
+    #[test]
+    fn reexported_types_are_available() {
+        let ident = IcIdentity::from_byte(0x2A);
+        assert!(ident.is_st25r3916());
+
+        let status = RadioStatus::from_byte(0x24);
+        assert!(status.is_standby());
     }
 }

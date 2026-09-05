@@ -141,6 +141,23 @@ names panel **DEPG0397BBS770F3HP-XM**. Lite flash **size** is
 measured (16 MB); JEDEC manufacturer bytes and PSRAM still
 [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id).
 
+## PaperMono (C153) Discovery Verification Targets
+
+Active on branch `feat/papermono-discovery`. The targets below are structured
+for live measurement once a physical `C153` is connected, following the
+safe four-stage confirmation protocol (host-only inspect -> factory backup ->
+table confirm -> packed safe diagnostic flash):
+
+| Item | SKU | Status / Target | Next Recipe |
+| --- | --- | --- | --- |
+| USB run & download VID:PID | `C153` | Unmeasured; verify if `303a:1001` matches Lite | [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
+| Flash size & JEDEC bytes | `C153` | Unmeasured; verify 16 MB flash and JEDEC manufacturer bytes | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| Factory partition table | `C153` | Unmeasured; inspect table at `0x8000` against UserDemo `partitions.csv` | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| System I2C roster | `C153` | Target: `0x32, 0x38, 0x4F, 0x68, 0x6E`, plus `0x50` (NFC) when M5IOE1 `PYG4` is high | [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
+| ST25R3916 IC identity | `C153` | Unmeasured; query command `0x7F` for IC type `0x05` | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
+| SX1262 LoRa SPI status | `C153` | Unmeasured; verify M5PM1 `G2` enable, M5IOE1 `PYG10` reset, `GetStatus` `0xC0` | [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack) |
+| Leftover pins transition | `C153` | GPIO5 (LoRa IRQ), GPIO6 (NFC IRQ), GPIO21 (BUSY) transition from floating leftovers to active | [pin-map.md](pin-map.md) |
+
 ## What this page is not
 
 - Not a pinout ([pin-map.md](pin-map.md)).

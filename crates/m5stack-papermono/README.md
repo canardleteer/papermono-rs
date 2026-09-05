@@ -7,9 +7,10 @@ Documentation:
 and [M5Stack PaperMono Documentation](https://docs.m5stack.com/en/core/PaperMono).
 
 This package re-exports the common pin map and panel definitions from
-`m5stack-papermono-lite`. It introduces hardware definitions for features
-unique to the standard PaperMono model, specifically the ST25R3916 near-field
-communication controller and the Semtech SX1262-based Stamp LoRa-1262 radio
-module.
+`m5stack-papermono-lite`. It introduces hardware definitions and safe discovery
+primitives for features unique to the standard PaperMono model, specifically the
+ST25R3916 near-field communication controller (I2C `0x50` identity queries and
+`PYG4` power-gating) and the Semtech SX1262-based Stamp LoRa-1262 radio module
+(dedicated SPI bus, JTAG pin multiplexing, and status decoding).
 
 The crate is `#![no_std]` and fully testable on the host compiler.
