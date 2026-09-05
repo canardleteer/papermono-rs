@@ -12,8 +12,9 @@ On the unit:
   (USB-C down). Original Ferris: Karen Rustad Tölva
   ([rustacean.net](https://rustacean.net/)). Line-art
   monification details in [assets/SOURCE.md](assets/SOURCE.md).
-- BUTTON A previous card, BUTTON B next (both on **release**
-  after the previous paint finishes). The walk is splash →
+- BUTTON A previous card (short press release), BUTTON B next
+  (press down). Presses during panel refreshes are queued so
+  rapid navigation clicks are never dropped. The walk is splash →
   shapes (procedural 3-degree Koch snowflake benchmark) →
   legend (pinout, touch rails, sleep/wake instructions) →
   bluetooth (BLE passkey pairing) → wifi survey (channel scan) →

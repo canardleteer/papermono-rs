@@ -64,12 +64,16 @@ channel occupancy + top APs; touch `[ START SURVEY ]`), wifi_ap
 (WPA2 SoftAP `PaperMono-AP` / `mono2026` + DHCP + JSON HTTP at
 `http://192.168.4.1/`; touch `[ START HOTSPOT ]`; mutually
 exclusive with survey), four-gray tones, target walk. Short A
-previous, short B next, wrap. Right-edge contact sets PWM0 from Y
-(top bright); left-edge contact sets buzzer volume from Y (top
-loud); both sliders respect screen orientation. Hold A 2 s triggers
-sleep notice and light sleep; hold A or B 1 s wakes. Hold A ~1 s dumps
-PCM only when `mic` is on. GPIO42 passive buzzer provides click
-feedback on button navigation and touchscreen hits.
+previous, short B next (down-press); button presses during EPD
+paint are queued so clicks are never dropped; wrap. Right-edge
+contact sets PWM0 from Y (top bright); left-edge contact sets
+buzzer volume from Y (top loud); both sliders respect screen
+orientation. Hold A 2 s triggers sleep notice and light sleep;
+hold A or B 1 s wakes. Hold A ~1 s dumps PCM only when `mic` is
+on. GPIO42 passive buzzer provides click feedback on button
+navigation and touchscreen hits. Active channel survey runs
+continuously until touching `[ STOP SURVEY ]` (transitions
+through `[ STOPPING... ]` to complete).
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png),

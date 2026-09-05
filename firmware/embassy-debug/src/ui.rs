@@ -42,6 +42,7 @@
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
 
+use embassy_futures::select::{select, Either};
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::gpio::Input;
 #[cfg(feature = "sleep")]
@@ -169,7 +170,20 @@ pub async fn run(
         let soft = same_scene
             && (orient_changed
                 || (last_rotation == Some(rotation) && scene_allows_soft_refresh(scene)));
-        let drawn_revs = paint(&mut i2c, &mut panel, &busy, scene, planes, soft, rotation).await;
+        let mut pending_nav: Option<Nav> = None;
+        let drawn_revs = paint_with_buttons(
+            &mut i2c,
+            &mut panel,
+            &busy,
+            scene,
+            planes,
+            soft,
+            rotation,
+            &btn_a,
+            &btn_b,
+            &mut pending_nav,
+        )
+        .await;
         last_painted = Some(scene);
         last_rotation = Some(rotation);
         if scene == Scene::Targets {
@@ -183,24 +197,50 @@ pub async fn run(
                         wifi_watch_rev: None,
                         rotation,
                     };
-                    if let Some(nav) = wait_nav(
-                        &mut i2c,
-                        &mut panel,
-                        &busy,
-                        planes,
-                        &btn_a,
-                        &btn_b,
-                        &tp,
-                        &mut lamp,
-                        &mut vol,
-                        ctx,
-                        &mut rotation,
-                    )
-                    .await
-                    {
+                    let nav = if let Some(p) = pending_nav {
+                        Some(p)
+                    } else {
+                        wait_nav(
+                            &mut i2c,
+                            &mut panel,
+                            &busy,
+                            planes,
+                            &btn_a,
+                            &btn_b,
+                            &tp,
+                            &mut lamp,
+                            &mut vol,
+                            ctx,
+                            &mut rotation,
+                        )
+                        .await
+                    };
+                    if let Some(nav) = nav {
                         match nav {
-                            Nav::Prev => scene = scene.prev(),
-                            Nav::Next => scene = scene.next(),
+                            Nav::Prev => {
+                                #[cfg(feature = "radio")]
+                                if scene == Scene::WifiSurvey
+                                    && crate::radio::wifi_mode()
+                                        == crate::radio::WifiMode::SurveyScanning
+                                {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StopSurvey,
+                                    );
+                                }
+                                scene = scene.prev();
+                            }
+                            Nav::Next => {
+                                #[cfg(feature = "radio")]
+                                if scene == Scene::WifiSurvey
+                                    && crate::radio::wifi_mode()
+                                        == crate::radio::WifiMode::SurveyScanning
+                                {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StopSurvey,
+                                    );
+                                }
+                                scene = scene.next();
+                            }
                             Nav::Refresh => {}
                             #[cfg(feature = "sleep")]
                             Nav::Sleep => {
@@ -228,24 +268,44 @@ pub async fn run(
                 wifi_watch_rev,
                 rotation,
             };
-            if let Some(nav) = wait_nav(
-                &mut i2c,
-                &mut panel,
-                &busy,
-                planes,
-                &btn_a,
-                &btn_b,
-                &tp,
-                &mut lamp,
-                &mut vol,
-                ctx,
-                &mut rotation,
-            )
-            .await
-            {
+            let nav = if let Some(p) = pending_nav {
+                Some(p)
+            } else {
+                wait_nav(
+                    &mut i2c,
+                    &mut panel,
+                    &busy,
+                    planes,
+                    &btn_a,
+                    &btn_b,
+                    &tp,
+                    &mut lamp,
+                    &mut vol,
+                    ctx,
+                    &mut rotation,
+                )
+                .await
+            };
+            if let Some(nav) = nav {
                 match nav {
-                    Nav::Prev => scene = scene.prev(),
-                    Nav::Next => scene = scene.next(),
+                    Nav::Prev => {
+                        #[cfg(feature = "radio")]
+                        if scene == Scene::WifiSurvey
+                            && crate::radio::wifi_mode() == crate::radio::WifiMode::SurveyScanning
+                        {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
+                        }
+                        scene = scene.prev();
+                    }
+                    Nav::Next => {
+                        #[cfg(feature = "radio")]
+                        if scene == Scene::WifiSurvey
+                            && crate::radio::wifi_mode() == crate::radio::WifiMode::SurveyScanning
+                        {
+                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
+                        }
+                        scene = scene.next();
+                    }
                     Nav::Refresh => {}
                     #[cfg(feature = "sleep")]
                     Nav::Sleep => {
@@ -283,6 +343,104 @@ const fn scene_allows_soft_refresh(scene: Scene) -> bool {
         scene,
         Scene::Legend | Scene::Bluetooth | Scene::WifiSurvey | Scene::WifiAp
     )
+}
+
+/// Renders a card onto framebuffers and executes e-paper refresh while concurrently
+/// monitoring BUTTON A and BUTTON B so navigation presses during paint are not dropped.
+#[allow(clippy::too_many_arguments)]
+async fn paint_with_buttons(
+    i2c: &mut SysI2c,
+    panel: &mut Panel,
+    busy: &Input<'static>,
+    scene: Scene,
+    planes: &mut Planes,
+    soft: bool,
+    rotation: PageRotation,
+    btn_a: &Input<'static>,
+    btn_b: &Input<'static>,
+    pending_nav: &mut Option<Nav>,
+) -> DrawnRevs {
+    match select(
+        paint(i2c, panel, busy, scene, planes, soft, rotation),
+        monitor_buttons_during_paint(btn_a, btn_b, pending_nav),
+    )
+    .await
+    {
+        Either::First(revs) => revs,
+        Either::Second(_) => unreachable!(),
+    }
+}
+
+/// Continuously samples tactile buttons during lengthy e-paper refreshes, capturing
+/// clicks into `pending_nav` and providing instant audible key-click feedback.
+async fn monitor_buttons_during_paint(
+    btn_a: &Input<'static>,
+    btn_b: &Input<'static>,
+    pending_nav: &mut Option<Nav>,
+) -> ! {
+    let mut prev_a = btn_a.is_high();
+    let mut prev_b = btn_b.is_high();
+    let mut a_down: Option<Instant> = None;
+    let mut a_held = false;
+    let mut t_ms = 0_u32;
+    loop {
+        Timer::after(Duration::from_millis(NAV_POLL_MS.into())).await;
+        t_ms = t_ms.saturating_add(NAV_POLL_MS);
+        let now_a = btn_a.is_high();
+        let now_b = btn_b.is_high();
+        share::BTN_A.store(now_a, core::sync::atomic::Ordering::Relaxed);
+        share::BTN_B.store(now_b, core::sync::atomic::Ordering::Relaxed);
+
+        if now_a != prev_a || now_b != prev_b {
+            cdc::edge(&Edge {
+                t_ms,
+                btn_a: (now_a != prev_a).then_some((prev_a, now_a)),
+                btn_b: (now_b != prev_b).then_some((prev_b, now_b)),
+            });
+        }
+
+        // Detect BUTTON A long press for sleep
+        if prev_a && !now_a {
+            a_down = Some(Instant::now());
+            a_held = false;
+        }
+        if let Some(start) = a_down {
+            if !now_a {
+                let duration = Instant::now().duration_since(start);
+                #[cfg(feature = "sleep")]
+                if duration >= Duration::from_millis(BUTTON_HOLD_SLEEP_MS.into())
+                    && pending_nav.is_none()
+                {
+                    *pending_nav = Some(Nav::Sleep);
+                }
+                if !a_held && duration >= Duration::from_millis(BUTTON_HOLD_PCM_MS.into()) {
+                    #[cfg(feature = "mic")]
+                    crate::mic::ask_tone();
+                    a_held = true;
+                }
+            }
+        }
+        // Short press BUTTON A on release
+        if !prev_a && now_a {
+            let held = a_held;
+            a_down = None;
+            a_held = false;
+            prev_a = now_a;
+            if !held && pending_nav.is_none() {
+                crate::beep::click();
+                *pending_nav = Some(Nav::Prev);
+            }
+        } else {
+            prev_a = now_a;
+        }
+
+        // BUTTON B down-press (falling edge) triggers immediate key-click and queues next card
+        if prev_b && !now_b && pending_nav.is_none() {
+            crate::beep::click();
+            *pending_nav = Some(Nav::Next);
+        }
+        prev_b = now_b;
+    }
 }
 
 /// Renders a card into framebuffers and triggers an e-paper refresh waveform.
@@ -347,14 +505,10 @@ async fn paint(
 ///
 /// # Returns
 /// - `Some(Nav::Prev)` on short press of Button A (release edge).
-/// - `Some(Nav::Next)` on short press of Button B (release edge).
+/// - `Some(Nav::Next)` on press of Button B (falling edge).
 /// - `Some(Nav::Sleep)` on 2-second hold of Button A (when `sleep` feature is active).
 /// - `Some(Nav::Refresh)` on auto-refresh timeout, BLE/Wi-Fi status revision change,
 ///   stable orientation change, or touch button toggle.
-///
-/// Both buttons must be released before edges are armed. That drops a hold that
-/// started during the previous paint (Shapes is slow) so the first post-paint
-/// release is not mistaken for a missing press.
 #[allow(clippy::too_many_arguments)]
 async fn wait_nav(
     i2c: &mut SysI2c,
@@ -369,21 +523,8 @@ async fn wait_nav(
     ctx: NavContext,
     #[cfg_attr(not(feature = "orient"), allow(unused_variables))] rotation: &mut PageRotation,
 ) -> Option<Nav> {
-    // Drain holds that overlapped the previous EPD paint / snowflake work.
-    loop {
-        let a = btn_a.is_high();
-        let b = btn_b.is_high();
-        share::BTN_A.store(a, core::sync::atomic::Ordering::Relaxed);
-        share::BTN_B.store(b, core::sync::atomic::Ordering::Relaxed);
-        share::TP.store(tp.is_high(), core::sync::atomic::Ordering::Relaxed);
-        if a && b {
-            break;
-        }
-        Timer::after(Duration::from_millis(NAV_POLL_MS.into())).await;
-    }
-
-    let mut prev_a = true;
-    let mut prev_b = true;
+    let mut prev_a = btn_a.is_high();
+    let mut prev_b = btn_b.is_high();
     let mut a_down: Option<Instant> = None;
     let mut a_held = false;
     let mut t_ms = 0_u32;
@@ -445,7 +586,7 @@ async fn wait_nav(
             prev_a = now_a;
         }
 
-        if !prev_b && now_b {
+        if prev_b && !now_b {
             crate::beep::click();
             return Some(Nav::Next);
         }

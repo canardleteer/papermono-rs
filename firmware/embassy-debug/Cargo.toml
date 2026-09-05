@@ -17,7 +17,7 @@ touch = []
 # PDM audio: PDM GPIO45/46 + PYG12. Needs expander.
 mic = ["touch"]
 # Display: OTP 4-gray panel. Needs expander.
-panel = ["touch"]
+panel = ["touch", "dep:embassy-futures"]
 # Interactive button sleep & wake: Button A hold 2 s to sleep, 1 s A/B hold to wake.
 sleep = ["touch", "panel"]
 # BMI270-driven page rotation (sticky-rs style). Opt-in until axis map is

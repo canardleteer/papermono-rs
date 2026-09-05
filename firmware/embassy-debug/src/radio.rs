@@ -1036,7 +1036,7 @@ async fn handle_command(cmd: WifiCommand, controller: &mut WifiController<'stati
             set_wifi_mode(WifiMode::SurveyScanning);
         }
         WifiCommand::StopSurvey => {
-            set_wifi_mode(WifiMode::Idle);
+            set_wifi_mode(WifiMode::SurveyComplete);
         }
         WifiCommand::StartHotspot => {
             set_wifi_mode(WifiMode::Hotspot);
@@ -1202,7 +1202,19 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                 match select(controller.scan_async(&scan_cfg), WIFI_CMD.receive()).await {
                     Either::First(Ok(aps)) => {
                         process_survey_results(&aps);
-                        set_wifi_mode(WifiMode::SurveyComplete);
+                        WIFI_STATE_REV.fetch_add(1, Ordering::Release);
+                        // Inter-scan pause keeping responsiveness to stop commands.
+                        match select(
+                            Timer::after(Duration::from_millis(1000)),
+                            WIFI_CMD.receive(),
+                        )
+                        .await
+                        {
+                            Either::First(()) => {}
+                            Either::Second(cmd) => {
+                                handle_command(cmd, &mut controller).await;
+                            }
+                        }
                     }
                     Either::First(Err(_)) => {
                         set_wifi_mode(WifiMode::Idle);
@@ -1213,7 +1225,7 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                 }
             }
             WifiMode::SurveyStopping => {
-                set_wifi_mode(WifiMode::Idle);
+                set_wifi_mode(WifiMode::SurveyComplete);
             }
             WifiMode::Hotspot => {
                 set_hotspot_state(HotspotState::Starting);
