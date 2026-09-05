@@ -11,7 +11,7 @@ license = "MIT"
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
-default = ["touch", "panel", "sleep", "radio"]
+default = ["touch", "panel", "sleep", "radio", "orient"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
 touch = []
 # PDM audio: PDM GPIO45/46 + PYG12. Needs expander.

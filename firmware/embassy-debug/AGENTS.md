@@ -25,7 +25,7 @@ opt-in. `simple-debug-fw` stays featureless.
 | `mic` | **off** | PDM energy + hold-A PCM dump |
 | `radio` | on | BLE pairing + Wi-Fi survey / SoftAP cards + wifi/ble counts. No MAC/BSSID/IRK. No NVS |
 | `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
-| `orient` | **off** | BMI270 page rotation (sticky-rs style). Lite axis map glass-confirmed 2026-09-04 |
+| `orient` | on | BMI270 page rotation (sticky-rs style). Lite axis map glass-confirmed 2026-09-04 |
 
 `mic`, `panel`, `sleep`, and `orient` depend on `touch`
 (expander). `sleep` / `orient` depend on `panel`.
@@ -183,7 +183,7 @@ Lite SoftAP host-verified 2026-09-04:
 
 ## IMU page rotation (`orient`)
 
-Opt-in Cargo feature. Sticky-rs policy ported to BMI270:
+Default Cargo feature. Sticky-rs policy ported to BMI270:
 
 - Dominant-axis classify at 0.70 g; FaceUp/FaceDown keep last page.
 - Draw in page space (`PageRotation`); map via

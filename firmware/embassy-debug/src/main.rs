@@ -35,7 +35,7 @@
 //!   - `mic` (opt-in): PDM microphone RMS and peak energy measurement via DMA.
 //!   - `radio` (default): BLE pairing + Wi-Fi survey / SoftAP cards.
 //!   - `sleep` (default): Button A hold sleep / A or B hold wake.
-//!   - `orient` (opt-in): BMI270-driven page rotation (sticky-rs style).
+//!   - `orient` (default): BMI270-driven page rotation (sticky-rs style).
 
 #![no_std]
 #![no_main]

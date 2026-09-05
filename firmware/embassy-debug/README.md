@@ -30,8 +30,8 @@ On the unit:
 - Passive buzzer on GPIO42 is driven via LEDC low-speed Timer 3 / Channel 7 at
   2 kHz with audible key clicks on button navigation and touchscreen actions.
 
-Default features are `touch`, `panel`, `sleep`, and `radio`.
-The `mic` and `orient` features are opt-in. First SKU is Lite.
+Default features are `touch`, `panel`, `sleep`, `radio`, and `orient`.
+The `mic` feature is opt-in. First SKU is Lite.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
 and 180° flips). Cards redraw upright for the hold via soft
