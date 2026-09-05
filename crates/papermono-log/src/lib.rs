@@ -85,6 +85,9 @@ pub const SCENE_CAPACITY: usize = 48;
 /// Bytes reserved for a lamp duty line (`lamp=1024`).
 pub const LAMP_CAPACITY: usize = 40;
 
+/// Bytes reserved for a volume level line (`volume=50`).
+pub const VOLUME_CAPACITY: usize = 40;
+
 /// Bytes reserved for a snowflake render timing line (`snowflake us=12345`).
 pub const SNOWFLAKE_CAPACITY: usize = 48;
 
@@ -770,6 +773,11 @@ pub fn format_lamp(duty: u16, buf: &mut [u8]) -> Result<&str, FormatError> {
     write_into(buf, format_args!("{}: lamp={duty}", LOG_PREFIX))
 }
 
+/// Writes `simple-debug: volume=<volume>` without a trailing newline.
+pub fn format_volume(volume: u8, buf: &mut [u8]) -> Result<&str, FormatError> {
+    write_into(buf, format_args!("{}: volume={volume}", LOG_PREFIX))
+}
+
 /// Writes `simple-debug: snowflake us=<us>` without a trailing newline.
 pub fn format_snowflake(us: u32, buf: &mut [u8]) -> Result<&str, FormatError> {
     write_into(buf, format_args!("{}: snowflake us={us}", LOG_PREFIX))
@@ -1240,6 +1248,11 @@ mod tests {
         assert_eq!(
             format_lamp(1024, &mut lamp).unwrap(),
             "simple-debug: lamp=1024"
+        );
+        let mut vol = [0u8; VOLUME_CAPACITY];
+        assert_eq!(
+            format_volume(75, &mut vol).unwrap(),
+            "simple-debug: volume=75"
         );
         let mut snowflake = [0u8; SNOWFLAKE_CAPACITY];
         assert_eq!(

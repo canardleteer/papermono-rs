@@ -19,12 +19,15 @@ On the unit:
   bluetooth (BLE passkey pairing) → wifi survey (channel scan) →
   wifi hotspot (WPA2 SoftAP + JSON HTTP) → four-gray tones →
   touch targets.
-- Slide the right edge for the lamp (top bright, USB-C dim).
+- Slide the right edge for the lamp (top bright, bottom dim).
+- Slide the left edge for passive buzzer volume (top loudest, bottom silent;
+  audio ticks on drag). Both sliders respect screen orientation.
 - Hold BUTTON A about 2 s to enter low-power sleep; hold BUTTON A
   or B about 1 s to wake up.
 - Hold BUTTON A about 1 s for a PCM dump when the image
   was built `--features mic` (default image leaves mic off).
-- The GPIO42 buzzer chirp is parked.
+- Passive buzzer on GPIO42 is driven via LEDC low-speed Timer 3 / Channel 7 at
+  2 kHz with audible key clicks on button navigation and touchscreen actions.
 
 Default features are `touch`, `panel`, `sleep`, and `radio`.
 The `mic` and `orient` features are opt-in. First SKU is Lite.

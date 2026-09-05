@@ -206,6 +206,15 @@ pub fn lamp(duty: u16) {
     }
 }
 
+/// Emits buzzer volume level.
+#[allow(dead_code)]
+pub fn volume(volume: u8) {
+    let mut buf = [0u8; papermono_log::VOLUME_CAPACITY];
+    if let Ok(line) = papermono_log::format_volume(volume, &mut buf) {
+        emit(line);
+    }
+}
+
 /// Emits display refresh completion telemetry (`PanelStamp`).
 #[cfg(feature = "panel")]
 pub fn panel(stamp: &papermono_log::PanelStamp) {

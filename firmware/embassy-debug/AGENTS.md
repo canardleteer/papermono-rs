@@ -65,9 +65,11 @@ channel occupancy + top APs; touch `[ START SURVEY ]`), wifi_ap
 `http://192.168.4.1/`; touch `[ START HOTSPOT ]`; mutually
 exclusive with survey), four-gray tones, target walk. Short A
 previous, short B next, wrap. Right-edge contact sets PWM0 from Y
-(top bright). Hold A 2 s triggers sleep notice and light sleep;
-hold A or B 1 s wakes. Hold A ~1 s dumps PCM only when `mic` is on.
-GPIO42 chirp stays parked.
+(top bright); left-edge contact sets buzzer volume from Y (top
+loud); both sliders respect screen orientation. Hold A 2 s triggers
+sleep notice and light sleep; hold A or B 1 s wakes. Hold A ~1 s dumps
+PCM only when `mic` is on. GPIO42 passive buzzer provides click
+feedback on button navigation and touchscreen hits.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png),

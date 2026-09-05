@@ -34,6 +34,8 @@ pub enum LineKind {
     Scene,
     /// Frontlight PWM duty (`lamp=`).
     Lamp,
+    /// Buzzer volume percentage (`volume=`).
+    Volume,
     /// Lite leftover MCU inputs (`leftover`).
     Leftover,
     /// Wi-Fi scan count (`wifi n=`).
@@ -140,6 +142,9 @@ pub fn classify(body: &str) -> LineKind {
     }
     if token.starts_with("lamp=") {
         return LineKind::Lamp;
+    }
+    if token.starts_with("volume=") {
+        return LineKind::Volume;
     }
     match token {
         "hello" => LineKind::Hello,
@@ -275,6 +280,10 @@ mod tests {
         assert_eq!(
             records("simple-debug: lamp=1024\n").next().unwrap().kind,
             LineKind::Lamp
+        );
+        assert_eq!(
+            records("simple-debug: volume=75\n").next().unwrap().kind,
+            LineKind::Volume
         );
         assert_eq!(
             records("simple-debug: leftover lora_irq=0 nfc_irq=1 sx_busy=0\n")

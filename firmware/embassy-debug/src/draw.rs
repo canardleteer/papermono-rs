@@ -217,7 +217,7 @@ fn draw_splash(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     )
     .draw(&mut GrayInk::new(bw, red, rotation));
     let _ = Text::with_alignment(
-        "Right edge slides frontlight",
+        "Left/right edges slide vol/lamp",
         Point::new(cx, hint2_y),
         style,
         Alignment::Center,
@@ -332,7 +332,7 @@ fn draw_legend(
     let items = [
         ("BUTTON A (GPIO2)", "Previous card / hold 2s sleep"),
         ("BUTTON B (GPIO3)", "Next card / hold 1s wake"),
-        ("SLEEP & WAKE", "Hold A 2s: sleep. Hold A/B 1s: wake"),
+        ("LEFT GUTTER", "Buzzer volume slider (GPIO42)"),
         ("RIGHT GUTTER", "Frontlight brightness slider"),
         ("TOUCH DIGITIZER", "FT6336G capacitive I2C (0x38)"),
         ("PMIC (M5PM1)", "Power rails, buttons, battery ADC"),

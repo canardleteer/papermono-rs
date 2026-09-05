@@ -242,6 +242,7 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::Panel => "panel",
         LineKind::Scene => "scene",
         LineKind::Lamp => "lamp",
+        LineKind::Volume => "volume",
         LineKind::Leftover => "leftover",
         LineKind::Wifi => "wifi",
         LineKind::Ble => "ble",

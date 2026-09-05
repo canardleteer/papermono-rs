@@ -69,6 +69,21 @@ pub const fn in_lamp_gutter(x: u16) -> bool {
     x + LAMP_GUTTER_PX >= ACTIVE_MAX_X
 }
 
+/// Gutter width for left and right edge sliders (pixels in page coordinates).
+pub const GUTTER_PX: u16 = 80;
+
+/// True when page-space `px` is in the left-edge volume slider strip.
+#[must_use]
+pub const fn in_page_left_gutter(px: u16) -> bool {
+    px <= GUTTER_PX
+}
+
+/// True when page-space `px` is in the right-edge lamp slider strip.
+#[must_use]
+pub const fn in_page_right_gutter(px: u16, page_w: u16) -> bool {
+    px.saturating_add(GUTTER_PX) >= page_w
+}
+
 /// How close to each active-area end a slide must reach.
 pub const SLIDE_END_INSET: u16 = 80;
 /// Drawn line half-width (pixels).
@@ -127,6 +142,25 @@ mod tests {
         const { assert!(LAMP_DUTY_PER_PX == 8) };
         // Targets-card first top-right / bottom-right dots.
         const { assert!(in_lamp_gutter(400)) };
+    }
+
+    #[test]
+    fn page_gutter_boundaries() {
+        // Portrait 480x800
+        assert!(in_page_left_gutter(0));
+        assert!(in_page_left_gutter(80));
+        assert!(!in_page_left_gutter(81));
+        assert!(!in_page_right_gutter(399, 480));
+        assert!(in_page_right_gutter(400, 480));
+        assert!(in_page_right_gutter(479, 480));
+
+        // Landscape 800x480
+        assert!(in_page_left_gutter(0));
+        assert!(in_page_left_gutter(80));
+        assert!(!in_page_left_gutter(81));
+        assert!(!in_page_right_gutter(719, 800));
+        assert!(in_page_right_gutter(720, 800));
+        assert!(in_page_right_gutter(799, 800));
     }
 
     #[test]

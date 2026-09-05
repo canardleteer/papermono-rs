@@ -18,6 +18,16 @@ pub const BEEP_MS: u64 = 40;
 /// Factory demo 50% on-time.
 pub const DUTY_PCT: u8 = 50;
 
+/// Maps a volume percentage (0..=100) to LEDC square-wave duty cycle percentage (0..=50).
+///
+/// For a passive magnetic buzzer driven by a square wave, 50% duty cycle produces
+/// maximum acoustic amplitude. Zero duty cycle silences the transducer.
+#[must_use]
+pub const fn volume_to_duty_pct(volume: u8) -> u8 {
+    let vol = if volume > 100 { 100 } else { volume };
+    ((vol as u16 * DUTY_PCT as u16) / 100) as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27,5 +37,13 @@ mod tests {
         const { assert!(BEEP_HZ >= 40 && BEEP_HZ <= 12_000) };
         const { assert!(TIMER == 3 && CHANNEL == 7 && DUTY_BITS == 10) };
         const { assert!(DUTY_PCT == 50 && BEEP_MS > 0) };
+    }
+
+    #[test]
+    fn volume_to_duty_pct_mapping() {
+        assert_eq!(volume_to_duty_pct(0), 0);
+        assert_eq!(volume_to_duty_pct(50), 25);
+        assert_eq!(volume_to_duty_pct(100), 50);
+        assert_eq!(volume_to_duty_pct(150), 50);
     }
 }

@@ -40,7 +40,6 @@
 #![no_std]
 #![no_main]
 
-#[allow(dead_code)]
 mod beep;
 mod cdc;
 #[cfg(feature = "panel")]
@@ -187,6 +186,9 @@ async fn main(spawner: Spawner) -> ! {
         spawner.spawn(radio::ble_run(peripherals.BT).unwrap());
         radio::init_wifi(peripherals.WIFI, spawner);
     }
+
+    // Initialize and spawn passive buzzer driver on GPIO42 via LEDC Channel 7.
+    spawner.spawn(beep::run(peripherals.LEDC, peripherals.GPIO42).unwrap());
 
     // Capture boot identification metadata for telemetry.
     let hello = Hello {

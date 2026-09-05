@@ -23,6 +23,8 @@ use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 
 use embassy_time::{Duration, Timer};
 use m5stack_papermono_lite::addresses;
+#[cfg(feature = "panel")]
+use m5stack_papermono_lite::display::{self, PageRotation};
 use m5stack_papermono_lite::imu;
 use m5stack_papermono_lite::ioe1;
 use m5stack_papermono_lite::pmic;
@@ -382,10 +384,13 @@ impl LampSlide {
         self.armed
     }
 
-    /// Evaluates a touch sample: updates lamp duty if inside the right gutter.
+    /// Evaluates a touch sample in page space: updates lamp duty if inside the right gutter.
+    ///
+    /// Respects the current [`PageRotation`] so the slider always attaches to the
+    /// user's visual right edge with top bright and bottom dim.
     ///
     /// Returns `true` if the sample was consumed by the gutter slider.
-    pub fn feed(&mut self, i2c: &mut SysI2c, sample: &TouchSample) -> bool {
+    pub fn feed(&mut self, i2c: &mut SysI2c, sample: &TouchSample, rotation: PageRotation) -> bool {
         if sample.n < 1 {
             self.empty = self.empty.saturating_add(1);
             if self.empty >= LAMP_EMPTY_RESET {
@@ -394,26 +399,104 @@ impl LampSlide {
             }
             return false;
         }
-        if !touch::in_lamp_gutter(sample.x) {
+        let Some((px, py)) = display::framebuffer_to_page(sample.x, sample.y, rotation) else {
+            return false;
+        };
+        let (page_w, page_h) = rotation.page_size();
+        if !touch::in_page_right_gutter(px, page_w) {
             self.empty = 0;
             self.armed = false;
             return false;
         }
         self.empty = 0;
         self.armed = true;
-        set_frontlight_duty(i2c, duty_from_y(sample.y));
+        set_frontlight_duty(i2c, duty_from_page_y(py, page_h));
         true
     }
 }
 
 #[cfg(feature = "panel")]
-fn duty_from_y(y: u16) -> u16 {
-    let span = touch::ACTIVE_MAX_Y
-        .saturating_sub(touch::ACTIVE_MIN_Y)
-        .max(1);
-    let y = y.clamp(touch::ACTIVE_MIN_Y, touch::ACTIVE_MAX_Y);
-    let from_bottom = touch::ACTIVE_MAX_Y.saturating_sub(y);
+fn duty_from_page_y(py: u16, page_h: u16) -> u16 {
+    let py = py.min(page_h.saturating_sub(1));
+    let from_bottom = page_h.saturating_sub(1).saturating_sub(py);
+    let span = page_h.saturating_sub(1).max(1);
     ((u32::from(from_bottom) * u32::from(pmic::PWM0_DUTY_MAX)) / u32::from(span)) as u16
+}
+
+/// Gesture detector for the display left-edge buzzer volume slider.
+#[cfg(feature = "panel")]
+pub struct VolumeSlide {
+    empty: u8,
+    armed: bool,
+    last_reported_vol: u8,
+    last_tick_vol: u8,
+}
+
+#[cfg(feature = "panel")]
+impl VolumeSlide {
+    /// Creates a new inactive volume slider gesture recognizer.
+    pub const fn new() -> Self {
+        Self {
+            empty: 0,
+            armed: false,
+            last_reported_vol: crate::beep::DEFAULT_VOLUME,
+            last_tick_vol: crate::beep::DEFAULT_VOLUME,
+        }
+    }
+
+    /// Indicates whether the left-edge gutter contact is actively tracking.
+    #[allow(dead_code)]
+    pub const fn armed(&self) -> bool {
+        self.armed
+    }
+
+    /// Evaluates a touch sample in page space: updates buzzer volume if inside the left gutter.
+    ///
+    /// Respects the current [`PageRotation`] so the slider always attaches to the
+    /// user's visual left edge with top loudest (100%) and bottom silent (0%).
+    ///
+    /// Returns `true` if the sample was consumed by the gutter slider.
+    pub fn feed(&mut self, sample: &TouchSample, rotation: PageRotation) -> bool {
+        if sample.n < 1 {
+            self.empty = self.empty.saturating_add(1);
+            if self.empty >= LAMP_EMPTY_RESET {
+                self.empty = 0;
+                self.armed = false;
+            }
+            return false;
+        }
+        let Some((px, py)) = display::framebuffer_to_page(sample.x, sample.y, rotation) else {
+            return false;
+        };
+        if !touch::in_page_left_gutter(px) {
+            self.empty = 0;
+            self.armed = false;
+            return false;
+        }
+        let was_armed = self.armed;
+        self.empty = 0;
+        self.armed = true;
+        let (_, page_h) = rotation.page_size();
+        let vol = volume_from_page_y(py, page_h);
+        if vol != self.last_reported_vol {
+            self.last_reported_vol = vol;
+            crate::beep::set_volume(vol);
+            crate::cdc::volume(vol);
+        }
+        if !was_armed || vol.abs_diff(self.last_tick_vol) >= 5 {
+            self.last_tick_vol = vol;
+            crate::beep::tick();
+        }
+        true
+    }
+}
+
+#[cfg(feature = "panel")]
+fn volume_from_page_y(py: u16, page_h: u16) -> u8 {
+    let py = py.min(page_h.saturating_sub(1));
+    let from_bottom = page_h.saturating_sub(1).saturating_sub(py);
+    let span = page_h.saturating_sub(1).max(1);
+    ((u32::from(from_bottom) * 100) / u32::from(span)) as u8
 }
 
 /// Enables the frontlight at default brightness level.

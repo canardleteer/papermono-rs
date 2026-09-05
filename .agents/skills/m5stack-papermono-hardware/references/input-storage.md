@@ -15,11 +15,10 @@ low, in the default USB-C-down hold. `C153` still:
 
 GPIO42 PWM (`BB_PWM`). Mux off JTAG `MTMS` (ESP32-S3 Table
 2-4) before PWM. UserDemo LEDC: low-speed timer 3 / channel 7,
-10-bit, 50% duty, 40–12000 Hz. `embassy-debug` chirp is
-**parked**. The image that muxed this pad off JTAG for
-LEDC coincided with wedged card flips and a lamp that
-CDC moved but the LED did not. Do not take GPIO42 until
-that is isolated. Resonance / SPL:
+10-bit, 50% duty, 40–12000 Hz. `embassy-debug` activates LEDC
+low-speed timer 3 / channel 7 for key-click feedback (2000 Hz,
+40 ms) and orientation-aware left-edge volume sliding (0..=100%).
+Resonance / SPL:
 [nyc-buzzer](../resources/not-yet-confirmed.md#nyc-buzzer).
 
 ## microSD

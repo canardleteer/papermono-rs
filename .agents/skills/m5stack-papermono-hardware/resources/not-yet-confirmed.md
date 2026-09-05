@@ -523,10 +523,12 @@ during low-power light sleep. `C153` open.
 ### nyc-buzzer
 
 GPIO42 PWM sweep; note resonance. Optional SPL.
-`embassy-debug` chirp is parked. A later no-buzzer image
-still wedged on bare Mode 1 (`scene=shapes`, `gpio busy=1`
-~30 s, Ferris stuck). GPIO42 is not sufficient to explain
-the hang. Isolate `0x14` vs `0xD7` before another chirp.
+`embassy-debug` drives LEDC low-speed timer 3 / channel 7 at
+2000 Hz with an interactive left-edge volume slider (0..=100%,
+scaling 0..=50% duty) and click feedback on navigation and touch
+buttons. EPD card flips and lamp PWM operate concurrently without
+interference. Sweep for resonant peak and sound pressure level
+remains open.
 [input-storage.md](../references/input-storage.md).
 
 ### nyc-enclosure-edges

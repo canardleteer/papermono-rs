@@ -61,7 +61,7 @@ use crate::ioe::SysI2c;
 use crate::panel::Panel;
 use crate::share;
 use crate::targets::{self, WalkEnd};
-use crate::touch_bus::{self, LampSlide};
+use crate::touch_bus::{self, LampSlide, VolumeSlide};
 
 /// Framebuffer container holding dual 1bpp planes for 4-gray rendering.
 struct Planes {
@@ -133,6 +133,7 @@ pub async fn run(
     let mut last_rotation: Option<PageRotation> = None;
     let mut rotation = PageRotation::Portrait0;
     let mut lamp = LampSlide::new();
+    let mut vol = VolumeSlide::new();
 
     #[cfg(feature = "orient")]
     {
@@ -182,8 +183,17 @@ pub async fn run(
                         wifi_watch_rev: None,
                         rotation,
                     };
-                    if let Some(nav) =
-                        wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx, &mut rotation).await
+                    if let Some(nav) = wait_nav(
+                        &mut i2c,
+                        &btn_a,
+                        &btn_b,
+                        &tp,
+                        &mut lamp,
+                        &mut vol,
+                        ctx,
+                        &mut rotation,
+                    )
+                    .await
                     {
                         match nav {
                             Nav::Prev => scene = scene.prev(),
@@ -215,8 +225,17 @@ pub async fn run(
                 wifi_watch_rev,
                 rotation,
             };
-            if let Some(nav) =
-                wait_nav(&mut i2c, &btn_a, &btn_b, &tp, &mut lamp, ctx, &mut rotation).await
+            if let Some(nav) = wait_nav(
+                &mut i2c,
+                &btn_a,
+                &btn_b,
+                &tp,
+                &mut lamp,
+                &mut vol,
+                ctx,
+                &mut rotation,
+            )
+            .await
             {
                 match nav {
                     Nav::Prev => scene = scene.prev(),
@@ -317,6 +336,7 @@ async fn paint(
 /// - `btn_b`: Input pin driver for Button B (`GPIO3` / DOWN).
 /// - `tp`: Touch interrupt line (`GPIO4` / `TOUCH_INT`).
 /// - `lamp`: Frontlight slider tracker updating M5PM1 PWM0 duty from capacitive Y coordinates.
+/// - `vol`: Buzzer volume slider tracker updating LEDC duty cycle from capacitive Y coordinates.
 /// - `ctx`: Polling context holding scene and watched telemetry revisions.
 ///
 /// # Returns
@@ -329,12 +349,14 @@ async fn paint(
 /// Both buttons must be released before edges are armed. That drops a hold that
 /// started during the previous paint (Shapes is slow) so the first post-paint
 /// release is not mistaken for a missing press.
+#[allow(clippy::too_many_arguments)]
 async fn wait_nav(
     i2c: &mut SysI2c,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     tp: &Input<'static>,
     lamp: &mut LampSlide,
+    vol: &mut VolumeSlide,
     ctx: NavContext,
     #[cfg_attr(not(feature = "orient"), allow(unused_variables))] rotation: &mut PageRotation,
 ) -> Option<Nav> {
@@ -407,6 +429,7 @@ async fn wait_nav(
             a_held = false;
             prev_a = now_a;
             if !held {
+                crate::beep::click();
                 return Some(Nav::Prev);
             }
         } else {
@@ -414,17 +437,21 @@ async fn wait_nav(
         }
 
         if !prev_b && now_b {
+            crate::beep::click();
             return Some(Nav::Next);
         }
         prev_b = now_b;
 
-        // Poll touch digitizer for right-gutter frontlight brightness slider and on-screen buttons.
+        // Poll touch digitizer for edge sliders and on-screen buttons.
         let int_high = tp.is_high();
         let sample = touch_bus::read_points(i2c, int_high, true);
         if sample.n >= 1 {
             cdc::touch(&sample);
         }
-        let _ = lamp.feed(i2c, &sample);
+        if ctx.scene != Scene::Targets {
+            let _ = lamp.feed(i2c, &sample, ctx.rotation);
+            let _ = vol.feed(&sample, ctx.rotation);
+        }
 
         // Wi-Fi action button is laid out in page space; map physical touch → page.
         let in_button = if sample.n >= 1 {
