@@ -463,67 +463,76 @@ async fn wait_nav(
         }
 
         // Wi-Fi action button is laid out in page space; map physical touch → page.
-        let in_button = if sample.n >= 1 {
-            display::framebuffer_to_page(sample.x, sample.y, ctx.rotation)
-                .is_some_and(|(px, py)| draw::wifi_action_hit(px, py, ctx.rotation))
-        } else {
-            false
-        };
-        if in_button {
+        if sample.n >= 1 {
             if !button_touch_down {
                 button_touch_down = true;
-                crate::beep::click();
+                let is_hit = display::framebuffer_to_page(sample.x, sample.y, ctx.rotation)
+                    .is_some_and(|(px, py)| draw::wifi_action_hit(px, py, ctx.rotation));
 
-                // 1. Immediately highlight button box on glass:
-                let (bx, by, bw, bh) = draw::wifi_action_rect(ctx.rotation);
-                draw::invert_page_rect(
-                    &mut planes.bw,
-                    &mut planes.red,
-                    bx,
-                    by,
-                    bw,
-                    bh,
-                    ctx.rotation,
-                );
-                panel
-                    .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
-                    .await;
-
-                // 2. Immediately unhighlight button box on glass:
-                draw::invert_page_rect(
-                    &mut planes.bw,
-                    &mut planes.red,
-                    bx,
-                    by,
-                    bw,
-                    bh,
-                    ctx.rotation,
-                );
-                panel
-                    .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
-                    .await;
-
-                // 3. Dispatch backend action regardless of async completion timing:
-                match ctx.scene {
-                    Scene::WifiSurvey => {
-                        let mode = crate::radio::wifi_mode();
-                        if mode == crate::radio::WifiMode::SurveyScanning {
-                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
-                        } else {
-                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StartSurvey);
+                if is_hit {
+                    let can_trigger = match ctx.scene {
+                        Scene::WifiSurvey => {
+                            let mode = crate::radio::wifi_mode();
+                            mode != crate::radio::WifiMode::SurveyStarting
+                                && mode != crate::radio::WifiMode::SurveyStopping
                         }
-                        return Some(Nav::Refresh);
-                    }
-                    Scene::WifiAp => {
-                        let ap_status = crate::radio::wifi_ap_status();
-                        if ap_status.active {
-                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopHotspot);
-                        } else {
-                            crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StartHotspot);
+                        Scene::WifiAp => {
+                            let ap = crate::radio::wifi_ap_status();
+                            ap.state != crate::radio::HotspotState::Starting
+                                && ap.state != crate::radio::HotspotState::Stopping
                         }
-                        return Some(Nav::Refresh);
+                        _ => false,
+                    };
+
+                    if can_trigger {
+                        crate::beep::click();
+
+                        // 1. Immediately highlight button box on glass:
+                        let (bx, by, bw, bh) = draw::wifi_action_rect(ctx.rotation);
+                        draw::invert_page_rect(
+                            &mut planes.bw,
+                            &mut planes.red,
+                            bx,
+                            by,
+                            bw,
+                            bh,
+                            ctx.rotation,
+                        );
+                        panel
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .await;
+
+                        // 2. Dispatch backend action (which transitions to Starting/Stopping):
+                        match ctx.scene {
+                            Scene::WifiSurvey => {
+                                let mode = crate::radio::wifi_mode();
+                                if mode == crate::radio::WifiMode::SurveyScanning {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StopSurvey,
+                                    );
+                                } else {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StartSurvey,
+                                    );
+                                }
+                                return Some(Nav::Refresh);
+                            }
+                            Scene::WifiAp => {
+                                let ap_status = crate::radio::wifi_ap_status();
+                                if ap_status.state == crate::radio::HotspotState::Active {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StopHotspot,
+                                    );
+                                } else {
+                                    crate::radio::send_wifi_cmd(
+                                        crate::radio::WifiCommand::StartHotspot,
+                                    );
+                                }
+                                return Some(Nav::Refresh);
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
                 }
             }
         } else if sample.n == 0 {

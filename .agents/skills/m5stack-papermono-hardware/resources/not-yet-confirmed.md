@@ -525,8 +525,12 @@ during low-power light sleep. `C153` open.
 GPIO42 PWM sweep; note resonance. Optional SPL.
 `embassy-debug` drives LEDC low-speed timer 3 / channel 7 at
 2000 Hz with an interactive left-edge volume slider (0..=100%,
-scaling 0..=50% duty) and click feedback on navigation and touch
-buttons. EPD card flips and lamp PWM operate concurrently without
+scaling 0..=25% duty) and click feedback on navigation and touch
+buttons. Live hardware testing on `C153-Lite` confirmed acoustic
+output peaks at ~25% duty cycle rather than 50% due to coil
+inductance saturation and rich harmonic output in the ear's
+3–4 kHz sensitivity band; duty cycles above 25% decrease perceived
+loudness. EPD card flips and lamp PWM operate concurrently without
 interference. Sweep for resonant peak and sound pressure level
 remains open.
 [input-storage.md](../references/input-storage.md).

@@ -51,7 +51,7 @@ use m5stack_papermono_lite::display::{self, PageRotation};
 use m5stack_papermono_lite::pmic;
 use papermono_log::{ChargeSample, Scene};
 
-use crate::radio::{BlePairStatus, WifiMode};
+use crate::radio::{BlePairStatus, HotspotState, WifiMode};
 
 /// 360×240 packed 1bpp bitmap of Ferris the Rust mascot.
 /// Provenance: Generated from SVG via `cargo xtask encode-assets` (see `assets/SOURCE.md`).
@@ -1182,7 +1182,9 @@ fn draw_wifi_survey(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     .draw(&mut ink);
 
     let status_str = match mode {
+        WifiMode::SurveyStarting => "STATUS: STARTING SCAN...",
         WifiMode::SurveyScanning => "STATUS: SCANNING CHANNELS...",
+        WifiMode::SurveyStopping => "STATUS: STOPPING SCAN...",
         WifiMode::SurveyComplete => "STATUS: SCAN COMPLETE",
         WifiMode::Hotspot => "STATUS: HOTSPOT ACTIVE",
         WifiMode::Idle => "STATUS: IDLE (READY TO SCAN)",
@@ -1340,10 +1342,11 @@ fn draw_wifi_survey(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
         guide_y += layout.guide_step;
     }
 
-    let button_label = if mode == WifiMode::SurveyScanning {
-        "[ STOP SURVEY ]"
-    } else {
-        "[ START SURVEY ]"
+    let button_label = match mode {
+        WifiMode::SurveyStarting => "[ STARTING... ]",
+        WifiMode::SurveyScanning => "[ STOP SURVEY ]",
+        WifiMode::SurveyStopping => "[ STOPPING... ]",
+        WifiMode::SurveyComplete | WifiMode::Hotspot | WifiMode::Idle => "[ START SURVEY ]",
     };
     let btn_label_y = i32::from(btn_y) + i32::from(btn_h / 2) + (GLYPH_H / 2) - 4;
     let _ = Text::with_alignment(
@@ -1508,10 +1511,11 @@ fn draw_wifi_ap(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     )
     .draw(&mut ink);
 
-    let status_str = if status.active {
-        "STATUS: ACTIVE (HOTSPOT RUNNING)"
-    } else {
-        "STATUS: STOPPED (OFFLINE)"
+    let status_str = match status.state {
+        HotspotState::Starting => "STATUS: STARTING HOTSPOT...",
+        HotspotState::Active => "STATUS: ACTIVE (HOTSPOT RUNNING)",
+        HotspotState::Stopping => "STATUS: STOPPING HOTSPOT...",
+        HotspotState::Stopped => "STATUS: STOPPED (OFFLINE)",
     };
     let _ = Text::with_alignment(
         status_str,
@@ -1644,10 +1648,11 @@ fn draw_wifi_ap(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
         tut_y += layout.guide_step;
     }
 
-    let button_label = if status.active {
-        "[ STOP HOTSPOT ]"
-    } else {
-        "[ START HOTSPOT ]"
+    let button_label = match status.state {
+        HotspotState::Starting => "[ STARTING... ]",
+        HotspotState::Active => "[ STOP HOTSPOT ]",
+        HotspotState::Stopping => "[ STOPPING... ]",
+        HotspotState::Stopped => "[ START HOTSPOT ]",
     };
     let btn_label_y = i32::from(btn_y) + i32::from(btn_h / 2) + (GLYPH_H / 2) - 4;
     let _ = Text::with_alignment(

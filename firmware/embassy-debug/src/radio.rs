@@ -100,12 +100,29 @@ pub const AP_IP_STR: &str = "192.168.4.1";
 pub enum WifiMode {
     /// Radio is idle; neither survey nor hotspot is active.
     Idle,
+    /// Channel survey scan is initializing.
+    SurveyStarting,
     /// Channel survey scan is currently running in the background.
     SurveyScanning,
+    /// Channel survey scan is stopping.
+    SurveyStopping,
     /// Channel survey scan has completed and cached results are displayed.
     SurveyComplete,
     /// Hotspot mode is active: running SoftAP, DHCP server, and JSON HTTP server.
     Hotspot,
+}
+
+/// Operational state of the PaperMono WPA2 SoftAP and embedded HTTP web server.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HotspotState {
+    /// SoftAP is offline.
+    Stopped,
+    /// SoftAP and web server are initializing.
+    Starting,
+    /// SoftAP and web server are actively running.
+    Active,
+    /// SoftAP is shutting down.
+    Stopping,
 }
 
 /// Control command sent from the UI touch interaction to the Wi-Fi manager task.
@@ -156,8 +173,8 @@ pub struct WifiSurveyData {
 /// Live status report of the SoftAP and embedded HTTP web server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WifiApStatus {
-    /// Whether the access point beacon and network stack are actively running.
-    pub active: bool,
+    /// Operational state of the SoftAP server.
+    pub state: HotspotState,
     /// Number of stations currently associated with the SoftAP.
     pub clients: u16,
     /// Cumulative count of HTTP GET requests served on port 80.
@@ -168,6 +185,14 @@ pub struct WifiApStatus {
     pub password: &'static str,
     /// IPv4 gateway URL address.
     pub ip: &'static str,
+}
+
+impl WifiApStatus {
+    /// Returns `true` when the SoftAP is actively running.
+    #[must_use]
+    pub fn is_active(&self) -> bool {
+        self.state == HotspotState::Active
+    }
 }
 
 /// Encoded integer representation of the active [`BlePairStatus`].
@@ -346,13 +371,17 @@ use crate::cdc;
 #[cfg(feature = "radio")]
 pub const AP_IP: Ipv4Addr = Ipv4Addr::new(192, 168, 4, 1);
 
-/// Active Wi-Fi mode: 0=Idle, 1=SurveyScanning, 2=SurveyComplete, 3=Hotspot.
+/// Active Wi-Fi mode: 0=Idle, 1=SurveyScanning, 2=SurveyComplete, 3=Hotspot, 4=SurveyStarting, 5=SurveyStopping.
 #[cfg(feature = "radio")]
 static WIFI_MODE: AtomicU8 = AtomicU8::new(0);
 
 /// Monotonically increasing revision counter triggering UI re-renders on Wi-Fi state changes.
 #[cfg(feature = "radio")]
 static WIFI_STATE_REV: AtomicU32 = AtomicU32::new(0);
+
+/// Operational state of the SoftAP server: 0=Stopped, 1=Starting, 2=Active, 3=Stopping.
+#[cfg(feature = "radio")]
+static HOTSPOT_STATE: AtomicU8 = AtomicU8::new(0);
 
 /// Flag indicating whether the SoftAP and HTTP/DHCP servers are active.
 #[cfg(feature = "radio")]
@@ -384,10 +413,55 @@ static STACK_RESOURCES: static_cell::StaticCell<StackResources<4>> = static_cell
 static UDP_BUFFERS: static_cell::StaticCell<UdpBuffers<2, 1024, 1024, 4>> =
     static_cell::StaticCell::new();
 
+/// Updates the shared atomic Hotspot state and syncs the boolean active flag.
+#[cfg(feature = "radio")]
+fn set_hotspot_state(state: HotspotState) {
+    let val = match state {
+        HotspotState::Stopped => 0,
+        HotspotState::Starting => 1,
+        HotspotState::Active => 2,
+        HotspotState::Stopping => 3,
+    };
+    HOTSPOT_STATE.store(val, Ordering::Release);
+    HOTSPOT_ACTIVE.store(state == HotspotState::Active, Ordering::Release);
+    WIFI_STATE_REV.fetch_add(1, Ordering::Release);
+}
+
+/// Retrieves the live operational state of the SoftAP server.
+pub fn hotspot_state() -> HotspotState {
+    #[cfg(feature = "radio")]
+    {
+        match HOTSPOT_STATE.load(Ordering::Relaxed) {
+            1 => HotspotState::Starting,
+            2 => HotspotState::Active,
+            3 => HotspotState::Stopping,
+            _ => HotspotState::Stopped,
+        }
+    }
+    #[cfg(not(feature = "radio"))]
+    {
+        HotspotState::Stopped
+    }
+}
+
 /// Sends an asynchronous control command to the background Wi-Fi manager task.
 pub fn send_wifi_cmd(cmd: WifiCommand) {
     #[cfg(feature = "radio")]
     {
+        match cmd {
+            WifiCommand::StartHotspot => {
+                set_hotspot_state(HotspotState::Starting);
+            }
+            WifiCommand::StopHotspot => {
+                set_hotspot_state(HotspotState::Stopping);
+            }
+            WifiCommand::StartSurvey => {
+                set_wifi_mode(WifiMode::SurveyStarting);
+            }
+            WifiCommand::StopSurvey => {
+                set_wifi_mode(WifiMode::SurveyStopping);
+            }
+        }
         let _ = WIFI_CMD.try_send(cmd);
     }
     #[cfg(not(feature = "radio"))]
@@ -404,6 +478,8 @@ pub fn wifi_mode() -> WifiMode {
             1 => WifiMode::SurveyScanning,
             2 => WifiMode::SurveyComplete,
             3 => WifiMode::Hotspot,
+            4 => WifiMode::SurveyStarting,
+            5 => WifiMode::SurveyStopping,
             _ => WifiMode::Idle,
         }
     }
@@ -442,7 +518,7 @@ pub fn wifi_ap_status() -> WifiApStatus {
     #[cfg(feature = "radio")]
     {
         WifiApStatus {
-            active: HOTSPOT_ACTIVE.load(Ordering::Relaxed),
+            state: hotspot_state(),
             clients: AP_CLIENTS.load(Ordering::Relaxed),
             http_requests: HTTP_REQUESTS.load(Ordering::Relaxed),
             ssid: AP_SSID,
@@ -453,7 +529,7 @@ pub fn wifi_ap_status() -> WifiApStatus {
     #[cfg(not(feature = "radio"))]
     {
         WifiApStatus {
-            active: false,
+            state: HotspotState::Stopped,
             clients: 0,
             http_requests: 0,
             ssid: AP_SSID,
@@ -843,6 +919,8 @@ fn set_wifi_mode(mode: WifiMode) {
         WifiMode::SurveyScanning => 1,
         WifiMode::SurveyComplete => 2,
         WifiMode::Hotspot => 3,
+        WifiMode::SurveyStarting => 4,
+        WifiMode::SurveyStopping => 5,
     };
     WIFI_MODE.store(val, Ordering::Release);
     WIFI_STATE_REV.fetch_add(1, Ordering::Release);
@@ -948,11 +1026,12 @@ fn process_survey_results(aps: &[esp_radio::wifi::ap::AccessPointInfo]) {
 async fn handle_command(cmd: WifiCommand, controller: &mut WifiController<'static>) {
     match cmd {
         WifiCommand::StartSurvey => {
-            if HOTSPOT_ACTIVE.load(Ordering::Relaxed) {
-                HOTSPOT_ACTIVE.store(false, Ordering::Release);
+            if hotspot_state() == HotspotState::Active {
+                set_hotspot_state(HotspotState::Stopping);
                 AP_CLIENTS.store(0, Ordering::Relaxed);
                 let _ = controller.set_config(&Config::Station(StationConfig::default()));
                 cdc::wifi_ap("state=stopped");
+                set_hotspot_state(HotspotState::Stopped);
             }
             set_wifi_mode(WifiMode::SurveyScanning);
         }
@@ -963,11 +1042,12 @@ async fn handle_command(cmd: WifiCommand, controller: &mut WifiController<'stati
             set_wifi_mode(WifiMode::Hotspot);
         }
         WifiCommand::StopHotspot => {
-            if HOTSPOT_ACTIVE.load(Ordering::Relaxed) {
-                HOTSPOT_ACTIVE.store(false, Ordering::Release);
+            if hotspot_state() == HotspotState::Active {
+                set_hotspot_state(HotspotState::Stopping);
                 AP_CLIENTS.store(0, Ordering::Relaxed);
                 let _ = controller.set_config(&Config::Station(StationConfig::default()));
                 cdc::wifi_ap("state=stopped");
+                set_hotspot_state(HotspotState::Stopped);
             }
             set_wifi_mode(WifiMode::Idle);
         }
@@ -1109,7 +1189,8 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                 let cmd = WIFI_CMD.receive().await;
                 handle_command(cmd, &mut controller).await;
             }
-            WifiMode::SurveyScanning => {
+            WifiMode::SurveyStarting | WifiMode::SurveyScanning => {
+                set_wifi_mode(WifiMode::SurveyScanning);
                 let _ = controller.set_config(&Config::Station(StationConfig::default()));
                 let scan_cfg = WifiScanConfig::default()
                     .with_max(WIFI_MAX)
@@ -1131,7 +1212,11 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                     }
                 }
             }
+            WifiMode::SurveyStopping => {
+                set_wifi_mode(WifiMode::Idle);
+            }
             WifiMode::Hotspot => {
+                set_hotspot_state(HotspotState::Starting);
                 let ap_cfg = Config::AccessPoint(
                     AccessPointConfig::default()
                         .with_ssid(AP_SSID.try_into().unwrap())
@@ -1140,7 +1225,7 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                         )),
                 );
                 let _ = controller.set_config(&ap_cfg);
-                HOTSPOT_ACTIVE.store(true, Ordering::Release);
+                set_hotspot_state(HotspotState::Active);
                 AP_CLIENTS.store(0, Ordering::Relaxed);
                 cdc::wifi_ap("state=active ssid=PaperMono-AP pass=mono2026 ip=192.168.4.1");
                 WIFI_STATE_REV.fetch_add(1, Ordering::Release);
@@ -1178,12 +1263,12 @@ pub async fn wifi_manager_task(mut controller: WifiController<'static>) {
                             Timer::after(Duration::from_millis(500)).await;
                         }
                         Either::Second(cmd) => {
-                            HOTSPOT_ACTIVE.store(false, Ordering::Release);
+                            set_hotspot_state(HotspotState::Stopping);
                             AP_CLIENTS.store(0, Ordering::Relaxed);
                             let _ =
                                 controller.set_config(&Config::Station(StationConfig::default()));
                             cdc::wifi_ap("state=stopped");
-                            WIFI_STATE_REV.fetch_add(1, Ordering::Release);
+                            set_hotspot_state(HotspotState::Stopped);
 
                             handle_command(cmd, &mut controller).await;
                             break;

@@ -11,9 +11,9 @@
 //!   `hal_buzzer.cpp`).
 //! - **Acoustic Amplitude & Volume Scaling**: For a passive electromagnetic transducer driven
 //!   by a periodic square wave, acoustic volume is modulated by scaling the duty cycle:
-//!   - 50% duty cycle ([`buzzer::DUTY_PCT`]) delivers maximum acoustic power.
+//!   - 25% duty cycle ([`buzzer::DUTY_MAX_PCT`]) delivers maximum acoustic power on hardware.
 //!   - 0% duty cycle holds the pin at constant DC low, silencing the transducer.
-//!   - Volume levels (0..=100%) map linearly to 0..=50% duty via [`buzzer::volume_to_duty_pct`].
+//!   - Volume levels (0..=100%) map linearly to 0..=25% duty via [`buzzer::volume_to_duty_pct`].
 //! - **Asynchronous Cooperative Execution**: An Embassy background worker task coordinates
 //!   tone requests received over an in-memory queue ([`Channel`]), ensuring UI rendering and
 //!   touch digitizer polling loops remain strictly non-blocking.

@@ -17,7 +17,8 @@ GPIO42 PWM (`BB_PWM`). Mux off JTAG `MTMS` (ESP32-S3 Table
 2-4) before PWM. UserDemo LEDC: low-speed timer 3 / channel 7,
 10-bit, 50% duty, 40–12000 Hz. `embassy-debug` activates LEDC
 low-speed timer 3 / channel 7 for key-click feedback (2000 Hz,
-40 ms) and orientation-aware left-edge volume sliding (0..=100%).
+40 ms) and orientation-aware left-edge volume sliding (0..=100%,
+scaled 0..=25% duty for monotonic acoustic output).
 Resonance / SPL:
 [nyc-buzzer](../resources/not-yet-confirmed.md#nyc-buzzer).
 
