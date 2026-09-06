@@ -257,5 +257,11 @@ pub const PASSIVE_TARGET_MOD_PTM_RES_MASK: u8 = 0xF0;
 /// Section 4.5.62 `Auxiliary display register`: oscillator stable flag (`osc_ok`).
 pub const AUX_DISPLAY_OSC_OK: u8 = 0x80;
 
+/// Section 4.5.62 `Auxiliary display register`: transmitter active flag (`tx_on`).
+pub const AUX_DISPLAY_TX_ON: u8 = 1 << 5;
+
+/// Section 4.5.62 `Auxiliary display register`: receiver active flag (`rx_on`).
+pub const AUX_DISPLAY_RX_ON: u8 = 1 << 3;
+
 /// Expected ST25R3916 IC type code in bits [7:3] of `REG_IC_IDENTITY`.
 pub const IC_TYPE_ST25R3916: u8 = 0x05;

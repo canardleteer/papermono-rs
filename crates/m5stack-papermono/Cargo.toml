@@ -15,6 +15,7 @@ categories.workspace = true
 [dependencies]
 embedded-hal.workspace = true
 m5stack-papermono-lite = { path = "../m5stack-papermono-lite", version = "0.1.0" }
+st25r3916 = { path = "../st25r3916", version = "0.1.0" }
 
 [dev-dependencies]
 embedded-hal-mock.workspace = true

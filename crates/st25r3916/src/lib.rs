@@ -21,31 +21,26 @@ extern crate std;
 pub mod commands;
 pub mod error;
 pub mod framing;
+pub mod initiator;
 pub mod memory;
 pub mod registers;
 pub mod target;
 
-pub use commands::{
-    register_read_cmd, CMD_GOTO_SENSE, CMD_GOTO_SLEEP, CMD_NFC_INITIAL_FIELD_ON,
-    CMD_NFC_RESPONSE_FIELD_ON, CMD_READ_IC_IDENTITY, CMD_RESET_RX_GAIN, CMD_SET_DEFAULT,
-    CMD_STOP_ALL, CMD_TRANSMIT_REQA, CMD_TRANSMIT_WITH_CRC, CMD_TRANSMIT_WITHOUT_CRC,
-    CMD_TRANSMIT_WUPA, MODE_PT_MEM_A_CONFIG, MODE_PT_MEM_F_CONFIG, MODE_PT_MEM_READ,
-    MODE_PT_MEM_TSN,
-};
+pub use commands::*;
 pub use error::Error;
 pub use framing::{
     build_text_record, build_uri_record, wrap_in_type2_tlv, ApduError, CommandApdu, NdefError,
     Type2Error, Type2Memory, Type4TagApp, UriPrefix, AID_NDEF_V2, FILE_ID_CC, FILE_ID_NDEF,
     SW_SUCCESS,
 };
-pub use memory::{NfcFParams, PtMemory};
-pub use registers::{
-    PtaState, IC_TYPE_ST25R3916, REG_AUX_DISPLAY, REG_BIT_RATE, REG_FIFO_STATUS1,
-    REG_FIFO_STATUS2, REG_IC_IDENTITY, REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS,
-    REG_MAIN_IRQ, REG_MODE_DEFINITION, REG_NFCIP1_PASSIVE_TARGET, REG_OP_CONTROL,
-    REG_RECEIVER_CONF1, REG_RECEIVER_CONF2, REG_RECEIVER_CONF3, REG_RECEIVER_CONF4,
-    REG_TARGET_DISPLAY, REG_TARGET_IRQ,
+pub use initiator::{
+    Iso14443aCard, AUX_DEF_NO_CRC_RX, ISO14443A_ANTCL, ISO14443A_CASCADE_TAG,
+    ISO14443A_CMD_SEL_CL1, ISO14443A_CMD_SEL_CL2, ISO14443A_NVB_ANTICOLLISION,
+    ISO14443A_NVB_SELECT, RX_CONF1_Z600K, RX_CONF2_DEFAULT, RX_CONF3_STABILITY,
+    RX_CONF4_STABILITY, TX_DRIVER_DEFAULT,
 };
+pub use memory::{NfcFParams, PtMemory};
+pub use registers::*;
 pub use target::{
     NfcATargetConfig, NfcATargetKind, NfcFBitRate, NfcFTargetConfig, Nfcip1CommunicationMode,
     Nfcip1TargetConfig, TargetInterrupts, TargetModulation,
@@ -140,6 +135,41 @@ impl<I2C: I2c> St25r3916<I2C> {
     pub fn read_identity(&mut self) -> Result<IcIdentity, I2C::Error> {
         let b = self.read_reg(registers::REG_IC_IDENTITY)?;
         Ok(IcIdentity::from_byte(b))
+    }
+
+    /// Reads data from the internal FIFO buffer via mode byte `0x9F`.
+    pub fn read_fifo(&mut self, buf: &mut [u8]) -> Result<(), I2C::Error> {
+        self.i2c.write_read(self.address, &[commands::MODE_FIFO_READ], buf)
+    }
+
+    /// Loads transmit data into the FIFO buffer via mode byte `0x80`.
+    pub fn write_fifo(&mut self, data: &[u8]) -> Result<(), I2C::Error> {
+        let mut buf = [0u8; 33];
+        let len = data.len().min(32);
+        buf[0] = commands::MODE_FIFO_LOAD;
+        buf[1..=len].copy_from_slice(&data[..len]);
+        self.i2c.write(self.address, &buf[..=len])
+    }
+
+    /// Returns the count of bytes currently waiting in the FIFO buffer.
+    pub fn fifo_bytes(&mut self) -> Result<usize, I2C::Error> {
+        let count = self.read_reg(registers::REG_FIFO_STATUS1)? as usize;
+        Ok(count)
+    }
+
+    /// Reads the auxiliary display register (`0x31`).
+    pub fn read_aux(&mut self) -> Result<u8, I2C::Error> {
+        self.read_reg(registers::REG_AUX_DISPLAY)
+    }
+
+    /// Reads the main, timer, and error interrupt status registers (`0x1A`, `0x1B`, `0x1C`).
+    ///
+    /// Clears the interrupt flags on readout.
+    pub fn read_irqs(&mut self) -> Result<(u8, u8, u8), I2C::Error> {
+        let main = self.read_reg(registers::REG_MAIN_IRQ)?;
+        let timer = self.read_reg(registers::REG_TIMER_NFC_IRQ)?;
+        let err = self.read_reg(registers::REG_ERROR_IRQ)?;
+        Ok((main, timer, err))
     }
 }
 
