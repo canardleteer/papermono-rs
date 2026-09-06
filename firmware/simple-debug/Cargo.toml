@@ -13,8 +13,10 @@ license = "MIT"
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
-default = []
+default = ["c153"]
 c153 = ["dep:m5stack-papermono"]
+# Compile-time pruned Lite-only profile
+lite = []
 
 [dependencies]
 # Same git tag as a later embassy-debug-fw. One lockfile cannot hold

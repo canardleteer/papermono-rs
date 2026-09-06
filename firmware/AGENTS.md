@@ -23,19 +23,23 @@ excludes `simple-debug-fw` and `embassy-debug-fw`.
 
 | Path | Stack | First SKU | Status |
 | --- | --- | --- | --- |
-| `simple-debug/` | blocking `esp-hal` | Lite baseline (`C153-Lite`), or Full with `--features c153` | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
-| `embassy-debug/` | `esp-hal` + Embassy | Lite baseline (`C153-Lite`), or Full with `--features c153` | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep` + `radio` + `orient`. `mic` opt-in. Eight OTP cards, no LUT. `--features c153` adds NFC and LoRa discovery |
+| `simple-debug/` | blocking `esp-hal` | `C153` default, `C153-Lite` via `--no-default-features --features lite` | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
+| `embassy-debug/` | `esp-hal` + Embassy | Unified `C153` + `C153-Lite` auto-detecting, pruned Lite via `--no-default-features --features lite` | Member. `image=embassy-debug`. Default `c153` + `touch` + `panel` + `sleep` + `radio` + `orient`. `mic` opt-in. Auto-detects C153 vs C153-Lite at boot via ST25R3916 I2C probe; filters UI cards dynamically. |
 
 `esp-idf-hal` remains a valid stack (hardware skill `rust.md`); it
-is not a first image. Default images depend on
-`m5stack-papermono-lite` only. Compiling with `--features c153` brings in
-`m5stack-papermono` for NFC and LoRa. SKU split:
-[crates/AGENTS.md](../crates/AGENTS.md).
+is not a first image. Default builds are unified and safe:
+`embassy-debug-fw` compiles full driver support and auto-detects
+board SKU at boot. If executed on a PaperMono-Lite (`C153-Lite`),
+unpopulated radio GPIOs are left completely quiescent and floating,
+and the UI carousel dynamically presents an 8-card walk without
+unpopulated hardware. Passing `--no-default-features --features lite`
+prunes `C153` drivers at compile time for a smaller binary.
+SKU split: [crates/AGENTS.md](../crates/AGENTS.md).
 
 Envelope for the default builds:
 
-- No NFC, no LoRa (default images leave lines quiescent;
-  `--features c153` enables discovery probes)
+- Safe radio discovery: on Lite, radio pads stay quiescent and floating;
+  NFC and LoRa cards are dynamically omitted
 - No waveform LUT (OTP first)
 - GPIO45/46 are PDM, not a power latch
 - Park IP2315 off the system I2C bus except a gated charge

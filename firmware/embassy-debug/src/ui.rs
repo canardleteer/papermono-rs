@@ -129,7 +129,11 @@ pub async fn run(
     let _ = &mut lpwr;
 
     let planes = PLANES.take();
+    let has_radios = crate::board::model().has_radios();
     let mut scene = Scene::Splash;
+    if !has_radios && scene.is_c153_only() {
+        scene = Scene::Splash;
+    }
     let mut last_painted: Option<Scene> = None;
     let mut last_rotation: Option<PageRotation> = None;
     let mut rotation = PageRotation::Portrait0;
@@ -227,7 +231,7 @@ pub async fn run(
                                         crate::radio::WifiCommand::StopSurvey,
                                     );
                                 }
-                                scene = scene.prev();
+                                scene = scene.prev_for_model(has_radios);
                             }
                             Nav::Next => {
                                 #[cfg(feature = "radio")]
@@ -239,7 +243,7 @@ pub async fn run(
                                         crate::radio::WifiCommand::StopSurvey,
                                     );
                                 }
-                                scene = scene.next();
+                                scene = scene.next_for_model(has_radios);
                             }
                             Nav::Refresh => {}
                             #[cfg(feature = "sleep")]
@@ -253,8 +257,8 @@ pub async fn run(
                         }
                     }
                 }
-                WalkEnd::AbortPrev => scene = scene.prev(),
-                WalkEnd::AbortNext => scene = scene.next(),
+                WalkEnd::AbortPrev => scene = scene.prev_for_model(has_radios),
+                WalkEnd::AbortNext => scene = scene.next_for_model(has_radios),
             }
         } else {
             let auto_refresh_ms = (scene == Scene::Legend).then_some(LEGEND_AUTO_REFRESH_MS);
@@ -295,7 +299,7 @@ pub async fn run(
                         {
                             crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
                         }
-                        scene = scene.prev();
+                        scene = scene.prev_for_model(has_radios);
                     }
                     Nav::Next => {
                         #[cfg(feature = "radio")]
@@ -304,7 +308,7 @@ pub async fn run(
                         {
                             crate::radio::send_wifi_cmd(crate::radio::WifiCommand::StopSurvey);
                         }
-                        scene = scene.next();
+                        scene = scene.next_for_model(has_radios);
                     }
                     Nav::Refresh => {}
                     #[cfg(feature = "sleep")]

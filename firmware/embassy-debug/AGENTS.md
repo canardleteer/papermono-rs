@@ -3,32 +3,42 @@
 Embassy `esp-hal` staged image. Workspace member, **not** a
 default-member: host `cargo test` must not compile this package.
 
-Primary baseline: PaperMono-Lite via `m5stack-papermono-lite`.
-Safe across both SKUs for shared peripherals (display, touch, buttons,
-frontlight, buzzer, IMU, battery gauge, BLE/Wi-Fi). On PaperMono (`C153`),
-NFC and LoRa pins remain unasserted inputs / quiescent in standard builds.
-USB-Serial/JTAG (`esp-println` `jtag-serial`), not UART0. Do
-not init NFC or LoRa in default images. No LUT. No GPIO45/46 latch (PDM). No
-Cargo `runner`. CPU stays `Config::default()` (80 MHz) so
-USB-Serial/JTAG PLL is unchanged.
+Unified build by default: `embassy-debug-fw` compiles with `c153` enabled
+and auto-detects board hardware at startup via non-destructive ST25R3916 NFC
+probe at I2C address `0x50`:
+
+- When detected on PaperMono (`C153`), it enables LoRa SPI and the full 11-card
+  carousel (`Splash`, `LoraScan`, `Lora`, `Nfc`, `WifiAp`, `WifiSurvey`,
+  `Bluetooth`, `Legend`, `Shapes`, `Tones`, `Targets`).
+- When unpopulated on PaperMono-Lite (`C153-Lite`), it sets
+  `BoardModel::PaperMonoLite`, leaves all radio GPIOs completely quiescent
+  and floating, and provides an 8-card carousel bypassing the radio cards.
+- For a minimal-footprint image with all `C153` driver crates pruned at compile
+  time, build with `--no-default-features --features lite`.
+
+USB-Serial/JTAG (`esp-println` `jtag-serial`), not UART0. No LUT.
+No GPIO45/46 latch (PDM). No Cargo `runner`. CPU stays `Config::default()`
+(80 MHz) so USB-Serial/JTAG PLL is unchanged.
 
 Same CDC prefix as Path A (`simple-debug:`). Identity is
 `hello image=embassy-debug`. Host-tested lines live in
 `crates/papermono-log`.
 
-Landing image: **`touch` + `panel` + `sleep` + `radio`** (Ferris,
-cards, lamp, sleep, BLE pairing, Wi-Fi survey, SoftAP). `mic` is
-opt-in. `simple-debug-fw` stays featureless.
+Landing image: **`c153` + `touch` + `panel` + `sleep` + `radio` + `orient`**
+(Ferris, cards, lamp, sleep, BLE pairing, Wi-Fi survey, SoftAP, NFC, LoRa).
+`mic` is opt-in.
 
 | Feature | Default | Role |
 | --- | --- | --- |
 | (none) | — | Async 50 ms poll, 1 Hz `hb`, 10 s `hello`/`git`/`gpio` |
+| `c153` | on | PaperMono C153 hardware: ST25R3916 NFC & Stamp LoRa-1262 discovery + cards |
 | `touch` | on | I2C roster, park IP2315, FT rails, gated `charge` |
-| `panel` | on | Eight-card OTP walk + PWM0 lamp |
+| `panel` | on | Card walk + PWM0 lamp (11 cards on C153, 8 cards on C153-Lite) |
 | `mic` | **off** | PDM energy + hold-A PCM dump |
 | `radio` | on | BLE pairing + Wi-Fi survey / SoftAP cards + wifi/ble counts. No MAC/BSSID/IRK. No NVS |
 | `sleep` | on | Button A hold 2 s to sleep, 1 s A/B hold to wake |
 | `orient` | on | BMI270 page rotation (sticky-rs style). Lite axis map glass-confirmed 2026-09-04 |
+| `lite` | off | Minimal-footprint profile: prunes C153 driver crates at compile time |
 
 `mic`, `panel`, `sleep`, and `orient` depend on `touch`
 (expander). `sleep` / `orient` depend on `panel`.

@@ -12,9 +12,11 @@ license = "MIT"
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
-default = ["touch", "panel", "sleep", "radio", "orient"]
+default = ["c153", "touch", "panel", "sleep", "radio", "orient"]
 # PaperMono Full SKU C153 hardware: ST25R3916 NFC identity & Stamp LoRa-1262 discovery
 c153 = ["dep:m5stack-papermono"]
+# Compile-time pruned Lite-only profile (excludes C153 radio drivers, leaves radio pins unassigned).
+lite = ["touch", "panel", "sleep", "radio", "orient"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
 touch = []
 # PDM audio: PDM GPIO45/46 + PYG12. Needs expander.

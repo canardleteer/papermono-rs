@@ -47,10 +47,10 @@ Hold the red power button about 2 s until it blinks
 
 ```shell
 . $HOME/export-esp.sh
-# PaperMono-Lite baseline:
+# Default PaperMono (C153):
 cargo xtask build-fw simple-debug
-# Or PaperMono Full SKU (C153):
-cargo xtask build-fw simple-debug --features c153
+# Or compile-time pruned PaperMono-Lite baseline:
+cargo xtask build-fw simple-debug --no-default-features --features lite
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
   --yes

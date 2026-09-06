@@ -238,9 +238,12 @@ flash size, stock partition table geometry, and factory demo version
 identification and button telemetry across USB-Serial/JTAG on PaperMono devices.
 
 `firmware/embassy-debug` targets the async Embassy runtime as a distinct
-workspace member package. The standard image includes touch digitizer and
-e-paper support, while microphone sampling, wireless scanning, and low-power
-sleep modes remain opt-in features.
+workspace member package. The standard unified image includes touch digitizer,
+e-paper display, wireless scanning, sleep, and auto-detection of PaperMono
+(`C153`) vs PaperMono-Lite (`C153-Lite`), dynamically tailoring the card
+carousel to the hardware. Compiling with `--no-default-features --features lite`
+prunes radio drivers at compile time for a minimal binary. Microphone
+sampling remains an opt-in feature (`--features mic`).
 
 Host commands in `cargo xtask` have been verified against both PaperMono-Lite
 and PaperMono hardware for identification, backup extraction, and serial

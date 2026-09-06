@@ -10,7 +10,7 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
 | `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |
-| `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) |
+| `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) + `BoardModel` enum and profile |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |
 
 ## SKU split
@@ -21,7 +21,7 @@ add-on. Do not fork examples or drivers along the SKU line.
 
 Put new code where the hardware is:
 
-- Shared pins, buses, panel, PMIC, touch, buzzer:
+- Shared pins, buses, panel, PMIC, touch, buzzer, board profile:
   `m5stack-papermono-lite` (or a chip-driver crate both SKUs
   use). Panel call site is `display::OtpRefresh`.
   `display::RefreshMode` is the HTML `epd_*` catalog only.
@@ -31,14 +31,12 @@ Put new code where the hardware is:
 - Proof-of-life, EPD demos, host tools: one package, Lite
   board crate, unless the image talks to a radio.
 
-Lite firmware depends on `m5stack-papermono-lite` only so it
-cannot name radio GPIOs. Do not init NFC or LoRa on Lite. Do
-not `#[cfg(feature = "lite")]` (or `nfc` / `lora`) through
-display, I2C, or Embassy. The official factory demo firmware
-([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
-one-ELF runtime NFC probe is vendor app policy, not this BSP; leftover
-pads stay undriven until `nyc-lite-nfc-pads` / `nyc-lite-lora-pads`
-close.
+Runtime profile detection uses `BoardModel` in `m5stack-papermono-lite`:
+a unified firmware binary probes ST25R3916 NFC IC identity at `0x50`
+at boot. If unpopulated (`C153-Lite`), the board model is set to
+`PaperMonoLite` and all radio GPIOs stay undriven and floating.
+For minimal images, `--no-default-features --features lite` prunes
+the `m5stack-papermono` dependency at compile time.
 
 Collapsing the thin C153 crate into optional features later is
 a rename. cfg-gating application code is the expensive

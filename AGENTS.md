@@ -92,7 +92,12 @@ not pack a current-meter step.
 
 Do not add OTP, SDMMC, buzzer, IP2315 hang, or RGB sweep
 unless they asked (those need eyes, a card, or parked
-pins). Do not init NFC or LoRa on Lite. Recipes:
+pins). Unified images auto-detect C153 vs C153-Lite via boot-time
+ST25R3916 I2C `0x50` probe. When running on Lite, NFC and LoRa
+initialization is completely bypassed, leaving radio GPIOs undriven
+and floating; the UI dynamically skips those cards. For a
+minimal-footprint Lite-only binary, compile with
+`--no-default-features --features lite`. Recipes:
 [not-yet-confirmed.md](docs/not-yet-confirmed.md).
 
 ## Bluetooth testing options

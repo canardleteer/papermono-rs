@@ -512,6 +512,62 @@ impl Scene {
         }
     }
 
+    /// Whether this card is only supported on the standard PaperMono (`C153`)
+    /// model (requires ST25R3916 NFC or Stamp LoRa-1262 transceiver hardware).
+    #[inline]
+    #[must_use]
+    pub const fn is_c153_only(self) -> bool {
+        matches!(self, Self::LoraScan | Self::Lora | Self::Nfc)
+    }
+
+    /// Next card for a given board model profile, wrapping.
+    ///
+    /// When `has_radios` is `true` (standard PaperMono `C153`), advances through the
+    /// full 11-card carousel including `LoraScan`, `Lora`, and `Nfc`.
+    /// When `false` (PaperMono-Lite `C153-Lite`), bypasses those cards and advances
+    /// directly from `Splash` to `WifiAp`.
+    #[must_use]
+    pub const fn next_for_model(self, has_radios: bool) -> Self {
+        if has_radios {
+            self.next()
+        } else {
+            match self {
+                Self::Splash | Self::LoraScan | Self::Lora | Self::Nfc => Self::WifiAp,
+                Self::WifiAp => Self::WifiSurvey,
+                Self::WifiSurvey => Self::Bluetooth,
+                Self::Bluetooth => Self::Legend,
+                Self::Legend => Self::Shapes,
+                Self::Shapes => Self::Tones,
+                Self::Tones => Self::Targets,
+                Self::Targets => Self::Splash,
+            }
+        }
+    }
+
+    /// Previous card for a given board model profile, wrapping.
+    ///
+    /// When `has_radios` is `true` (standard PaperMono `C153`), steps backward through
+    /// the full 11-card carousel including `LoraScan`, `Lora`, and `Nfc`.
+    /// When `false` (PaperMono-Lite `C153-Lite`), bypasses those cards and steps
+    /// directly from `WifiAp` to `Splash`.
+    #[must_use]
+    pub const fn prev_for_model(self, has_radios: bool) -> Self {
+        if has_radios {
+            self.prev()
+        } else {
+            match self {
+                Self::Splash => Self::Targets,
+                Self::LoraScan | Self::Lora | Self::Nfc | Self::WifiAp => Self::Splash,
+                Self::WifiSurvey => Self::WifiAp,
+                Self::Bluetooth => Self::WifiSurvey,
+                Self::Legend => Self::Bluetooth,
+                Self::Shapes => Self::Legend,
+                Self::Tones => Self::Shapes,
+                Self::Targets => Self::Tones,
+            }
+        }
+    }
+
     /// OTP 4-gray `0xD7` on the tones card only.
     ///
     /// Splash is 1-bit Ferris line art (same 360×240
@@ -1493,6 +1549,18 @@ mod tests {
         assert_eq!(Scene::Targets.next(), Scene::Splash);
         assert_eq!(Scene::Splash.prev(), Scene::Targets);
         assert_eq!(Scene::Targets.prev(), Scene::Tones);
+
+        // Lite model (has_radios = false) skips LoraScan, Lora, and Nfc:
+        assert_eq!(Scene::Splash.next_for_model(false), Scene::WifiAp);
+        assert_eq!(Scene::WifiAp.next_for_model(false), Scene::WifiSurvey);
+        assert_eq!(Scene::Targets.next_for_model(false), Scene::Splash);
+        assert_eq!(Scene::Splash.prev_for_model(false), Scene::Targets);
+        assert_eq!(Scene::WifiAp.prev_for_model(false), Scene::Splash);
+        assert!(Scene::LoraScan.is_c153_only());
+        assert!(Scene::Lora.is_c153_only());
+        assert!(Scene::Nfc.is_c153_only());
+        assert!(!Scene::Splash.is_c153_only());
+        assert!(!Scene::WifiAp.is_c153_only());
         assert_eq!(Scene::Tones.prev(), Scene::Shapes);
         assert_eq!(Scene::Shapes.prev(), Scene::Legend);
         assert_eq!(Scene::Legend.prev(), Scene::Bluetooth);

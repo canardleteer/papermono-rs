@@ -10,10 +10,14 @@ stacks are valid on this MCU:
 | `std`: `esp-idf-hal` + `esp-idf-svc` | Share ESP-IDF drivers/partition story with vendor C++ firmware |
 
 Encode [pin-map.md](pin-map.md) in the two board crates:
-`m5stack-papermono-lite` (`C153-Lite`, shared map) and
-`m5stack-papermono` (`C153`, NFC + LoRa). That split is two
+`m5stack-papermono-lite` (`C153-Lite`, shared map and `BoardModel` runtime
+profile) and `m5stack-papermono` (`C153`, NFC + LoRa). That split is two
 crates, not a Cargo feature
-([crates/AGENTS.md](../../../../crates/AGENTS.md)). Chip drivers stay
+([crates/AGENTS.md](../../../../crates/AGENTS.md)). Unified firmware
+images auto-detect board identity via boot-time ST25R3916 NFC probe at I2C
+address `0x50`; on Lite, radio GPIOs stay undriven and floating, and UI
+cards are dynamically skipped. Pruned Lite-only builds compile with
+`--no-default-features --features lite`. Chip drivers stay
 MCU-agnostic. Register facts come from
 [datasheets.md](../resources/datasheets.md). USB/flash geometry:
 [flashing.md](flashing.md). Observed silicon:

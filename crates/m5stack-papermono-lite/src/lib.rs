@@ -43,8 +43,11 @@ pub mod imu;
 pub mod ioe1;
 pub mod pins;
 pub mod pmic;
+pub mod profile;
 pub mod rtc;
 pub mod touch;
+
+pub use profile::BoardModel;
 
 /// Official SKU code for this crate (`C153-Lite`).
 pub const SKU: &str = "C153-Lite";

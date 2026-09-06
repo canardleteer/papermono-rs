@@ -12,7 +12,8 @@
 extern crate std;
 
 pub use m5stack_papermono_lite::{
-    addresses, buzzer, display, imu, ioe1, pins, pmic, rtc, touch, SKU as LITE_SKU,
+    addresses, buzzer, display, imu, ioe1, pins, pmic, profile, rtc, touch, BoardModel,
+    SKU as LITE_SKU,
 };
 
 pub mod lora;

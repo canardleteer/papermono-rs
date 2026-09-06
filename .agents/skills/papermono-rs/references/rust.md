@@ -86,12 +86,26 @@ offsets or 32 MB geometry.
 
 | Part | Crate | Notes |
 | --- | --- | --- |
-| Shared pins / SKU | `m5stack-papermono-lite` | This repo. Lite firmware depends on this only |
-| C153 radios | `m5stack-papermono` | NFC + LoRa add-on |
+| Shared pins / SKU | `m5stack-papermono-lite` | This repo. Core pin map and `BoardModel` runtime profile |
+| C153 radios | `m5stack-papermono` | NFC + LoRa add-on. Compiled in unified builds, pruned with `--no-default-features --features lite` |
 | SSD1677 OTP | `ssd1677-otp` | Not crates.io `ssd1677`. Dedicated panel OTP driver |
 | M5PM1 | `m5pm1` | PWM0 is G3. PWM1 is unused on this SKU |
 | M5IOE1 | `m5ioe1` | Board `0x4F`. Park IP2315 on `PYG11` |
 | CDC lines | `papermono-log` | Host-tested grammar for both images |
+
+## Board profile runtime detection and pruning
+
+Firmware builds are unified by default:
+
+- Cold boot probes the ST25R3916 NFC IC identity at I2C address `0x50`
+  (following the `M5PaperMono-UserDemo` `Hal::detectBoardVariant` discriminator).
+- On PaperMono (`C153`), the NFC and LoRa drivers are energized and probed,
+  and the 11-card UI carousel is loaded.
+- On PaperMono-Lite (`C153-Lite`), the board model is recorded as
+  `BoardModel::PaperMonoLite`. All radio GPIOs are left completely quiescent
+  and floating; the UI automatically bypasses the radio cards.
+- To produce a minimal-footprint binary with radio drivers pruned at compile
+  time, build with `--no-default-features --features lite`.
 
 ## Wi-Fi / BLE in embassy-debug
 

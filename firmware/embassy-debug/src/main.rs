@@ -44,6 +44,7 @@
 #![no_main]
 
 mod beep;
+mod board;
 mod cdc;
 #[cfg(feature = "panel")]
 mod draw;
@@ -81,11 +82,7 @@ use esp_hal::ram;
 use esp_hal::rtc_cntl::SocResetReason;
 use esp_hal::system::reset_reason;
 use esp_hal::timer::timg::TimerGroup;
-#[cfg(feature = "c153")]
-use m5stack_papermono::SKU;
 use m5stack_papermono_lite::pins;
-#[cfg(not(feature = "c153"))]
-use m5stack_papermono_lite::SKU;
 use papermono_log::{Hello, IMAGE_EMBASSY};
 
 // Application descriptor for the ESP-IDF second-stage bootloader.
@@ -213,10 +210,11 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(beep::run(peripherals.LEDC, peripherals.GPIO42).unwrap());
 
     // Capture boot identification metadata for telemetry.
-    let hello = Hello {
+    #[allow(unused_mut)]
+    let mut hello = Hello {
         t_s: 0,
         image: IMAGE_EMBASSY,
-        sku: SKU,
+        sku: board::model().sku(),
         cpu_mhz: cpu_clock().as_mhz(),
         xtal_mhz: xtal_clock().as_mhz(),
         reset: reset_token(reset_reason()),
@@ -235,10 +233,11 @@ async fn main(spawner: Spawner) -> ! {
 
         // Bring up system expander rails and configure touch digitizer.
         let _ = touch_bus::bring_up(&mut i2c).await;
+        hello.sku = board::model().sku();
 
         // Safe SX1262 LoRa module discovery probe on PaperMono (C153).
         #[cfg(feature = "c153")]
-        {
+        if board::model().has_radios() {
             use esp_hal::gpio::{Level, Output, OutputConfig};
             use esp_hal::spi::master::{Config, Spi};
             use esp_hal::time::Rate;

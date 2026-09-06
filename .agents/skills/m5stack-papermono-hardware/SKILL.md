@@ -238,8 +238,11 @@ flash size is 16 MB
 6. **Ship a 16 MB-aware partition table.** Do not inherit 8 MB
    DevKit limits. Do not assume 32 MB geometry or arbitrary partition offsets.
 7. **Lite has no NFC and no LoRa.** Do not init ST25R3916 or
-   Stamp LoRa-1262 / SX1262 on `C153-Lite`. Do not treat those
-   GPIOs as free until
+   Stamp LoRa-1262 / SX1262 on `C153-Lite`. Unified firmware images
+   auto-detect board identity via boot-time ST25R3916 I2C `0x50` probe,
+   leaving radio GPIOs completely quiescent and floating on `C153-Lite`
+   while dynamically omitting radio cards from the UI carousel. Do
+   not treat those GPIOs as free until
    [nyc-lite-nfc-pads](resources/not-yet-confirmed.md#nyc-lite-nfc-pads)
    / [nyc-lite-lora-pads](resources/not-yet-confirmed.md#nyc-lite-lora-pads)
    close.

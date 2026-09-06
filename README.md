@@ -1,13 +1,5 @@
 # `papermono-rs`
 
-> [!NOTE]
-> PaperMono (`C153`) hardware discovery is now underway on the
-> `feat/papermono-discovery` branch! Both ST25R3916 ISO14443-A contactless
-> card reading and Stamp LoRa-1262 (SX1262) over-the-air packet reception
-> and channel sweeping have been confirmed live on physical `C153` silicon.
-> Firmware packages support both models with shared core functionality,
-> unlocking Full-model NFC and LoRa features via `--features c153`.
-
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
 [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite).
@@ -48,6 +40,40 @@ documented vendor intent. The open measurement list is tracked
 in [`nyc-*`](docs/not-yet-confirmed.md). Consult the
 [tool verification ledger](docs/firmware-snapshot-management.md#tool-verification-ledger)
 before treating a command as verified on target hardware.
+
+### PaperMono + PaperMono-Lite Setup
+
+The firmware ecosystem provides a unified, safe-by-default architecture
+that auto-detects board hardware at startup and operates both PaperMono
+(`C153`) and PaperMono-Lite (`C153-Lite`):
+
+1. **Unified Default Binary**: The default firmware image includes full
+   peripherals and dynamic board profile detection (`BoardModel`). At boot,
+   the firmware probes ST25R3916 NFC IC identity at I2C address `0x50`
+   (matching the official `M5PaperMono-UserDemo` `Hal::detectBoardVariant`
+   hardware discriminator):
+   - When detected (`C153`), the system initializes LoRa SPI and the full
+     11-card UI carousel (`Splash`, `LoraScan`, `Lora`, `Nfc`, `WifiAp`,
+     `WifiSurvey`, `Bluetooth`, `Legend`, `Shapes`, `Tones`, `Targets`).
+   - When unpopulated or NAK (`C153-Lite`), the board model is set to
+     `PaperMonoLite`. All radio initialization is safely bypassed, leaving
+     unpopulated radio GPIOs completely quiescent and floating. The UI
+     carousel automatically skips NFC and LoRa cards, presenting an 8-card
+     flow without unpopulated features.
+2. **Hardware Safety**:
+   - Radio test pads and unpopulated nets on `C153-Lite` stay undriven,
+     avoiding back-powering unpopulated silicon or driving floating pins.
+   - The ST25R3916 NFC field is energized only during deliberate
+     user-initiated polling and is powered down immediately when idle.
+   - The SX1262 LoRa module operates with internal LDO regulation, hardware
+     over-current protection (OCP 60 mA), +14 dBm bench-safe TX power, and
+     an active antenna switch (`PYG2`) engaged only when the transceiver is
+     powered.
+3. **Compile-Time Pruning**: For users desiring minimal binary footprint or
+   strictly verified Lite-only builds, passing
+   `--no-default-features --features lite` completely compiles out all
+   `C153` radio driver crates and dependencies at compile time, reducing
+   flash consumption by ~34 KB.
 
 ## Firmware Examples
 

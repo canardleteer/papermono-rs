@@ -237,6 +237,15 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
     } else {
         false
     };
+
+    #[cfg(feature = "c153")]
+    {
+        if nfc {
+            crate::board::set_model(m5stack_papermono_lite::BoardModel::PaperMono);
+        } else {
+            crate::board::set_model(m5stack_papermono_lite::BoardModel::PaperMonoLite);
+        }
+    }
     let charge = charge_once(i2c, ioe_ack).await;
     store_charge(charge);
     let chg = charge.then;

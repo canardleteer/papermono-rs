@@ -15,13 +15,14 @@ On the unit:
   monification details in [assets/SOURCE.md](assets/SOURCE.md).
 - BUTTON A previous card (short press release), BUTTON B next
   (press down). Presses during panel refreshes are queued so
-  rapid navigation clicks are never dropped. The walk is splash →
+  rapid navigation clicks are never dropped. On `C153`, the walk is splash →
   lora_scan (channel energy & packet sweeper) →
   lora (test ping + packet sniffer) → nfc (ISO14443-A tag poll) →
   wifi hotspot (WPA2 SoftAP + JSON HTTP) → wifi survey (channel scan) →
   bluetooth (BLE passkey pairing) → legend (pinout, touch rails, sleep) →
   shapes (procedural 3-degree Koch snowflake benchmark) → four-gray tones →
-  touch targets.
+  touch targets (11 cards). On `C153-Lite`, the radio cards are bypassed
+  automatically, presenting an 8-card walk.
 - Slide the right edge for the lamp (top bright, bottom dim).
 - Slide the left edge for passive buzzer volume (top loudest, bottom silent;
   audio ticks on drag). Both sliders respect screen orientation.
@@ -36,10 +37,11 @@ On the unit:
 - Passive buzzer on GPIO42 is driven via LEDC low-speed Timer 3 / Channel 7 at
   2 kHz with audible key clicks on button navigation and touchscreen actions.
 
-Default features are `touch`, `panel`, `sleep`, `radio`, and `orient`.
-The `mic` feature is opt-in. The `c153` feature activates PaperMono Full SKU
-hardware definitions, ST25R3916 NFC identity checking, and Stamp LoRa-1262
-status discovery.
+The default build is unified (`c153`, `touch`, `panel`, `sleep`, `radio`,
+`orient`), auto-detecting PaperMono (`C153`) vs PaperMono-Lite (`C153-Lite`)
+at boot. For a minimal-footprint image with all `C153` driver crates pruned at
+compile time, build with `--no-default-features --features lite`.
+The `mic` feature is opt-in.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
 and 180° flips). Cards redraw upright for the hold via soft
