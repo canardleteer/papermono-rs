@@ -335,7 +335,18 @@ pub fn set_listening_state(freq_khz: u32) {
     LORA_STATE_CODE.store(5, Ordering::Release);
 }
 
-/// Powers up the 3V3_L2_LoRa rail and releases hardware reset.
+/// Powers up the `3V3_L2_LoRa` power rail and brings the Stamp LoRa-1262 out of reset.
+///
+/// # Hardware Sequencing & Net Routing
+/// - **Hold in Reset**: M5IOE1 `PYG10` (`lora::IOE1_RESET`) is driven LOW as push-pull.
+/// - **Connect Antenna**: M5IOE1 `PYG2` (`lora::IOE1_ANTENNA_SWITCH`, schematic net `PYB_LoRa_ANT_SW`)
+///   is driven HIGH as push-pull to connect the built-in FPC antenna to the module RF path
+///   (per PaperMono Schematic V0.6.2 Page 5 and official `M5PaperMono-UserDemo` `hal_lora.cpp`).
+/// - **Energize Power Rail**: M5PM1 GPIO `G2` (`lora::PMIC_ENABLE`) is driven HIGH as push-pull
+///   output to energize the `3V3_L2_LoRa` switched power rail.
+/// - **Rail Settle**: 15 ms stabilization delay.
+/// - **Release Reset**: M5IOE1 `PYG10` is driven HIGH.
+/// - **Boot Settle**: 20 ms delay for the 32 MHz TCXO and internal SX1262 logic to reach Standby RC.
 #[cfg(feature = "c153")]
 async fn power_up(i2c: &mut ioe::SysI2c) {
     let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
@@ -350,7 +361,10 @@ async fn power_up(i2c: &mut ioe::SysI2c) {
     Timer::after(Duration::from_millis(20)).await;
 }
 
-/// Parks the LoRa transceiver safely (asserts reset low and cuts PMIC power rail).
+/// Parks the Stamp LoRa-1262 transceiver safely.
+///
+/// Drives M5IOE1 `PYG10` (reset) LOW, disconnects the antenna switch (M5IOE1 `PYG2` LOW),
+/// and de-energizes the `3V3_L2_LoRa` power rail via M5PM1 `G2`.
 #[cfg(feature = "c153")]
 async fn power_down(i2c: &mut ioe::SysI2c) {
     let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
@@ -401,6 +415,21 @@ pub async fn probe_and_park(_i2c: &mut crate::ioe::SysI2c) -> bool {
 }
 
 /// Transmits a user-controlled test ping packet at 915.000 MHz (+14 dBm bench safe).
+///
+/// # RF Safety & Sequencing
+/// 1. Powers up `3V3_L2_LoRa` rail via M5PM1 `G2`, connects FPC antenna via M5IOE1 `PYG2`,
+///    and releases reset via M5IOE1 `PYG10`.
+/// 2. Configures the transceiver in Standby RC (Semtech SX1262 Section 13.1.2 "SetStandby"),
+///    LDO regulator mode (Section 13.1.8 "SetRegulatorMode", matching `hal_lora.cpp`),
+///    3.0 V TCXO supply (Section 13.3.2 "SetDio3AsTcxoCtrl"), and automatic RF switch
+///    via DIO2 (Section 13.3.1 "SetDio2AsRfSwitchCtrl").
+/// 3. Configures carrier frequency to 915.000 MHz (Section 13.4.1 "SetRfFrequency") and
+///    clamps output power to +14 dBm with 60 mA hardware over-current protection
+///    (Section 13.1.11 "SetPaConfig", Section 13.4.4 "SetTxParams", Section 13.4.15 "SetOcp").
+/// 4. Loads payload into the transceiver FIFO (Section 13.2.3 "WriteBuffer") and
+///    triggers transmission (Section 13.1.4 "SetTx").
+/// 5. Polls for `IRQ_TX_DONE` (Section 13.5.1 "GetIrqStatus"), then immediately returns
+///    to Standby RC and parks the hardware rails via [`power_down`].
 #[cfg(feature = "c153")]
 pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraTxSample> {
     let mut lock = LORA_HW.lock().await;
@@ -498,6 +527,18 @@ pub async fn transmit_ping(_i2c: &mut crate::ioe::SysI2c) -> Option<papermono_lo
 
 /// Listens for incoming LoRa packets on the sniffer frequency for up to 60 seconds,
 /// or until cancelled by button press or screen tap. Records ambient noise floor if quiet.
+///
+/// # Hardware Sequencing
+/// 1. Engages antenna via M5IOE1 `PYG2`, powers module via M5PM1 `G2`, and releases reset.
+/// 2. Configures receiver parameters: Semtech SX1262 Section 13.1.5 "SetRx" (`0xFFFFFF`
+///    for continuous reception), Section 13.4.5 "SetModulationParams" (SF11, BW 250 kHz,
+///    CR 4/5), Section 13.4.6 "SetPacketParams" (variable header, 255-byte max buffer, CRC on),
+///    and Section 13.4.8 "SetLoRaSyncWord" (`0x24B4`).
+/// 3. Arms `IRQ_RX_DONE` on DIO1 (Section 13.3.3 "SetDioIrqParams").
+/// 4. Polls for packet arrival. Upon reception, reads packet length and buffer start pointer
+///    (Section 13.5.3 "GetRxBufferStatus"), queries packet RSSI and SNR (Section 13.5.4
+///    "GetPacketStatus"), reads payload bytes (Section 13.2.4 "ReadBuffer"), and immediately
+///    returns to standby and powers down.
 #[cfg(feature = "c153")]
 pub async fn listen_rx(
     i2c: &mut ioe::SysI2c,
@@ -628,10 +669,15 @@ pub async fn listen_rx(
     Err(-120)
 }
 
-/// Executes a full sweep across the US915 band.
-/// Applies "double duty" scanning to the expected channel neighborhood (slots 61..=63),
-/// visiting them twice per sweep and doubling their dwell time.
-/// Emits a beep whenever elevated channel activity or a valid packet is heard.
+/// Executes a full sweep across the US915 band (104 channels, 902.125 MHz to 927.875 MHz).
+///
+/// # Hardware Operation & Double-Duty Scanning
+/// - Applies "double duty" scanning to the expected channel neighborhood (slots 61..=63),
+///   visiting them twice per sweep and doubling their dwell time (25 ms vs 10 ms).
+/// - Queries instantaneous RSSI (Semtech SX1262 Section 13.5.5 "GetRssiInst").
+/// - Emits acoustic feedback via GPIO42 passive buzzer: 25 ms chirp on elevated RSSI
+///   (above -105 dBm) and 80 ms tone on packet detection.
+/// - Parks transceiver and powers down rails upon completion or cancellation.
 #[cfg(feature = "c153")]
 pub async fn run_scan_sweep(
     i2c: &mut ioe::SysI2c,

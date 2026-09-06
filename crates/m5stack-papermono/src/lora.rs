@@ -35,7 +35,12 @@ pub const SPI_MISO: u8 = 40;
 /// SX1262 NSS chip select (GPIO41). Active low. Multiplex off default ESP32-S3 JTAG `MTDI`.
 pub const NSS: u8 = 41;
 
-/// M5IOE1 `PYG2` (`PYB_LoRa_ANT_SW`): LoRa RF antenna switch.
+/// M5IOE1 `PYG2` (`PYB_LoRa_ANT_SW`): LoRa RF antenna switch gate control.
+///
+/// Per PaperMono Schematic V0.6.2 Page 5 and official factory firmware
+/// (`M5PaperMono-UserDemo` `hal_lora.cpp`), this expander output controls an RF
+/// switch connecting the built-in FPC antenna to the transceiver front-end.
+/// Driving this line HIGH engages the antenna; driving LOW isolates it.
 pub const IOE1_ANTENNA_SWITCH: u8 = 2;
 
 /// M5IOE1 `PYG10` (`PYB_LoRa_RST`): LoRa hardware reset line (active low).
@@ -187,10 +192,14 @@ pub const STDBY_CONFIG_RC: u8 = 0x00;
 /// Standby configuration: STDBY_XOSC (32 MHz crystal oscillator, opcode param `0x01`).
 pub const STDBY_CONFIG_XOSC: u8 = 0x01;
 
-/// Regulator mode: internal LDO enabled (opcode param `0x00`).
+/// Semtech SX1262 Section 13.1.8 "SetRegulatorMode": internal LDO enabled (opcode param `0x00`).
+///
+/// Modules that omit the external switched-mode DC-DC inductor (such as the Stamp LoRa-1262
+/// populated on PaperMono C153) must select LDO mode (matches `M5PaperMono-UserDemo` `hal_lora.cpp`
+/// `useRegulatorLDO = true`).
 pub const REGULATOR_LDO: u8 = 0x00;
 
-/// Regulator mode: internal DC-DC converter enabled (opcode param `0x01`).
+/// Semtech SX1262 Section 13.1.8 "SetRegulatorMode": internal DC-DC converter enabled (opcode param `0x01`).
 pub const REGULATOR_DC_DC: u8 = 0x01;
 
 /// Fallback mode: return to FS mode after packet handling (opcode param `0x40`).
@@ -673,16 +682,22 @@ where
     }
 
     /// Places the transceiver into standby mode (`STDBY_CONFIG_RC` or `STDBY_CONFIG_XOSC`).
+    ///
+    /// Semtech SX1262 Section 13.1.2 "SetStandby" (opcode `0x80`).
     pub fn set_standby(&mut self, config: u8) -> Result<(), SxError<SPI::Error>> {
         self.write_cmd(CMD_SET_STANDBY, &[config])
     }
 
     /// Configures regulator mode: LDO (`REGULATOR_LDO`) or DC-DC (`REGULATOR_DC_DC`).
+    ///
+    /// Semtech SX1262 Section 13.1.8 "SetRegulatorMode" (opcode `0x96`).
     pub fn set_regulator_mode(&mut self, mode: u8) -> Result<(), SxError<SPI::Error>> {
         self.write_cmd(CMD_SET_REGULATOR_MODE, &[mode])
     }
 
     /// Configures DIO3 as a regulated TCXO supply voltage with stabilization delay ticks.
+    ///
+    /// Semtech SX1262 Section 13.3.2 "SetDio3AsTcxoCtrl" (opcode `0x97`).
     pub fn set_dio3_as_tcxo_ctrl(
         &mut self,
         voltage: u8,
@@ -698,11 +713,15 @@ where
     }
 
     /// Calibrates image rejection for the given frequency range.
+    ///
+    /// Semtech SX1262 Section 13.1.10 "CalibrateImage" (opcode `0x98`).
     pub fn calibrate_image(&mut self, freq1: u8, freq2: u8) -> Result<(), SxError<SPI::Error>> {
         self.write_cmd(CMD_CALIBRATE_IMAGE, &[freq1, freq2])
     }
 
     /// Configures internal DIO2 to control the external RF switch.
+    ///
+    /// Semtech SX1262 Section 13.3.1 "SetDio2AsRfSwitchCtrl" (opcode `0x9D`).
     pub fn set_dio2_as_rf_switch_ctrl(&mut self, enable: bool) -> Result<(), SxError<SPI::Error>> {
         self.write_cmd(
             CMD_SET_DIO2_AS_RF_SWITCH_CTRL,
@@ -711,11 +730,15 @@ where
     }
 
     /// Sets the packet type modem: `PACKET_TYPE_GFSK` (`0x00`) or `PACKET_TYPE_LORA` (`0x01`).
+    ///
+    /// Semtech SX1262 Section 13.4.2 "SetPacketType" (opcode `0x8A`).
     pub fn set_packet_type(&mut self, packet_type: u8) -> Result<(), SxError<SPI::Error>> {
         self.write_cmd(CMD_SET_PACKET_TYPE, &[packet_type])
     }
 
     /// Configures the RF carrier frequency in hertz.
+    ///
+    /// Semtech SX1262 Section 13.4.1 "SetRfFrequency" (opcode `0x86`).
     pub fn set_rf_frequency(&mut self, freq_hz: u32) -> Result<(), SxError<SPI::Error>> {
         let reg = calculate_rf_freq_reg(freq_hz);
         let params = [
@@ -728,6 +751,8 @@ where
     }
 
     /// Configures the Power Amplifier (PA) parameters.
+    ///
+    /// Semtech SX1262 Section 13.1.11 "SetPaConfig" (opcode `0x95`).
     pub fn set_pa_config(
         &mut self,
         pa_duty_cycle: u8,
@@ -742,6 +767,8 @@ where
     }
 
     /// Sets the transmit output power in dBm and ramp time.
+    ///
+    /// Semtech SX1262 Section 13.4.4 "SetTxParams" (opcode `0x8E`).
     pub fn set_tx_params(
         &mut self,
         power_dbm: i8,
@@ -751,6 +778,8 @@ where
     }
 
     /// Configures Over-Current Protection (OCP) clamp in register `0x08E7`.
+    ///
+    /// Semtech SX1262 Section 13.4.15 "SetOcp" (register `0x08E7`).
     pub fn set_ocp(&mut self, ocp_val: u8) -> Result<(), SxError<SPI::Error>> {
         self.write_reg(REG_OCP, ocp_val)
     }
