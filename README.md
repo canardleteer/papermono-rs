@@ -1,5 +1,9 @@
 # `papermono-rs`
 
+> [!IMPORTANT]
+> This repository is not currently stable, and is being built as we
+> confirm hardware capabilities and code.
+
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
 [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite).
