@@ -20,6 +20,7 @@ extern crate std;
 
 pub mod commands;
 pub mod error;
+pub mod memory;
 pub mod registers;
 
 pub use commands::{
@@ -30,6 +31,7 @@ pub use commands::{
     MODE_PT_MEM_TSN,
 };
 pub use error::Error;
+pub use memory::{NfcFParams, PtMemory};
 pub use registers::{
     IC_TYPE_ST25R3916, REG_AUX_DISPLAY, REG_BIT_RATE, REG_FIFO_STATUS1, REG_FIFO_STATUS2,
     REG_IC_IDENTITY, REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS, REG_MAIN_IRQ,
