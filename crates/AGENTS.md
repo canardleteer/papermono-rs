@@ -10,6 +10,7 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
 | `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |
+| `st25r3916/` | — | ST25R3916 NFC transceiver driver (initiator, target profiles, PT_Memory, framing) |
 | `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) + `BoardModel` enum and profile |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |
 

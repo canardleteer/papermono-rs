@@ -253,6 +253,7 @@ xtask catalog a human sees, update the matching row in the
 | [crates/ssd1677-otp/README.md](crates/ssd1677-otp/README.md) | crates.io | panel OTP, no MCU LUT |
 | [crates/m5pm1/README.md](crates/m5pm1/README.md) | crates.io | PMIC registers + PWM0 |
 | [crates/m5ioe1/README.md](crates/m5ioe1/README.md) | crates.io | expander + IP2315 gate |
+| [crates/st25r3916/README.md](crates/st25r3916/README.md) | crates.io | ST25R3916 NFC driver |
 | [crates/m5stack-papermono-lite/README.md](crates/m5stack-papermono-lite/README.md) | crates.io | Lite / shared pin-map role |
 | [crates/m5stack-papermono/README.md](crates/m5stack-papermono/README.md) | crates.io | C153 radio add-on role |
 | [host/papermono-host/README.md](host/papermono-host/README.md) | humans | host library, udev, flash contract |

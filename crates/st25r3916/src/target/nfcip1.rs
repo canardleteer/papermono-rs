@@ -143,7 +143,10 @@ mod tests {
             ),
             Transaction::write(ADDR, std::vec![REG_EXT_FIELD_DETECTOR_ACT, 0x13]),
             Transaction::write(ADDR, std::vec![REG_EXT_FIELD_DETECTOR_DEACT, 0x02]),
-            Transaction::write(ADDR, std::vec![REG_MODE_DEFINITION, config.mode.to_mode_byte()]),
+            Transaction::write(
+                ADDR,
+                std::vec![REG_MODE_DEFINITION, config.mode.to_mode_byte()],
+            ),
             Transaction::write(ADDR, std::vec![REG_OP_CONTROL, 0xC3]),
         ];
 

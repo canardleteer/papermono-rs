@@ -36,8 +36,8 @@ pub use framing::{
 pub use initiator::{
     Iso14443aCard, AUX_DEF_NO_CRC_RX, ISO14443A_ANTCL, ISO14443A_CASCADE_TAG,
     ISO14443A_CMD_SEL_CL1, ISO14443A_CMD_SEL_CL2, ISO14443A_NVB_ANTICOLLISION,
-    ISO14443A_NVB_SELECT, RX_CONF1_Z600K, RX_CONF2_DEFAULT, RX_CONF3_STABILITY,
-    RX_CONF4_STABILITY, TX_DRIVER_DEFAULT,
+    ISO14443A_NVB_SELECT, RX_CONF1_Z600K, RX_CONF2_DEFAULT, RX_CONF3_STABILITY, RX_CONF4_STABILITY,
+    TX_DRIVER_DEFAULT,
 };
 pub use memory::{NfcFParams, PtMemory};
 pub use registers::*;
@@ -139,7 +139,8 @@ impl<I2C: I2c> St25r3916<I2C> {
 
     /// Reads data from the internal FIFO buffer via mode byte `0x9F`.
     pub fn read_fifo(&mut self, buf: &mut [u8]) -> Result<(), I2C::Error> {
-        self.i2c.write_read(self.address, &[commands::MODE_FIFO_READ], buf)
+        self.i2c
+            .write_read(self.address, &[commands::MODE_FIFO_READ], buf)
     }
 
     /// Loads transmit data into the FIFO buffer via mode byte `0x80`.

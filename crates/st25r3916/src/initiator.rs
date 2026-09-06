@@ -20,17 +20,17 @@
 
 use crate::commands::{
     CMD_ADJUST_REGULATORS, CMD_CLEAR_FIFO, CMD_NFC_INITIAL_FIELD_ON, CMD_RESET_RX_GAIN,
-    CMD_SET_DEFAULT, CMD_STOP_ALL, CMD_TEST_ACCESS, CMD_TRANSMIT_REQA, CMD_TRANSMIT_WITH_CRC,
-    CMD_TRANSMIT_WITHOUT_CRC, CMD_TRANSMIT_WUPA,
+    CMD_SET_DEFAULT, CMD_STOP_ALL, CMD_TEST_ACCESS, CMD_TRANSMIT_REQA, CMD_TRANSMIT_WITHOUT_CRC,
+    CMD_TRANSMIT_WITH_CRC, CMD_TRANSMIT_WUPA,
 };
 use crate::registers::{
     AUX_DISPLAY_OSC_OK, IO_CONF2_AAT_EN, IO_CONF2_IO_DRV_LVL, IO_CONF2_SUP3V,
-    MODE_INITIATOR_ISO14443A, MODE_NFC_AR8_AUTO, OP_CONTROL_EN, OP_CONTROL_RX_EN,
-    OP_CONTROL_TX_EN, REG_ANTENNA_TUNING1, REG_ANTENNA_TUNING2, REG_AUX_DEFINITION,
-    REG_AUX_DISPLAY, REG_BIT_RATE, REG_EXT_FIELD_DETECTOR_ACT, REG_EXT_FIELD_DETECTOR_DEACT,
-    REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS, REG_MAIN_IRQ, REG_MODE_DEFINITION,
-    REG_NUM_TX_BYTES1, REG_NUM_TX_BYTES2, REG_OP_CONTROL, REG_RECEIVER_CONF1, REG_RECEIVER_CONF2,
-    REG_RECEIVER_CONF3, REG_RECEIVER_CONF4, REG_TX_DRIVER,
+    MODE_INITIATOR_ISO14443A, MODE_NFC_AR8_AUTO, OP_CONTROL_EN, OP_CONTROL_RX_EN, OP_CONTROL_TX_EN,
+    REG_ANTENNA_TUNING1, REG_ANTENNA_TUNING2, REG_AUX_DEFINITION, REG_AUX_DISPLAY, REG_BIT_RATE,
+    REG_EXT_FIELD_DETECTOR_ACT, REG_EXT_FIELD_DETECTOR_DEACT, REG_IO_CONF1, REG_IO_CONF2,
+    REG_ISO14443A_SETTINGS, REG_MAIN_IRQ, REG_MODE_DEFINITION, REG_NUM_TX_BYTES1,
+    REG_NUM_TX_BYTES2, REG_OP_CONTROL, REG_RECEIVER_CONF1, REG_RECEIVER_CONF2, REG_RECEIVER_CONF3,
+    REG_RECEIVER_CONF4, REG_TX_DRIVER,
 };
 use embedded_hal::i2c::I2c;
 
@@ -540,103 +540,103 @@ mod tests {
     #[test]
     fn st25r3916_single_size_poll_sequence_mock() {
         let txns = [
-        // send_reqa:
-        Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, ISO14443A_ANTCL]),
-        Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, AUX_DEF_NO_CRC_RX]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 0x00]),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_MAIN_IRQ)],
-            std::vec![0x00],
-        ),
-        Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
-        Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_REQA]),
-        // read_atqa:
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_FIFO_STATUS1)],
-            std::vec![2],
-        ),
-        Transaction::write_read(ADDRESS, std::vec![MODE_FIFO_READ], std::vec![0x04, 0x00]),
-        // anticollision_cl1:
-        Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, ISO14443A_ANTCL]),
-        Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 2 << 3]),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_MAIN_IRQ)],
-            std::vec![0x00],
-        ),
-        Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
-        Transaction::write(
-            ADDRESS,
-            std::vec![
-                MODE_FIFO_LOAD,
-                ISO14443A_CMD_SEL_CL1,
-                ISO14443A_NVB_ANTICOLLISION,
-            ],
-        ),
-        Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_WITHOUT_CRC]),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_FIFO_STATUS1)],
-            std::vec![5],
-        ),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![MODE_FIFO_READ],
-            std::vec![0x08, 0x2C, 0xA1, 0x3F, 0x08 ^ 0x2C ^ 0xA1 ^ 0x3F],
-        ),
-        // select_cl1:
-        Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
-        Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 7 << 3]),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_MAIN_IRQ)],
-            std::vec![0x00],
-        ),
-        Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
-        Transaction::write(
-            ADDRESS,
-            std::vec![
-                MODE_FIFO_LOAD,
-                ISO14443A_CMD_SEL_CL1,
-                ISO14443A_NVB_SELECT,
-                0x08,
-                0x2C,
-                0xA1,
-                0x3F,
-                0x08 ^ 0x2C ^ 0xA1 ^ 0x3F,
-            ],
-        ),
-        Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_WITH_CRC]),
-        Transaction::write_read(
-            ADDRESS,
-            std::vec![register_read_cmd(REG_FIFO_STATUS1)],
-            std::vec![1],
-        ),
-        Transaction::write_read(ADDRESS, std::vec![MODE_FIFO_READ], std::vec![0x08]),
-    ];
-    let i2c = Mock::new(&txns);
-    let mut st = crate::St25r3916::new(i2c, ADDRESS);
+            // send_reqa:
+            Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, ISO14443A_ANTCL]),
+            Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, AUX_DEF_NO_CRC_RX]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 0x00]),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_MAIN_IRQ)],
+                std::vec![0x00],
+            ),
+            Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
+            Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_REQA]),
+            // read_atqa:
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_FIFO_STATUS1)],
+                std::vec![2],
+            ),
+            Transaction::write_read(ADDRESS, std::vec![MODE_FIFO_READ], std::vec![0x04, 0x00]),
+            // anticollision_cl1:
+            Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, ISO14443A_ANTCL]),
+            Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 2 << 3]),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_MAIN_IRQ)],
+                std::vec![0x00],
+            ),
+            Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
+            Transaction::write(
+                ADDRESS,
+                std::vec![
+                    MODE_FIFO_LOAD,
+                    ISO14443A_CMD_SEL_CL1,
+                    ISO14443A_NVB_ANTICOLLISION,
+                ],
+            ),
+            Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_WITHOUT_CRC]),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_FIFO_STATUS1)],
+                std::vec![5],
+            ),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![MODE_FIFO_READ],
+                std::vec![0x08, 0x2C, 0xA1, 0x3F, 0x08 ^ 0x2C ^ 0xA1 ^ 0x3F],
+            ),
+            // select_cl1:
+            Transaction::write(ADDRESS, std::vec![REG_ISO14443A_SETTINGS, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_AUX_DEFINITION, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES1, 0x00]),
+            Transaction::write(ADDRESS, std::vec![REG_NUM_TX_BYTES2, 7 << 3]),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_MAIN_IRQ)],
+                std::vec![0x00],
+            ),
+            Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
+            Transaction::write(
+                ADDRESS,
+                std::vec![
+                    MODE_FIFO_LOAD,
+                    ISO14443A_CMD_SEL_CL1,
+                    ISO14443A_NVB_SELECT,
+                    0x08,
+                    0x2C,
+                    0xA1,
+                    0x3F,
+                    0x08 ^ 0x2C ^ 0xA1 ^ 0x3F,
+                ],
+            ),
+            Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_WITH_CRC]),
+            Transaction::write_read(
+                ADDRESS,
+                std::vec![register_read_cmd(REG_FIFO_STATUS1)],
+                std::vec![1],
+            ),
+            Transaction::write_read(ADDRESS, std::vec![MODE_FIFO_READ], std::vec![0x08]),
+        ];
+        let i2c = Mock::new(&txns);
+        let mut st = crate::St25r3916::new(i2c, ADDRESS);
 
-    st.send_reqa().unwrap();
-    let atqa = st.read_atqa().unwrap().expect("atqa");
-    assert_eq!(atqa, [0x04, 0x00]);
+        st.send_reqa().unwrap();
+        let atqa = st.read_atqa().unwrap().expect("atqa");
+        assert_eq!(atqa, [0x04, 0x00]);
 
-    let cl1 = st.anticollision_cl1().unwrap().expect("cl1");
-    assert_eq!(&cl1[..4], &[0x08, 0x2C, 0xA1, 0x3F]);
+        let cl1 = st.anticollision_cl1().unwrap().expect("cl1");
+        assert_eq!(&cl1[..4], &[0x08, 0x2C, 0xA1, 0x3F]);
 
-    let sak = st
-        .select_cl1([cl1[0], cl1[1], cl1[2], cl1[3]], cl1[4])
-        .unwrap()
-        .expect("sak");
-    assert_eq!(sak, 0x08);
+        let sak = st
+            .select_cl1([cl1[0], cl1[1], cl1[2], cl1[3]], cl1[4])
+            .unwrap()
+            .expect("sak");
+        assert_eq!(sak, 0x08);
 
-    st.release().done();
-}
+        st.release().done();
+    }
 }

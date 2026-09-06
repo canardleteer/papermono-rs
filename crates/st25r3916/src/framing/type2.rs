@@ -137,7 +137,8 @@ impl<const PAGES: usize> Type2Memory<PAGES> {
                 for i in 0..4 {
                     let page_idx = (start_page + i) % PAGES;
                     let out_start = i * TYPE2_PAGE_SIZE;
-                    resp[out_start..out_start + TYPE2_PAGE_SIZE].copy_from_slice(&self.data[page_idx]);
+                    resp[out_start..out_start + TYPE2_PAGE_SIZE]
+                        .copy_from_slice(&self.data[page_idx]);
                 }
                 Ok(16)
             }

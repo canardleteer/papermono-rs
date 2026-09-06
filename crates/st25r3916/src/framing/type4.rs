@@ -88,7 +88,11 @@ impl<'a> CommandApdu<'a> {
 
         if bytes.len() == 5 {
             // Case 2: Header + Le
-            let le = if bytes[4] == 0 { 256 } else { bytes[4] as usize };
+            let le = if bytes[4] == 0 {
+                256
+            } else {
+                bytes[4] as usize
+            };
             return Ok(Self {
                 cla,
                 ins,
@@ -181,17 +185,22 @@ impl<const MAX_NDEF: usize> Type4TagApp<MAX_NDEF> {
     pub fn cc_file(&self) -> [u8; 15] {
         let max_size = (MAX_NDEF as u16).to_be_bytes();
         [
-            0x00, 0x0F, // CCLEN: 15 bytes
+            0x00,
+            0x0F, // CCLEN: 15 bytes
             0x20, // Mapping version 2.0
-            0x00, 0x7F, // MLe: 127 bytes max read
-            0x00, 0x7F, // MLc: 127 bytes max write
+            0x00,
+            0x7F, // MLe: 127 bytes max read
+            0x00,
+            0x7F, // MLc: 127 bytes max write
             // NDEF File Control TLV:
             0x04, // T: NDEF File Control TLV
             0x06, // L: 6 bytes
-            FILE_ID_NDEF[0], FILE_ID_NDEF[1], // File ID: 0xE104
-            max_size[0], max_size[1], // Max NDEF size
-            0x00, // Read access: free
-            0x00, // Write access: free
+            FILE_ID_NDEF[0],
+            FILE_ID_NDEF[1], // File ID: 0xE104
+            max_size[0],
+            max_size[1], // Max NDEF size
+            0x00,        // Read access: free
+            0x00,        // Write access: free
         ]
     }
 
@@ -303,7 +312,9 @@ mod tests {
 
     #[test]
     fn test_parse_command_apdu() {
-        let raw = [0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01];
+        let raw = [
+            0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01,
+        ];
         let apdu = CommandApdu::parse(&raw).unwrap();
         assert_eq!(apdu.cla, 0x00);
         assert_eq!(apdu.ins, INS_SELECT);
@@ -319,7 +330,9 @@ mod tests {
         let mut resp = [0u8; 64];
 
         // 1. Select AID
-        let select_aid = [0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01];
+        let select_aid = [
+            0x00, 0xA4, 0x04, 0x00, 0x07, 0xD2, 0x76, 0x00, 0x00, 0x85, 0x01, 0x01,
+        ];
         let n = app.handle_apdu(&select_aid, &mut resp).unwrap();
         assert_eq!(n, 2);
         assert_eq!(&resp[..2], &[0x90, 0x00]);

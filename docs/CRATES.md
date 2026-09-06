@@ -28,7 +28,7 @@ IP2315 crates.
 | BMI270 | possible later | **constants-in-BSP** (+ accel bring-up helpers) | `CHIP_ID` `0x00` / payload `0x24`. Soft-reset + Bosch standard 8 KiB config (`INIT_ADDR_*` + `INIT_DATA`) + raw `DATA_8`…`DATA_13`. Orientation classify is sticky-rs policy; Lite axis map USB-C down = −X. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
-| ST25R3916 | no `st25r3916`. [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here driver in BSP** | I2C `0x50`, `I2C_EN=VDD`. Primitives, ISO14443-A polling (WUPA/REQA), anticollision CL1/CL2, SAK read, and `PYG4` power-gating in `m5stack-papermono::nfc`. Do not wrap `st25r95`. Confirmed live on C153. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
+| ST25R3916 | in-tree [`st25r3916`](../crates/st25r3916). [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here** | MCU-agnostic `embedded-hal` driver crate in `crates/st25r3916`. I2C `0x50`, `I2C_EN=VDD`. ISO14443-A initiator (WUPA/REQA, anticollision CL1/CL2, SAK read), target/card emulation profiles (NFC-A, NFC-F, NFCIP-1), PT_Memory layout, and Type 2/4A / NDEF protocol framing. Re-exported with board nets in `m5stack-papermono::nfc`. Confirmed live on C153. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
 | SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **written-here driver in BSP** | Complete `Sx1262` driver with opcodes, `RadioStatus` parser, modulation/packet configuration, buffer I/O, RSSI/SNR telemetry in `m5stack-papermono::lora`. Confirmed live on C153. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
 | Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). Confirmed live on C153. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
 
@@ -47,6 +47,7 @@ IP2315 crates.
 | --- | --- |
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map and `BoardModel` runtime profile. `C153-Lite` firmware depends on this only |
 | [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board crate with verified ST25R3916 NFC and Stamp LoRa-1262 transceiver drivers. Included in unified builds, pruned via `--no-default-features --features lite` |
+| [`st25r3916`](../crates/st25r3916) | ST25R3916 NFC transceiver driver: initiator (reader), target (card emulation) profiles, PT_Memory, Type 2/4A framing, and NDEF |
 | [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
 | [`m5pm1`](../crates/m5pm1) | Register map, ADC, battery %, PWM0, red LED. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |

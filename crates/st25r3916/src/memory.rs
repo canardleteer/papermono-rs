@@ -121,12 +121,7 @@ impl PtMemory {
     /// - `sak1`: Level 1 SAK byte with cascade bit set (`0x04`).
     /// - `sak2`: Level 2 SAK byte (e.g. `0x20` for ISO-DEP).
     #[must_use]
-    pub const fn with_nfc_a_double(
-        uid: [u8; 7],
-        sens_res: [u8; 2],
-        sak1: u8,
-        sak2: u8,
-    ) -> Self {
+    pub const fn with_nfc_a_double(uid: [u8; 7], sens_res: [u8; 2], sak1: u8, sak2: u8) -> Self {
         let mut mem = Self::new();
         mem.bytes[0] = uid[0];
         mem.bytes[1] = uid[1];
@@ -253,8 +248,7 @@ impl<I2C: embedded_hal::i2c::I2c> crate::St25r3916<I2C> {
     ///
     /// Emits operation mode byte `0xBF` followed by reading 48 bytes per Section 4.3.4 Table 11.
     pub fn read_pt_memory(&mut self, buf: &mut [u8; PT_MEMORY_SIZE]) -> Result<(), I2C::Error> {
-        self.i2c
-            .write_read(self.address, &[MODE_PT_MEM_READ], buf)
+        self.i2c.write_read(self.address, &[MODE_PT_MEM_READ], buf)
     }
 }
 
