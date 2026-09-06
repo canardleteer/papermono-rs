@@ -20,6 +20,7 @@ extern crate std;
 
 pub mod commands;
 pub mod error;
+pub mod framing;
 pub mod memory;
 pub mod registers;
 pub mod target;
@@ -32,6 +33,11 @@ pub use commands::{
     MODE_PT_MEM_TSN,
 };
 pub use error::Error;
+pub use framing::{
+    build_text_record, build_uri_record, wrap_in_type2_tlv, ApduError, CommandApdu, NdefError,
+    Type2Error, Type2Memory, Type4TagApp, UriPrefix, AID_NDEF_V2, FILE_ID_CC, FILE_ID_NDEF,
+    SW_SUCCESS,
+};
 pub use memory::{NfcFParams, PtMemory};
 pub use registers::{
     PtaState, IC_TYPE_ST25R3916, REG_AUX_DISPLAY, REG_BIT_RATE, REG_FIFO_STATUS1,
