@@ -505,10 +505,16 @@ impl LampSlide {
 
 #[cfg(feature = "panel")]
 fn duty_from_page_y(py: u16, page_h: u16) -> u16 {
-    let py = py.min(page_h.saturating_sub(1));
-    let from_bottom = page_h.saturating_sub(1).saturating_sub(py);
-    let span = page_h.saturating_sub(1).max(1);
-    ((u32::from(from_bottom) * u32::from(pmic::PWM0_DUTY_MAX)) / u32::from(span)) as u16
+    let inset = touch::SLIDER_INSET_PX;
+    if py <= inset {
+        return pmic::PWM0_DUTY_MAX;
+    }
+    if py >= page_h.saturating_sub(inset) {
+        return 0;
+    }
+    let usable_span = page_h.saturating_sub(inset * 2).max(1);
+    let from_bottom = page_h.saturating_sub(inset).saturating_sub(py);
+    ((u32::from(from_bottom) * u32::from(pmic::PWM0_DUTY_MAX)) / u32::from(usable_span)) as u16
 }
 
 /// Gesture detector for the display left-edge buzzer volume slider.
@@ -581,10 +587,16 @@ impl VolumeSlide {
 
 #[cfg(feature = "panel")]
 fn volume_from_page_y(py: u16, page_h: u16) -> u8 {
-    let py = py.min(page_h.saturating_sub(1));
-    let from_bottom = page_h.saturating_sub(1).saturating_sub(py);
-    let span = page_h.saturating_sub(1).max(1);
-    ((u32::from(from_bottom) * 100) / u32::from(span)) as u8
+    let inset = touch::SLIDER_INSET_PX;
+    if py <= inset {
+        return 100;
+    }
+    if py >= page_h.saturating_sub(inset) {
+        return 0;
+    }
+    let usable_span = page_h.saturating_sub(inset * 2).max(1);
+    let from_bottom = page_h.saturating_sub(inset).saturating_sub(py);
+    ((u32::from(from_bottom) * 100) / u32::from(usable_span)) as u8
 }
 
 /// Enables the frontlight at default brightness level.
