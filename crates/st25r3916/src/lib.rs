@@ -22,6 +22,7 @@ pub mod commands;
 pub mod error;
 pub mod memory;
 pub mod registers;
+pub mod target;
 
 pub use commands::{
     register_read_cmd, CMD_GOTO_SENSE, CMD_GOTO_SLEEP, CMD_NFC_INITIAL_FIELD_ON,
@@ -33,10 +34,15 @@ pub use commands::{
 pub use error::Error;
 pub use memory::{NfcFParams, PtMemory};
 pub use registers::{
-    IC_TYPE_ST25R3916, REG_AUX_DISPLAY, REG_BIT_RATE, REG_FIFO_STATUS1, REG_FIFO_STATUS2,
-    REG_IC_IDENTITY, REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS, REG_MAIN_IRQ,
-    REG_MODE_DEFINITION, REG_OP_CONTROL, REG_RECEIVER_CONF1, REG_RECEIVER_CONF2,
-    REG_RECEIVER_CONF3, REG_RECEIVER_CONF4, REG_TARGET_DISPLAY, REG_TARGET_IRQ,
+    PtaState, IC_TYPE_ST25R3916, REG_AUX_DISPLAY, REG_BIT_RATE, REG_FIFO_STATUS1,
+    REG_FIFO_STATUS2, REG_IC_IDENTITY, REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS,
+    REG_MAIN_IRQ, REG_MODE_DEFINITION, REG_NFCIP1_PASSIVE_TARGET, REG_OP_CONTROL,
+    REG_RECEIVER_CONF1, REG_RECEIVER_CONF2, REG_RECEIVER_CONF3, REG_RECEIVER_CONF4,
+    REG_TARGET_DISPLAY, REG_TARGET_IRQ,
+};
+pub use target::{
+    NfcATargetConfig, NfcATargetKind, NfcFBitRate, NfcFTargetConfig, Nfcip1CommunicationMode,
+    Nfcip1TargetConfig, TargetInterrupts, TargetModulation,
 };
 
 use embedded_hal::i2c::I2c;

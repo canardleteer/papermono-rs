@@ -52,8 +52,11 @@ pub const REG_BIT_RATE: u8 = 0x04;
 /// Section 4.5.6 "ISO14443A and NFC 106kb/s settings register" address (`0x05`).
 pub const REG_ISO14443A_SETTINGS: u8 = 0x05;
 
-/// Section 4.5.10 "NFCIP-1 target register" address (`0x09`).
-pub const REG_NFCIP1_TARGET: u8 = 0x09;
+/// Section 4.5.9 "NFCIP-1 passive target definition register" address (`0x08`).
+pub const REG_NFCIP1_PASSIVE_TARGET: u8 = 0x08;
+
+/// Section 4.5.10 "Stream mode definition register" address (`0x09`).
+pub const REG_STREAM_MODE: u8 = 0x09;
 
 /// Section 4.5.11 "Auxiliary definition register" address (`0x0A`).
 pub const REG_AUX_DEFINITION: u8 = 0x0A;
@@ -179,32 +182,77 @@ pub const MAIN_IRQ_RXE: u8 = 0x20;
 /// Section 4.5.35 `Timer and NFC interrupt register`: No-response timer timeout flag (`I_nre`).
 pub const TIMER_NFC_IRQ_NRE: u8 = 0x08;
 
-/// Section 4.5.37 `Target interrupt register`: Wake-up at end of 106 kbps transponder activation (`I_wu_a`).
-pub const TARGET_IRQ_WU_A: u8 = 0x80;
+/// Section 4.5.37 `Passive target interrupt register`: Active state reached (106 kbps transponder selected, `I_wu_a`).
+pub const TARGET_IRQ_WU_A: u8 = 0x01;
 
-/// Section 4.5.37 `Target interrupt register`: Wake-up at end of 212/424 kbps transponder activation (`I_wu_a_star`).
-pub const TARGET_IRQ_WU_A_STAR: u8 = 0x40;
+/// Section 4.5.37 `Passive target interrupt register`: Active* state reached (212/424 kbps transponder selected, `I_wu_a*`).
+pub const TARGET_IRQ_WU_A_STAR: u8 = 0x02;
 
-/// Section 4.5.37 `Target interrupt register`: Wake-up at end of FeliCa transponder activation (`I_wu_f`).
-pub const TARGET_IRQ_WU_F: u8 = 0x20;
+/// Section 4.5.37 `Passive target interrupt register`: NFC-F Active interrupt (`I_wu_f`).
+pub const TARGET_IRQ_WU_F: u8 = 0x08;
 
-/// Section 4.5.37 `Target interrupt register`: External field detector deactivation flag (`I_rxs_rf`).
-pub const TARGET_IRQ_RXS_RF: u8 = 0x10;
+/// Section 4.5.37 `Passive target interrupt register`: End of receive / automatic response sent (`I_rxe_pta`).
+pub const TARGET_IRQ_RXE_PTA: u8 = 0x10;
 
-/// Section 4.5.37 `Target interrupt register`: Target select command received (`I_sl_wl`).
-pub const TARGET_IRQ_SL_WL: u8 = 0x08;
+/// Section 4.5.37 `Passive target interrupt register`: Active P2P field on event (`I_apon`).
+pub const TARGET_IRQ_APON: u8 = 0x20;
 
-/// Section 4.5.41 `Target display register`: Bit rate detection complete (`bit_rate_det`).
-pub const TARGET_DISPLAY_BIT_RATE_DET: u8 = 0x80;
+/// Section 4.5.37 `Passive target interrupt register`: Slot number water level interrupt (`I_sl_wl`).
+pub const TARGET_IRQ_SL_WL: u8 = 0x40;
 
-/// Section 4.5.41 `Target display register`: Sub-carrier detected / field present (`subc_det`).
-pub const TARGET_DISPLAY_SUBC_DET: u8 = 0x04;
+/// Section 4.5.37 `Passive target interrupt register`: PPON2 field on waiting timer interrupt (`I_ppon2`).
+pub const TARGET_IRQ_PPON2: u8 = 0x80;
+
+/// Section 4.5.41 Table 69 "Passive target display register" states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PtaState {
+    /// Target is in Power Off state (`0000b`).
+    PowerOff,
+    /// Target is in Sense/Idle state waiting for REQA/WUPA (`0001b`).
+    Idle,
+    /// Target is in Cascade Level 1 anticollision (`0010b`).
+    ReadyL1,
+    /// Target is in Cascade Level 2 anticollision (`0011b`).
+    ReadyL2,
+    /// Target is in Active state (transponder selected, MCU handles incoming commands) (`0101b`).
+    Active,
+    /// Target is in Halt/Sleep state (`1001b`).
+    Halt,
+    /// Target is in Ready L1* state (212/424 kbps) (`1010b`).
+    ReadyL1Star,
+    /// Target is in Ready L2* state (212/424 kbps) (`1011b`).
+    ReadyL2Star,
+    /// Target is in Active* state (212/424 kbps transponder selected) (`1101b`).
+    ActiveStar,
+    /// Reserved or unknown state.
+    Unknown(u8),
+}
+
+impl PtaState {
+    /// Decodes a 4-bit state nibble from `REG_TARGET_DISPLAY`.
+    #[inline]
+    #[must_use]
+    pub const fn from_nibble(n: u8) -> Self {
+        match n & 0x0F {
+            0x00 => Self::PowerOff,
+            0x01 => Self::Idle,
+            0x02 => Self::ReadyL1,
+            0x03 => Self::ReadyL2,
+            0x05 => Self::Active,
+            0x09 => Self::Halt,
+            0x0A => Self::ReadyL1Star,
+            0x0B => Self::ReadyL2Star,
+            0x0D => Self::ActiveStar,
+            other => Self::Unknown(other),
+        }
+    }
+}
 
 /// Section 4.5.50 `Passive target modulation register`: Modulation resistance mask (`pt_res[3:0]`).
-pub const PASSIVE_TARGET_MOD_PT_RES_MASK: u8 = 0xF0;
+pub const PASSIVE_TARGET_MOD_PT_RES_MASK: u8 = 0x0F;
 
-/// Section 4.5.50 `Passive target modulation register`: Mode-specific modulation resistance mask (`ptm_res[3:0]`).
-pub const PASSIVE_TARGET_MOD_PTM_RES_MASK: u8 = 0x0F;
+/// Section 4.5.50 `Passive target modulation register`: Modulated state resistance mask (`ptm_res[3:0]`).
+pub const PASSIVE_TARGET_MOD_PTM_RES_MASK: u8 = 0xF0;
 
 /// Section 4.5.62 `Auxiliary display register`: oscillator stable flag (`osc_ok`).
 pub const AUX_DISPLAY_OSC_OK: u8 = 0x80;
