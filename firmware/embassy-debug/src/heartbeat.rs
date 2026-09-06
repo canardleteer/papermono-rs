@@ -170,6 +170,14 @@ pub async fn run(pins: Inputs, hello: Hello) {
             if let Some(sample) = crate::touch_bus::last_i2c() {
                 cdc::i2c(&sample);
             }
+            #[cfg(all(feature = "touch", feature = "c153"))]
+            if let Some(nfc) = crate::touch_bus::last_nfc() {
+                cdc::nfc(&nfc);
+            }
+            #[cfg(all(feature = "touch", feature = "c153"))]
+            if let Some(lora) = crate::last_lora() {
+                cdc::lora(&lora);
+            }
             #[cfg(feature = "touch")]
             if let Some(sample) = crate::touch_bus::last_charge() {
                 cdc::charge(&sample);

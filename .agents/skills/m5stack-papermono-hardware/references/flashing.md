@@ -4,22 +4,24 @@ How to read a unit: [measure.md](measure.md). Layers:
 [sources.md](sources.md). This page is geometry, not a host-tool
 cheatsheet. Consuming projects supply their own flash path.
 
-Name `C153` vs `C153-Lite`. USB run- and download-mode on Lite
-are measured below. Flash **size** on Lite is measured (16 MB).
-Other rows stay official intent until their `nyc-*` ids close.
+Name `C153` vs `C153-Lite`. USB run- and download-mode on both SKUs
+are measured below (`303a:1001`). Flash **size** on both SKUs is
+measured (16 MB). Partition tables on both SKUs match UserDemo
+`partitions.csv`. Other rows stay official intent until their `nyc-*`
+ids close.
 
 | Item | Official / vendor intent | Open |
 | --- | --- | --- |
-| Flash size | 16 MB | Lite **measured** 16 MB (`0x1000000`). JEDEC bytes and `C153`: [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| PSRAM | 8 MB octal; PIO `qio_opi` | Not in Lite `board-info` Features. [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| USB | Native pads. Vendor Arduino: CDC on boot | Lite run **and** download: `303a:1001`. Lite run: one ACM + vendor JTAG; `probe-rs` `EspJtag`. `C153` still [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
-| Download | Power-button hold ~2 s, red LED blink | Lite **measured** (2026-09-02): ~2 s to first blink; small red (`LED_EN_PP`), not RGB. Then `--probe` (`NoReset`) worked. `C153`: [nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode) |
-| Partition table | UserDemo `partitions.csv`; PIO `default_16MB.csv` | Lite **measured** matches UserDemo CSV (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`). `C153`: [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| Flash size | 16 MB | Lite and `C153` **measured** 16 MB (`0x1000000`). JEDEC bytes: [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| PSRAM | 8 MB octal; PIO `qio_opi` | Not in `board-info` Features. [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| USB | Native pads. Vendor Arduino: CDC on boot | Lite and `C153` run **and** download: `303a:1001`. Native Espressif JTAG/serial |
+| Download | Power-button hold ~2 s, red LED blink | Lite and `C153` **measured**: ~2 s to first blink; small red (`LED_EN_PP`), not RGB. Then `--probe` (`NoReset`) / backup works |
+| Partition table | UserDemo `partitions.csv`; PIO `default_16MB.csv` | Lite and `C153` **measured** match UserDemo CSV (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`) |
 | Runtime DIO/QIO, CPU MHz | Capability 240 MHz. UserDemo `sdkconfig.defaults`: `CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240`, octal SPIRAM, 16 MB flash | [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
 | PHY / NVS | ESP32-S3 typically stores RF cal in NVS; M5 publishes restore images | [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy) |
 
-Lite measured flash length: `0x1000000`. Lite stock partition
-table at `0x8000` matches UserDemo `partitions.csv` (not PIO
+Measured flash length: `0x1000000` (16 MB) across both models. Stock
+partition table at `0x8000` matches UserDemo `partitions.csv` (not PIO
 `default_16MB.csv`). Do not assume 32 MB flash geometry.
 
 Keep `*.bin` flash images out of git. Do not restore one unit’s
@@ -63,13 +65,11 @@ string. UiFlow2 MicroPython defines USB VID `0x303A` and PID
 `0x816B` for its PaperMono runtime firmware (Board ID 29,
 240 MHz CPU, 8 MB Octal SPIRAM, 16 MB QIO Flash).
 
-**Lite run (2026-09-02):** one USB device, three
-interfaces: CDC comm `02/02`, CDC data `0a/00` (one ACM),
-vendor JTAG `ff/ff/01`. No second CDC. No UART0/CH343
-USB node. `probe-rs list` saw `EspJtag` `303a:1001` in
-run mode. Probe serial is MAC-shaped; do not commit it.
-`C153` still
-[nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid).
+**Run mode on both SKUs:** one USB device, three interfaces: CDC
+comm `02/02`, CDC data `0a/00` (one ACM), vendor JTAG `ff/ff/01`. No
+second CDC. No UART0/CH343 USB node. `probe-rs list` on Lite saw
+`EspJtag` `303a:1001` in run mode. Probe serial is MAC-shaped; do not
+commit it. USB run and download mode on `C153` verified 2026-09-05.
 
 Prefer a stable by-id node. ACM numbers move. The host user
 needs `dialout` (or equivalent). **`cargo xtask monitor` also

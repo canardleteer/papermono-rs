@@ -19,28 +19,26 @@ open a port unless a human asked.
 Vendor C++ trees are wiring evidence in
 [cpp-platformio.md](cpp-platformio.md).
 
-**PaperMono (`C153`) USB, JEDEC, and partition table have not
-been measured.** Official HTML **M5GFX LUT Refresh Speed**
-times are laboratory results for **PaperMono**, reference
-only ([display.md](display.md)). They are not a row on this
-page. PaperMono-Lite (`C153-Lite`) has run- and
-download-mode USB IDs in
-[flashing.md](flashing.md#usb-measured) and a `--probe`
+**PaperMono (`C153`) USB, chip rev, 16 MB flash size, and
+partition table were measured live (2026-09-05).** JEDEC
+manufacturer bytes, PSRAM, and NFC/LoRa silicon status stay
+open. Official HTML **M5GFX LUT Refresh Speed** times are
+laboratory results for **PaperMono**, reference only
+([display.md](display.md)). They are not a row on this page.
+PaperMono-Lite (`C153-Lite`) has run- and download-mode USB IDs
+in [flashing.md](flashing.md#usb-measured) and a `--probe`
 board-info row below. Remaining recipes:
 [not-yet-confirmed.md](../resources/not-yet-confirmed.md).
 
 ## Find the USB device
 
-**Lite, run mode:** `303a:1001` Espressif “USB JTAG/serial
-debug unit” (`bcdDevice` 1.01, full-speed). Details:
-[flashing.md](flashing.md#usb-measured). Vendor Arduino CDC
-flags remain **intent**. Do not treat USB-C as QinHeng
-`1a86:55d3`.
+**Run mode (`C153` and `C153-Lite`):** `303a:1001` Espressif “USB
+JTAG/serial debug unit” (`bcdDevice` 1.01, full-speed). Details:
+[flashing.md](flashing.md#usb-measured). Vendor Arduino CDC flags
+remain **intent**. Do not treat USB-C as QinHeng `1a86:55d3`.
 
-Still open ([nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid)):
-`C153` only. Lite extra CDC and `probe-rs list` are in
-the table below. Lite download IDs match run mode
-(`303a:1001`).
+Download mode IDs match run mode (`303a:1001`) on both SKUs. Lite
+extra CDC and `probe-rs list` are in the table below.
 
 - Prefer a stable by-id node. ACM numbers move.
 - The host user needs `dialout` (or equivalent). `monitor`
@@ -77,12 +75,18 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | Item | SKU | Confirmed |
 | --- | --- | --- |
 | USB run mode | `C153-Lite` | `303a:1001` Espressif USB JTAG/serial debug unit; `bcdDevice` 1.01; full-speed. Serial omitted. 2026-09-02: three interfaces (CDC comm, CDC data, vendor JTAG `ff/ff/01`). One ACM. No second CDC. No `1a86:55d3`. [flashing.md](flashing.md#usb-measured) |
+| USB run mode | `C153` | `303a:1001` Espressif USB JTAG/serial debug unit; `bcdDevice` 1.01; full-speed. Serial omitted. 2026-09-05: matches Lite. [flashing.md](flashing.md#usb-measured) |
 | `probe-rs list` | `C153-Lite` | 2026-09-02 run mode. `EspJtag` `303a:1001`. Probe serial MAC-shaped; omitted. [flashing.md](flashing.md#usb-measured) |
 | USB download mode | `C153-Lite` | Same VID:PID and product string as run mode. `lsusb` `303a:1001` Espressif USB JTAG/serial debug unit. Serial omitted |
+| USB download mode | `C153` | Same VID:PID (`303a:1001`) and product string as run mode. Entered via ~2 s power-button hold until red LED blinks. Serial omitted |
 | Chip | `C153-Lite` | ESP32-S3 revision v0.2; crystal 40 MHz; features Wi-Fi, BLE, embedded flash. MAC omitted |
+| Chip | `C153` | ESP32-S3 revision v0.2; crystal 40 MHz; features Wi-Fi, BLE, embedded flash. MAC omitted (matches Lite) |
 | Flash size | `C153-Lite` | 16 MB (`0x1000000`) from flasher `board-info`. JEDEC bytes not printed |
+| Flash size | `C153` | 16 MB (`0x1000000` / 16777216 bytes) from flasher `board-info`. JEDEC bytes not printed |
 | Partition table | `C153-Lite` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv`. No `otadata`. PIO `default_16MB.csv` still different. `C153` open |
+| Partition table | `C153` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv` and Lite |
 | Secure boot / flash encryption | `C153-Lite` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
+| Secure boot / flash encryption | `C153` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
 | `simple-debug-fw` clocks | `C153-Lite` | CDC `hello`: `cpu_mhz=80` `xtal_mhz=40` (`esp-hal` `Config::default`). Not UserDemo. [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
 | `embassy-debug-fw` hello | `C153-Lite` | 2026-09-01 run mode after `flash-app`. `image=embassy-debug` `sku=C153-Lite` `cpu_mhz=80` `xtal_mhz=40` `reset=chip_power_on`. 1 Hz `hb` idle `btn_a=1 btn_b=1`. Same idle `gpio` as `simple-debug` (`boot=1 pmic_irq=0 tp=0 ioe=1 busy=0`). First CDC attach glued `i2c` onto `hb` |
 | I2C advertised roster | `C153-Lite` | 2026-09-02. Official `begin` at board `0x4F`. `ack=32,38,4f,68,6e nak=50,6f,75` `ioe_addr=4f` `imu_id=24` `rtc_flag=31` `tf=1` (empty slot; [nyc-tf-det](../resources/not-yet-confirmed.md#nyc-tf-det)). No `0x70`–`0x76` walk. `C153` still [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
@@ -132,30 +136,38 @@ short-press power left the unit looking as before. Confirm
 does not rewrite the snapshot. Do not commit dumps, NVS, PHY,
 image SHA, or the confirm-records JSON.
 
-`C153` table still
-[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+A `C153` full-chip original capture (`backup-factory-firmware
+--as-original`, 2026-09-05, unit `id-e3e5915e`) parsed the table at
+`0x8000`. Offsets match UserDemo `partitions.csv` and Lite. The factory
+app descriptor at `0x10000` names project **PaperMono-UserDemo**, IDF
+**v5.5.1**, version `c78f6c5-dirty`, compile date **Aug 6 2026
+16:12:13**, matching Lite stock. The same day, `confirm-factory-firmware`
+re-read the live `C153` flash; all partition regions and the full dump
+SHA-256 matched the original snapshot (`id-e3e5915e`). Do not commit
+dumps, NVS, PHY, image SHA, or unit MAC.
 
 OTP path:
 [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)
-names panel **DEPG0397BBS770F3HP-XM**. Lite flash **size** is
-measured (16 MB); JEDEC manufacturer bytes and PSRAM still
+names panel **DEPG0397BBS770F3HP-XM**. Lite and `C153` flash **size**
+is measured (16 MB); JEDEC manufacturer bytes and PSRAM still
 [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id).
 
 ## PaperMono (C153) Discovery Verification Targets
 
-Active on branch `feat/papermono-discovery`. The targets below are structured
-for live measurement once a physical `C153` is connected, following the
-safe four-stage confirmation protocol (host-only inspect -> factory backup ->
-table confirm -> packed safe diagnostic flash):
+Active on branch `feat/papermono-discovery`. The status below reflects
+findings from the factory backup and host inspection, and next steps
+for live safe diagnostics:
 
 | Item | SKU | Status / Target | Next Recipe |
 | --- | --- | --- | --- |
-| USB run & download VID:PID | `C153` | Unmeasured; verify if `303a:1001` matches Lite | [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
-| Flash size & JEDEC bytes | `C153` | Unmeasured; verify 16 MB flash and JEDEC manufacturer bytes | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| Factory partition table | `C153` | Unmeasured; inspect table at `0x8000` against UserDemo `partitions.csv` | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
-| System I2C roster | `C153` | Target: `0x32, 0x38, 0x4F, 0x68, 0x6E`, plus `0x50` (NFC) when M5IOE1 `PYG4` is high | [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
-| ST25R3916 IC identity | `C153` | Unmeasured; query command `0x7F` for IC type `0x05` | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
-| SX1262 LoRa SPI status | `C153` | Unmeasured; verify M5PM1 `G2` enable, M5IOE1 `PYG10` reset, `GetStatus` `0xC0` | [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack) |
+| USB run & download VID:PID | `C153` | **Confirmed live**: `303a:1001` Espressif USB JTAG/serial debug unit; ~2 s hold to download | [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
+| Flash size & JEDEC bytes | `C153` | **Flash size confirmed live**: 16 MB (`0x1000000`); JEDEC bytes open | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
+| Factory partition table | `C153` | **Confirmed live**: at `0x8000` (nvs `0x9000`, phy `0xf000`, factory `0x10000`) | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| Factory app descriptor | `C153` | **Confirmed live**: PaperMono-UserDemo, IDF v5.5.1, `c78f6c5-dirty` | [user-demo.md](user-demo.md) |
+| System I2C roster | `C153` | **Confirmed live**: `0x32, 0x38, 0x4F, 0x50, 0x68, 0x6E` ACK (`0x50` ST25R3916 ACKs when M5IOE1 `PYG4` asserted) | [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
+| ST25R3916 IC identity | `C153` | **Confirmed live**: ST25R3916 responds at `0x50` to command `0x7F` with IC type `0x05`, revision 2 (`id=05 rev=2`) | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
+| ST25R3916 ISO14443-A poll & UID | `C153` | **Confirmed live**: ISO14443-A short frames (REQA/WUPA), anticollision (CL1), SAK (`0x00`), and 4-byte UID read (`nfc_tag`) via `embassy-debug-fw` | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
+| SX1262 LoRa SPI status | `C153` | **Confirmed live**: SX1262 responds over SPI3 with status `0xAA` (mode 2 `STBY_RC`, cmd 5) when M5PM1 `G2` push-pull enabled and `PYG10` reset released | [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack) |
 | Leftover pins transition | `C153` | GPIO5 (LoRa IRQ), GPIO6 (NFC IRQ), GPIO21 (BUSY) transition from floating leftovers to active | [pin-map.md](pin-map.md) |
 
 ## What this page is not

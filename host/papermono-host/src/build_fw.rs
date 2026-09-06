@@ -39,8 +39,10 @@ impl FirmwareImage {
 pub struct BuildFwArgs {
     /// Which firmware package to build.
     pub image: FirmwareImage,
-    /// Cargo features on that package (none on simple-debug yet).
+    /// Cargo features on that package (`mic` / `radio` / `sleep` / `c153` on embassy-debug).
     pub features: Vec<String>,
+    /// Pass `--all-features` to build with all package features enabled.
+    pub all_features: bool,
     /// `true` is `--profile release-fw` (the documented default).
     pub release: bool,
     /// Pass `--no-default-features` (minimal unfeatured bring-up: no I2C / PDM / panel).
@@ -83,6 +85,9 @@ pub fn build_fw(repo_root: &Path, args: &BuildFwArgs) -> Result<BuildFwOutput, E
     }
     if args.no_default_features {
         cargo.arg("--no-default-features");
+    }
+    if args.all_features {
+        cargo.arg("--all-features");
     }
     if !args.features.is_empty() {
         cargo.arg("--features").arg(args.features.join(","));

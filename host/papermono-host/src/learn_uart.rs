@@ -255,6 +255,9 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::WifiAp => "wifi_ap",
         LineKind::WifiHttp => "wifi_http",
         LineKind::Imu => "imu",
+        LineKind::Nfc => "nfc",
+        LineKind::NfcTag => "nfc_tag",
+        LineKind::Lora => "lora",
         LineKind::Unknown => "unknown",
     }
 }

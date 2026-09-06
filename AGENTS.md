@@ -289,9 +289,9 @@ Vendor datasheets are official for registers of chips named on
 this model; observed hardware still outranks a datasheet default.
 See
 [Authority](.agents/skills/m5stack-papermono-hardware/SKILL.md#authority).
-PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
-IDs (`303a:1001`), a 16 MB flash size, and a partition table matching
-the official factory demo firmware
+Both PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) have run-
+and download-mode USB IDs (`303a:1001`), a 16 MB flash size, and a
+partition table matching the official factory demo firmware
 ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
 ([flashing.md](.agents/skills/m5stack-papermono-hardware/references/flashing.md#usb-measured),
 [measure.md](.agents/skills/m5stack-papermono-hardware/references/measure.md)).
@@ -302,6 +302,7 @@ results under M5GFX modes, reference only
 PaperMono (`C153`) discovery is tracked on branch
 `feat/papermono-discovery`. The board crate (`m5stack-papermono`) provides
 safe discovery primitives and register constants for ST25R3916 NFC and Stamp
-LoRa-1262 (SX1262). Physical `C153` USB IDs, JEDEC bytes, and partition
-tables remain unmeasured until confirmed on live hardware following the
-host-first inspection and factory snapshot safety protocol.
+LoRa-1262 (SX1262). Physical `C153` factory backup (`id-e3e5915e`) confirmed
+16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware. Both
+`simple-debug-fw` and `embassy-debug-fw` support both models: Lite baseline by
+default, and Full SKU with `--features c153` for packed NFC and LoRa discovery.

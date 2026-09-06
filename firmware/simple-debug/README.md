@@ -1,7 +1,8 @@
 # simple-debug-fw
 
-Blocking `esp-hal` proof-of-life image for PaperMono-Lite. No
-Embassy, no panel refresh, no I2C. Host-tested line format:
+Blocking `esp-hal` proof-of-life image for PaperMono (`C153-Lite`
+baseline, or `C153` with `--features c153`). No Embassy, no panel
+refresh, no I2C. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
 (wire prefix `simple-debug:`).
 
@@ -46,7 +47,10 @@ Hold the red power button about 2 s until it blinks
 
 ```shell
 . $HOME/export-esp.sh
+# PaperMono-Lite baseline:
 cargo xtask build-fw simple-debug
+# Or PaperMono Full SKU (C153):
+cargo xtask build-fw simple-debug --features c153
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
   --yes

@@ -112,11 +112,19 @@ If multiple Espressif devices are connected, specify the target port with
 
 `simple-debug` provides proof-of-life verification using blocking `esp-hal`
 routines. It streams a heartbeat and button events over the CDC interface
-while keeping the display inactive.
+while keeping the display inactive. The core firmware serves as a clean Lite
+baseline by default; passing `--features c153` activates Full-model identity
+and compile-time pin verification.
 
 ```shell
 . $HOME/export-esp.sh
+
+# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
 cargo xtask build-fw simple-debug
+
+# Or build with PaperMono Full SKU (C153) features:
+cargo xtask build-fw simple-debug --features c153
+
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
   --yes
@@ -140,9 +148,19 @@ presenting a Ferris splash on boot and allowing navigation across test cards
 with hardware buttons. Frontlight brightness and buzzer volume adjust via edge
 swipes, and touch buttons provide immediate visual highlight feedback.
 
+The core firmware operates as a Lite baseline by default. Adding `--features c153`
+activates PaperMono Full SKU (`C153`) board identity and discovery diagnostics
+for the ST25R3916 NFC controller and Stamp LoRa-1262 (SX1262) transceiver.
+
 ```shell
 . $HOME/export-esp.sh
+
+# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
 cargo xtask build-fw embassy-debug
+
+# Or build with PaperMono Full SKU (C153) features:
+cargo xtask build-fw embassy-debug --features c153
+
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
   --yes
@@ -182,6 +200,25 @@ Verify workspace dependencies against the locked configuration:
 cargo metadata --locked --format-version 1 --no-deps
 ```
 
+## Cross-model flashing (Full vs Lite)
+
+PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) share common electronics:
+ESP32-S3R8 SoC, 16 MB flash, SSD1677 OTP e-paper panel, FT6336G touch controller,
+M5PM1 PMIC, M5IOE1 expander, BMI270 IMU, RX8130CE RTC, buttons, buzzer, and
+frontlight PWM boost.
+
+- **Flashing Lite firmware to Full (`C153`) hardware**: Safe. All shared peripherals
+  function normally. Full-model peripherals (NFC and LoRa) remain safely unpowered
+  because their power gates (M5IOE1 `PYG4` and M5PM1 `G2`) default to unasserted.
+- **Flashing Full firmware to Lite (`C153-Lite`) hardware**: Safe. Unpopulated
+  pins are toggled without electrical load; I2C `0x50` and SPI3 safely NAK, and
+  firmware gracefully falls back.
+- **Why host-side refusal is not feasible in download mode**: Both models share
+  the identical ESP32-S3 USB VID:PID (`303a:1001`), identical product strings, and
+  ROM download mode does not expose board-level SKU metadata. Board model
+  differentiation is performed at runtime in firmware by probing the I2C peripheral
+  roster.
+
 ## Status
 
 Board support crates are validated with host unit tests. Target measurements on
@@ -191,9 +228,11 @@ for the display, touch controller, frontlight, buzzer, IMU, battery, and
 wireless cards.
 
 Discovery preparation for PaperMono (`C153`) is active on the
-`feat/papermono-discovery` branch, providing safe host-tested driver primitives
-for ST25R3916 NFC and Stamp LoRa-1262 (SX1262) before initiating physical
-hardware verification.
+`feat/papermono-discovery` branch. Safe host-tested driver primitives for
+ST25R3916 NFC and Stamp LoRa-1262 (SX1262) are implemented. The factory backup
+of the physical `C153` hardware (`id-e3e5915e`) confirmed identical 16 MB
+flash size, stock partition table geometry, and factory demo version
+(`c78f6c5-dirty`) matching the PaperMono-Lite baseline.
 
 `firmware/simple-debug` compiles for `xtensa-esp32s3-none-elf`, streaming
 identification and button telemetry across USB-Serial/JTAG on PaperMono devices.
@@ -203,8 +242,9 @@ workspace member package. The standard image includes touch digitizer and
 e-paper support, while microphone sampling, wireless scanning, and low-power
 sleep modes remain opt-in features.
 
-Host commands in `cargo xtask` have been verified against PaperMono-Lite
-hardware for identification, backup extraction, flashing, and serial monitoring.
+Host commands in `cargo xtask` have been verified against both PaperMono-Lite
+and PaperMono hardware for identification, backup extraction, and serial
+monitoring.
 
 ## Layout
 

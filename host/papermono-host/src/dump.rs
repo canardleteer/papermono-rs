@@ -65,7 +65,7 @@ pub fn split_image(dump: &[u8]) -> Result<SplitImage, Error> {
         if part.label == "otadata" {
             boot_slot = boot_slot_from_otadata(&data).map(str::to_string);
         }
-        if part.label == "app0" {
+        if (part.label == "app0" || part.label == "factory") && app0_desc.is_none() {
             app0_desc = extract_app_desc(&data);
         }
         parts.push((part.clone(), data));

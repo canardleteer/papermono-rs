@@ -60,6 +60,12 @@ pub enum LineKind {
     WifiHttp,
     /// BMI270 enclosure pose (`imu`).
     Imu,
+    /// ST25R3916 NFC IC identity (`nfc`).
+    Nfc,
+    /// ST25R3916 NFC tag detection report (`nfc_tag`).
+    NfcTag,
+    /// Stamp LoRa-1262 (SX1262) status (`lora`).
+    Lora,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -168,6 +174,9 @@ pub fn classify(body: &str) -> LineKind {
         "wifi_ap" => LineKind::WifiAp,
         "wifi_http" => LineKind::WifiHttp,
         "imu" => LineKind::Imu,
+        "nfc" => LineKind::Nfc,
+        "nfc_tag" => LineKind::NfcTag,
+        "lora" => LineKind::Lora,
         _ => LineKind::Unknown,
     }
 }
@@ -349,6 +358,27 @@ mod tests {
                 .unwrap()
                 .kind,
             LineKind::Imu
+        );
+        assert_eq!(
+            records("simple-debug: nfc ack=1 id=05 rev=1\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::Nfc
+        );
+        assert_eq!(
+            records("simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::NfcTag
+        );
+        assert_eq!(
+            records("simple-debug: lora ack=1 raw=24 mode=2 cmd=2\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::Lora
         );
     }
 

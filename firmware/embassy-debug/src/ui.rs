@@ -341,7 +341,7 @@ struct DrawnRevs {
 const fn scene_allows_soft_refresh(scene: Scene) -> bool {
     matches!(
         scene,
-        Scene::Legend | Scene::Bluetooth | Scene::WifiSurvey | Scene::WifiAp
+        Scene::Legend | Scene::Bluetooth | Scene::WifiSurvey | Scene::WifiAp | Scene::Nfc
     )
 }
 
@@ -673,6 +673,48 @@ async fn wait_nav(
                             }
                             _ => {}
                         }
+                    }
+                }
+
+                if ctx.scene == Scene::Nfc {
+                    let is_nfc_hit = display::framebuffer_to_page(sample.x, sample.y, ctx.rotation)
+                        .is_some_and(|(px, py)| draw::nfc_action_hit(px, py, ctx.rotation));
+
+                    if is_nfc_hit {
+                        crate::beep::click();
+
+                        // 1. Immediately highlight button box on glass:
+                        let (bx, by, bw, bh) = draw::nfc_action_rect(ctx.rotation);
+                        draw::invert_page_rect(
+                            &mut planes.bw,
+                            &mut planes.red,
+                            bx,
+                            by,
+                            bw,
+                            bh,
+                            ctx.rotation,
+                        );
+                        panel
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .await;
+
+                        // 2. Perform bounded ISO14443-A poll:
+                        let maybe_tag = crate::nfc::poll_iso14443a(i2c).await;
+                        if let Some(_card) = maybe_tag {
+                            crate::beep::click();
+                            #[cfg(feature = "c153")]
+                            {
+                                let sample = papermono_log::NfcTagSample {
+                                    atqa: (_card.atqa[0] as u16) | ((_card.atqa[1] as u16) << 8),
+                                    sak: _card.sak,
+                                    uid_len: _card.uid_len as u8,
+                                    uid_first: _card.uid[0],
+                                    uid_last: _card.uid[_card.uid_len.saturating_sub(1)],
+                                };
+                                crate::cdc::nfc_tag(&sample);
+                            }
+                        }
+                        return Some(Nav::Refresh);
                     }
                 }
             }

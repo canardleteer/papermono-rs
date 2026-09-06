@@ -88,6 +88,15 @@ pub const LAMP_CAPACITY: usize = 40;
 /// Bytes reserved for a volume level line (`volume=50`).
 pub const VOLUME_CAPACITY: usize = 40;
 
+/// Bytes reserved for an NFC identity line (`nfc ack=1 id=05 rev=1`).
+pub const NFC_CAPACITY: usize = 48;
+
+/// Bytes reserved for a LoRa status line (`lora ack=1 raw=02 mode=2 cmd=1`).
+pub const LORA_CAPACITY: usize = 64;
+
+/// Bytes reserved for an NFC tag detection line (`nfc_tag type=iso14443a ...`).
+pub const NFC_TAG_CAPACITY: usize = 96;
+
 /// Bytes reserved for a snowflake render timing line (`snowflake us=12345`).
 pub const SNOWFLAKE_CAPACITY: usize = 48;
 
@@ -219,6 +228,45 @@ pub struct LeftoverSample {
     pub sx_busy: bool,
 }
 
+/// ST25R3916 NFC IC identity report on PaperMono (`C153`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NfcIdentitySample {
+    /// Controller responded to identity query (`1` = ACK).
+    pub ack: bool,
+    /// IC type byte (`0x05` for ST25R3916).
+    pub id: u8,
+    /// Silicon revision number (`1`..=7).
+    pub rev: u8,
+}
+
+/// Stamp LoRa-1262 (SX1262) status report on PaperMono (`C153`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraStatusSample {
+    /// Transceiver responded to SPI `GetStatus` (`1` = ACK).
+    pub ack: bool,
+    /// Raw `GetStatus` status byte.
+    pub raw: u8,
+    /// Decoded 3-bit chip mode (`2` = STDBY_RC).
+    pub mode: u8,
+    /// Decoded 3-bit command status.
+    pub cmd: u8,
+}
+
+/// Detected ISO/IEC 14443-A contactless card or synthetic tag summary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NfcTagSample {
+    /// 2-byte Answer To Request (ATQA).
+    pub atqa: u16,
+    /// 1-byte Select Acknowledge (SAK).
+    pub sak: u8,
+    /// Valid UID length in bytes (typically 4 or 7).
+    pub uid_len: u8,
+    /// First byte of UID.
+    pub uid_first: u8,
+    /// Last byte of UID.
+    pub uid_last: u8,
+}
+
 /// One gated M5PM1 / IP2315 charge sample. Millivolts only.
 ///
 /// `ip` is ACK while the gate is on (expect `false` under permanent bus
@@ -320,6 +368,8 @@ pub enum Scene {
     WifiSurvey,
     /// WPA2-Personal SoftAP with embedded JSON status web server.
     WifiAp,
+    /// ST25R3916 near field communication tag detection and polling.
+    Nfc,
     /// Four OTP gray boxes.
     Tones,
     /// Dots + midline slides + mono-full white clear.
@@ -328,13 +378,14 @@ pub enum Scene {
 
 impl Scene {
     /// Walk order for BUTTON B (next).
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Splash,
         Self::Shapes,
         Self::Legend,
         Self::Bluetooth,
         Self::WifiSurvey,
         Self::WifiAp,
+        Self::Nfc,
         Self::Tones,
         Self::Targets,
     ];
@@ -349,6 +400,7 @@ impl Scene {
             Self::Bluetooth => "bluetooth",
             Self::WifiSurvey => "wifi_survey",
             Self::WifiAp => "wifi_ap",
+            Self::Nfc => "nfc",
             Self::Tones => "tones",
             Self::Targets => "targets",
         }
@@ -363,7 +415,8 @@ impl Scene {
             Self::Legend => Self::Bluetooth,
             Self::Bluetooth => Self::WifiSurvey,
             Self::WifiSurvey => Self::WifiAp,
-            Self::WifiAp => Self::Tones,
+            Self::WifiAp => Self::Nfc,
+            Self::Nfc => Self::Tones,
             Self::Tones => Self::Targets,
             Self::Targets => Self::Splash,
         }
@@ -379,7 +432,8 @@ impl Scene {
             Self::Bluetooth => Self::Legend,
             Self::WifiSurvey => Self::Bluetooth,
             Self::WifiAp => Self::WifiSurvey,
-            Self::Tones => Self::WifiAp,
+            Self::Nfc => Self::WifiAp,
+            Self::Tones => Self::Nfc,
             Self::Targets => Self::Tones,
         }
     }
@@ -496,6 +550,57 @@ pub fn format_leftover<'a>(
             u8::from(sample.lora_irq),
             u8::from(sample.nfc_irq),
             u8::from(sample.sx_busy),
+        ),
+    )
+}
+
+/// Writes `nfc` IC identity without a trailing newline.
+pub fn format_nfc<'a>(
+    sample: &NfcIdentitySample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: nfc ack={} id={:02x} rev={}",
+            LOG_PREFIX,
+            u8::from(sample.ack),
+            sample.id,
+            sample.rev,
+        ),
+    )
+}
+
+/// Writes `lora` status without a trailing newline.
+pub fn format_lora<'a>(
+    sample: &LoraStatusSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: lora ack={} raw={:02x} mode={} cmd={}",
+            LOG_PREFIX,
+            u8::from(sample.ack),
+            sample.raw,
+            sample.mode,
+            sample.cmd,
+        ),
+    )
+}
+
+/// Writes `nfc_tag` detection without a trailing newline.
+///
+/// Middle UID bytes are masked on serial for privacy.
+pub fn format_nfc_tag<'a>(
+    sample: &NfcTagSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: nfc_tag type=iso14443a atqa={:04x} sak={:02x} len={} uid={:02x}..{:02x}",
+            LOG_PREFIX, sample.atqa, sample.sak, sample.uid_len, sample.uid_first, sample.uid_last,
         ),
     )
 }
@@ -1025,6 +1130,37 @@ mod tests {
     }
 
     #[test]
+    fn nfc_sample_formats_identity() {
+        let mut buf = [0u8; NFC_CAPACITY];
+        let line = format_nfc(
+            &NfcIdentitySample {
+                ack: true,
+                id: 0x05,
+                rev: 1,
+            },
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(line, "simple-debug: nfc ack=1 id=05 rev=1");
+    }
+
+    #[test]
+    fn lora_sample_formats_status() {
+        let mut buf = [0u8; LORA_CAPACITY];
+        let line = format_lora(
+            &LoraStatusSample {
+                ack: true,
+                raw: 0x24,
+                mode: 2,
+                cmd: 2,
+            },
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(line, "simple-debug: lora ack=1 raw=24 mode=2 cmd=2");
+    }
+
+    #[test]
     fn radio_counts_have_no_mac() {
         let mut wifi = [0u8; WIFI_CAPACITY];
         let mut ble = [0u8; BLE_CAPACITY];
@@ -1209,12 +1345,14 @@ mod tests {
         assert_eq!(Scene::Legend.next(), Scene::Bluetooth);
         assert_eq!(Scene::Bluetooth.next(), Scene::WifiSurvey);
         assert_eq!(Scene::WifiSurvey.next(), Scene::WifiAp);
-        assert_eq!(Scene::WifiAp.next(), Scene::Tones);
+        assert_eq!(Scene::WifiAp.next(), Scene::Nfc);
+        assert_eq!(Scene::Nfc.next(), Scene::Tones);
         assert_eq!(Scene::Tones.next(), Scene::Targets);
         assert_eq!(Scene::Targets.next(), Scene::Splash);
         assert_eq!(Scene::Splash.prev(), Scene::Targets);
         assert_eq!(Scene::Targets.prev(), Scene::Tones);
-        assert_eq!(Scene::Tones.prev(), Scene::WifiAp);
+        assert_eq!(Scene::Tones.prev(), Scene::Nfc);
+        assert_eq!(Scene::Nfc.prev(), Scene::WifiAp);
         assert_eq!(Scene::WifiAp.prev(), Scene::WifiSurvey);
         assert_eq!(Scene::WifiSurvey.prev(), Scene::Bluetooth);
         assert_eq!(Scene::Bluetooth.prev(), Scene::Legend);
@@ -1224,13 +1362,18 @@ mod tests {
         assert!(!Scene::Bluetooth.uses_gray());
         assert!(!Scene::WifiSurvey.uses_gray());
         assert!(!Scene::WifiAp.uses_gray());
+        assert!(!Scene::Nfc.uses_gray());
         assert!(!Scene::Shapes.uses_gray());
         assert!(!Scene::Targets.uses_gray());
-        assert_eq!(Scene::ALL.len(), 8);
+        assert_eq!(Scene::ALL.len(), 9);
         let mut buf = [0u8; SCENE_CAPACITY];
         assert_eq!(
             format_scene(Scene::Splash, &mut buf).unwrap(),
             "simple-debug: scene=splash"
+        );
+        assert_eq!(
+            format_scene(Scene::Nfc, &mut buf).unwrap(),
+            "simple-debug: scene=nfc"
         );
         assert_eq!(
             format_scene(Scene::Bluetooth, &mut buf).unwrap(),
@@ -1298,6 +1441,26 @@ mod tests {
             "simple-debug: imu pose=Portrait0 x=0 y=-16384 z=0"
         );
         assert_eq!(BUTTON_HOLD_PCM_MS, 1_000);
+    }
+
+    #[test]
+    fn nfc_tag_formats_with_masked_uid() {
+        let mut buf = [0u8; NFC_TAG_CAPACITY];
+        let line = format_nfc_tag(
+            &NfcTagSample {
+                atqa: 0x0004,
+                sak: 0x08,
+                uid_len: 4,
+                uid_first: 0x08,
+                uid_last: 0x2C,
+            },
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(
+            line,
+            "simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c"
+        );
     }
 
     #[test]

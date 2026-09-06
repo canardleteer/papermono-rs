@@ -926,6 +926,11 @@ fn set_wifi_mode(mode: WifiMode) {
     WIFI_STATE_REV.fetch_add(1, Ordering::Release);
 }
 
+#[cfg(not(feature = "c153"))]
+const BOARD_SKU: &str = m5stack_papermono_lite::SKU;
+#[cfg(feature = "c153")]
+const BOARD_SKU: &str = m5stack_papermono::SKU;
+
 /// Serializes system telemetry and Wi-Fi state into a compact JSON string without heap allocations.
 #[cfg(feature = "radio")]
 fn build_status_json(buf: &mut [u8], req_count: u32) -> &str {
@@ -954,7 +959,7 @@ fn build_status_json(buf: &mut [u8], req_count: u32) -> &str {
 
     let _ = write!(
         writer,
-        "{{\"device\":\"PaperMono\",\"sku\":\"C153-Lite\",\"scene\":\"{scene}\",\"buttons\":{{\"btn_a\":{btn_a},\"btn_b\":{btn_b}}},\"battery\":{{\"vbat_mv\":{vbat},\"percent\":{pct},\"src\":\"{src:02x}\",\"charging\":{charging}}},\"lamp\":{lamp},\"wifi\":{{\"hotspot\":true,\"ssid\":\"{AP_SSID}\",\"clients\":{clients},\"requests\":{req_count}}}}}",
+        "{{\"device\":\"PaperMono\",\"sku\":\"{BOARD_SKU}\",\"scene\":\"{scene}\",\"buttons\":{{\"btn_a\":{btn_a},\"btn_b\":{btn_b}}},\"battery\":{{\"vbat_mv\":{vbat},\"percent\":{pct},\"src\":\"{src:02x}\",\"charging\":{charging}}},\"lamp\":{lamp},\"wifi\":{{\"hotspot\":true,\"ssid\":\"{AP_SSID}\",\"clients\":{clients},\"requests\":{req_count}}}}}",
     );
     writer.finish()
 }

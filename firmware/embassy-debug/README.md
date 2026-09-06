@@ -1,8 +1,9 @@
 # embassy-debug-fw
 
-Embassy staged image for PaperMono-Lite. USB-Serial/JTAG prints
-the same `simple-debug:` lines as the proof-of-life image, with
-`hello image=embassy-debug`. Host-tested line format:
+Embassy staged image for PaperMono (`C153-Lite` baseline, or `C153`
+with `--features c153`). USB-Serial/JTAG prints the same
+`simple-debug:` lines as the proof-of-life image, with `hello
+image=embassy-debug`. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
 (wire prefix `simple-debug:`).
 
@@ -35,7 +36,9 @@ On the unit:
   2 kHz with audible key clicks on button navigation and touchscreen actions.
 
 Default features are `touch`, `panel`, `sleep`, `radio`, and `orient`.
-The `mic` feature is opt-in. First SKU is Lite.
+The `mic` feature is opt-in. The `c153` feature activates PaperMono Full SKU
+hardware definitions, ST25R3916 NFC identity checking, and Stamp LoRa-1262
+status discovery.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
 and 180° flips). Cards redraw upright for the hold via soft
@@ -68,7 +71,10 @@ Hold the red power button about 2 s until it blinks
 
 ```shell
 . $HOME/export-esp.sh
+# PaperMono-Lite baseline:
 cargo xtask build-fw embassy-debug
+# Or PaperMono Full SKU (C153):
+cargo xtask build-fw embassy-debug --features c153
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
   --yes
@@ -108,9 +114,11 @@ with 60 s auto-refresh) → bluetooth (BLE peripheral pairing with 6-digit PIN
 passkey and success/fail status) → wifi survey (tap `[ START SURVEY ]` for
 2.4 GHz channel occupancy) → wifi hotspot (tap `[ START HOTSPOT ]` for
 SSID `PaperMono-AP`, password `mono2026`, URL `http://192.168.4.1/`) →
-tones → targets, then wrap. Survey and hotspot cannot run together:
-starting one stops the other. BUTTON A walks the other way. CDC prints
-`scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`, and `wifi_http`.
+nfc (tap `[ POLL TAG ]` for ISO14443-A UID reading and Flipper Zero /
+contactless card testing) → tones → targets, then wrap. Survey and hotspot
+cannot run together: starting one stops the other. BUTTON A walks the other
+way. CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
+`wifi_http`, and `nfc_tag`.
 
 ### Step 5: Slide the lamp
 

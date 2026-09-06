@@ -2,9 +2,10 @@
 
 > [!NOTE]
 > PaperMono (`C153`) discovery is now underway on the `feat/papermono-discovery`
-> branch! Having vetted the shared baseline on PaperMono-Lite, safe driver
-> primitives for the ST25R3916 NFC and Stamp LoRa-1262 are in place, and we are
-> preparing for our first safe physical unit inspection and snapshot.
+> branch! The factory backup of our physical `C153` unit has been captured and
+> verified, confirming identical 16 MB flash geometry and partition tables to
+> PaperMono-Lite. Firmware packages now support both models with shared core
+> functionality, unlocking Full-model NFC and LoRa discovery via `--features c153`.
 
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
@@ -87,7 +88,7 @@ QinHeng `1a86:55d3` is refused. Download is a power-button hold
 | `restore-factory-firmware` | yes | write-bin that unit's original or `--capture` (`--yes`). Never a full-chip erase |
 | `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs matching original or `--capture`. Does not compile |
 | `vet-idle-log` | no | Host-only idle grammar on a `monitor` capture |
-| `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` |
+| `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` (`--features c153`, `--all-features`) |
 | `ci` | no | Host-only CI gate (fmt, host clippy/test, firmware clippy, rumdl, machete, audit) |
 | `monitor` | yes | USB-Serial/JTAG listen at 115200 (usbfs). After `flash-app`, short-press red |
 

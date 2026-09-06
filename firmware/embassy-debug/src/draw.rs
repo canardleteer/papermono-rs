@@ -101,6 +101,10 @@ pub fn render(
             draw_wifi_ap(bw, red, rotation);
             None
         }
+        Scene::Nfc => {
+            draw_nfc(bw, red, rotation);
+            None
+        }
         Scene::Tones => {
             draw_tones(bw, red, rotation);
             None
@@ -170,6 +174,32 @@ pub fn wifi_action_rect(rotation: PageRotation) -> (u16, u16, u16, u16) {
 #[must_use]
 pub fn wifi_action_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
     let (x, y, w, h) = wifi_action_rect(rotation);
+    let x0 = x.saturating_sub(10);
+    let y0 = y.saturating_sub(10);
+    let x1 = x.saturating_add(w).saturating_add(10);
+    let y1 = y.saturating_add(h).saturating_add(10);
+    px >= x0 && px < x1 && py >= y0 && py < y1
+}
+
+/// Layout geometry of the NFC poll button in page space.
+#[must_use]
+pub fn nfc_action_rect(rotation: PageRotation) -> (u16, u16, u16, u16) {
+    let (pw, ph) = rotation.page_size();
+    let x = 60;
+    let w = pw.saturating_sub(120);
+    let h = 56;
+    let y = if rotation.is_portrait() {
+        ph.saturating_sub(140)
+    } else {
+        ph.saturating_sub(100)
+    };
+    (x, y, w, h)
+}
+
+/// Page-space touch hit test for the NFC poll button.
+#[must_use]
+pub fn nfc_action_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
+    let (x, y, w, h) = nfc_action_rect(rotation);
     let x0 = x.saturating_sub(10);
     let y0 = y.saturating_sub(10);
     let x1 = x.saturating_add(w).saturating_add(10);
@@ -1968,7 +1998,329 @@ impl WifiCardLayout {
     }
 }
 
-/// Renders Card 7: 4-level grayscale tone bands.
+/// Renders Card 7: ST25R3916 Near Field Communication (NFC) tag detection and identity.
+fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
+    use crate::nfc::NfcCardState;
+
+    clear(bw, red, display::GRAY_WHITE, rotation);
+    let state = crate::nfc::card_state();
+    let (pw, ph) = rotation.page_size();
+    let cx = i32::from(pw) / 2;
+    let (btn_x, btn_y, btn_w, btn_h) = nfc_action_rect(rotation);
+
+    let rule_x = 40;
+    let rule_w = pw.saturating_sub(80);
+    let header_bar_y = if rotation.is_portrait() { 52 } else { 42 };
+
+    // 1. Structural lines and frames
+    fill_rect(
+        bw,
+        red,
+        rule_x,
+        header_bar_y,
+        rule_w,
+        2,
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    let banner_y = header_bar_y + 16;
+    let banner_h = 36;
+    stroke_rect(
+        bw,
+        red,
+        rule_x,
+        banner_y,
+        rule_w,
+        banner_h,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        rule_x.saturating_add(2),
+        banner_y.saturating_add(2),
+        rule_w.saturating_sub(4),
+        banner_h.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    // Guide section rule in portrait
+    if rotation.is_portrait() {
+        let guide_div_y = 350;
+        fill_rect(
+            bw,
+            red,
+            rule_x,
+            guide_div_y,
+            rule_w,
+            1,
+            display::GRAY_LIGHT,
+            rotation,
+        );
+    }
+
+    // Action button double-stroke frame
+    stroke_rect(
+        bw,
+        red,
+        btn_x,
+        btn_y,
+        btn_w,
+        btn_h,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        btn_x.saturating_add(2),
+        btn_y.saturating_add(2),
+        btn_w.saturating_sub(4),
+        btn_h.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    let mut ink = GrayInk::new(bw, red, rotation);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    let title_y = header_bar_y.saturating_sub(10);
+    let _ = Text::with_alignment(
+        "NFC CARD DETECTOR",
+        Point::new(cx, i32::from(title_y)),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let banner_text_y = i32::from(banner_y) + 24;
+    let (banner_str, btn_label) = match state {
+        NfcCardState::Unpopulated => ("[ HARDWARE UNPOPULATED ]", "[ NOT AVAILABLE ]"),
+        NfcCardState::Idle => ("[ NFC READY - TAP TO SCAN ]", "[ POLL TAG ]"),
+        NfcCardState::Detected(_) => ("[ TAG DETECTED ]", "[ POLL AGAIN ]"),
+        NfcCardState::NoTag => ("[ NO TAG DETECTED ]", "[ POLL AGAIN ]"),
+    };
+
+    let _ = Text::with_alignment(
+        banner_str,
+        Point::new(cx, banner_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Content box
+    let content_x = rule_x.saturating_add(10);
+    let mut line_y = i32::from(banner_y + banner_h) + 28;
+    let step_y = if rotation.is_portrait() { 34 } else { 26 };
+
+    match state {
+        NfcCardState::Unpopulated => {
+            let _ = Text::new(
+                "Model:    PaperMono-Lite (C153-Lite)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "I2C Bus:  0x50 NAK (Pads unpowered)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Hardware: ST25R3916 on C153 Full only",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Note:     Unpopulated leftover pins",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        NfcCardState::Idle => {
+            let _ = Text::new(
+                "Controller: ST25R3916 (13.56 MHz)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Protocol:   ISO/IEC 14443-A (NFC-A)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "RF Carrier: Idle (Power gated PYG4)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Target:     Hold tag or Flipper near",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        #[cfg(feature = "c153")]
+        NfcCardState::Detected(card) => {
+            let _ = Text::new(
+                "Protocol:   ISO/IEC 14443-A",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let mut atqa_sak_buf = [0u8; 48];
+            let mut w = BufWriter {
+                buf: &mut atqa_sak_buf,
+                pos: 0,
+            };
+            let atqa_raw = (card.atqa[0] as u16) | ((card.atqa[1] as u16) << 8);
+            let _ = write!(w, "ATQA: 0x{:04X}      SAK: 0x{:02X}", atqa_raw, card.sak);
+            if let Ok(s) = core::str::from_utf8(&w.buf[..w.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut uid_buf = [0u8; 48];
+            let mut w_uid = BufWriter {
+                buf: &mut uid_buf,
+                pos: 0,
+            };
+            if card.uid_len == 4 {
+                let _ = write!(
+                    w_uid,
+                    "UID:  {:02X}:{:02X}:{:02X}:{:02X} (4-byte)",
+                    card.uid[0], card.uid[1], card.uid[2], card.uid[3]
+                );
+            } else if card.uid_len == 7 {
+                let _ = write!(
+                    w_uid,
+                    "UID:  {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                    card.uid[0],
+                    card.uid[1],
+                    card.uid[2],
+                    card.uid[3],
+                    card.uid[4],
+                    card.uid[5],
+                    card.uid[6]
+                );
+            } else {
+                let _ = write!(w_uid, "UID:  ({}-byte tag)", card.uid_len);
+            }
+            if let Ok(s) = core::str::from_utf8(&w_uid.buf[..w_uid.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let type_str = if card.uid_len == 7 {
+                "Type: NFC Forum Type 2 / NTAG"
+            } else if card.sak == 0x08 {
+                "Type: MIFARE Classic 1K"
+            } else if card.sak == 0x20 || card.sak == 0x28 {
+                "Type: ISO14443-4 / Contactless"
+            } else {
+                "Type: ISO14443-A Transponder"
+            };
+            let _ =
+                Text::new(type_str, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+        }
+        #[cfg(not(feature = "c153"))]
+        NfcCardState::Detected(_) => {}
+        NfcCardState::NoTag => {
+            let _ = Text::new(
+                "Controller: ST25R3916",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Status:     REQA scan timed out",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Result:     No 13.56 MHz tag in field",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Hint:       Hold card close to panel",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Guide section in portrait
+    if rotation.is_portrait() {
+        let _ = Text::with_alignment(
+            "HOW TO TEST WITH FLIPPER / CARD",
+            Point::new(cx, 380),
+            style,
+            Alignment::Center,
+        )
+        .draw(&mut ink);
+
+        let steps = [
+            "1. Hold contactless card or Flipper near.",
+            "2. Tap [ POLL TAG ] button below.",
+            "3. Flipper: 'Detect Reader' detects 13.56M.",
+            "4. Flipper: Emulate NTAG -> reads 7B UID.",
+            "5. Credit card: reads 4B random UID.",
+        ];
+        let mut step_y = 415;
+        for s in steps {
+            let _ = Text::new(s, Point::new(i32::from(rule_x), step_y), style).draw(&mut ink);
+            step_y += 30;
+        }
+    }
+
+    let btn_text_y = i32::from(btn_y) + 36;
+    let _ = Text::with_alignment(
+        btn_label,
+        Point::new(cx, btn_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Footer
+    let footer_y = ph.saturating_sub(25);
+    let _ = Text::with_alignment(
+        "Btn A: prev   Btn B: next",
+        Point::new(cx, i32::from(footer_y)),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 8: 4-level grayscale tone bands.
 ///
 /// Portrait: four stacked 140-tall bands (historical). Landscape: four boxes
 /// across so the 800×480 page is not four cropped portrait bands (sticky-rs).

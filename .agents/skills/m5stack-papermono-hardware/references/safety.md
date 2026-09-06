@@ -31,6 +31,7 @@ physical unit point at an `nyc-*` id. Name `C153` vs
 | Lite SKU | Do not init ST25R3916 or SX1262 | Assuming NFC/LoRa GPIOs are free GPIO ([nyc-lite-nfc-pads](../resources/not-yet-confirmed.md#nyc-lite-nfc-pads), [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)) |
 | Flash images | 16 MB-aware table. Snapshot that unit first if you care about PHY cal ([nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)) | Assuming 32 MB geometry or arbitrary `0x90000` offsets; flashing one unit’s NVS onto another; assuming M5 factory-restore regenerates that unit’s PHY without checking |
 | USB debug | Lite run **and** download: Espressif `303a:1001` USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Not CH343 | Treating USB-C as QinHeng `1a86:55d3`; assuming `probe-rs` until [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
+| Cross-model flashing | Full vs Lite share common peripheral topology. Lite image on Full is safe (NFC/LoRa unpowered). Full image on Lite safely NAKs unpopulated peripherals | Driving unmapped leftover pins without confirming board schematic net isolation |
 
 ## Why the panel rule comes first
 
@@ -102,6 +103,31 @@ closes (Lite table geometry is already in
 3. Restore from **that unit’s** snapshot, or from M5Stack’s
    published restore image after you accept that PHY may differ.
 4. Never flash one unit’s NVS onto another.
+
+## Cross-model flashing: Full vs Lite
+
+PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) share identical core
+electronics: ESP32-S3R8 SoC, 16 MB flash geometry, SSD1677 OTP e-paper panel,
+FT6336G touch controller, M5PM1 PMIC, M5IOE1 I/O expander, BMI270 IMU,
+RX8130CE RTC, user buttons A/B, buzzer on GPIO42, and frontlight PWM boost.
+
+- **Flashing Lite firmware onto Full (`C153`) hardware**:
+  Completely safe. All shared core peripherals operate normally. The additional
+  C153 hardware peripherals (ST25R3916 NFC and SX1262 LoRa) remain completely
+  unpowered and quiescent because their respective power gates (M5IOE1 `PYG4`
+  and M5PM1 `G2`) default to unasserted/low.
+- **Flashing Full firmware onto Lite (`C153-Lite`) hardware**:
+  Safe from an electrical damage perspective. Probing `PYG4` or PMIC `G2` toggles
+  unpopulated expander / PMIC pins without external loads; I2C address `0x50` and
+  SPI3 simply NAK or report no device, and firmware gracefully falls back.
+  However, software expecting NFC/LoRa functionality will report them absent.
+- **Hardware Model Detection & Flash Refusal Constraints**:
+  Both `C153` and `C153-Lite` share identical ESP32-S3 USB VID:PID (`303a:1001`),
+  identical USB product strings, and in ROM download mode the USB serial string
+  is not exposed or varies only by silicon MAC which is unmapped to SKU by Espressif.
+  Host tools cannot inspect board identity before flashing; model detection is
+  only possible at runtime in firmware by probing the I2C peripheral roster
+  (specifically ST25R3916 NFC on `0x50` after asserting `PYG4`).
 
 ## Host-only scope
 

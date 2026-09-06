@@ -1,8 +1,11 @@
-//! PaperMono-Lite Embassy interactive debug tutorial firmware.
+//! PaperMono Embassy interactive debug tutorial firmware.
 //!
 //! # Architecture & Purpose
 //! This firmware serves as an advanced, asynchronous reference application for
-//! the M5Stack PaperMono-Lite (`C153-Lite`), demonstrating principles from
+//! the M5Stack PaperMono-Lite (`C153-Lite`) and PaperMono (`C153`). Core functionality
+//! is shared across both models, operating as a clean Lite baseline by default.
+//! Compiling with `--features c153` activates the PaperMono (`C153`) board identity
+//! and discovery diagnostics for NFC and LoRa peripherals. Demonstrating principles from
 //! *The Embassy Book*, *The Rust on ESP Book*, and *The Embedded Rust Book*:
 //!
 //! - **Asynchronous Cooperative Multitasking**: Built on the `embassy-executor`
@@ -49,6 +52,8 @@ mod heartbeat;
 mod ioe;
 #[cfg(feature = "mic")]
 mod mic;
+#[cfg(feature = "touch")]
+pub mod nfc;
 #[cfg(feature = "panel")]
 mod panel;
 #[cfg(any(feature = "radio", feature = "panel"))]
@@ -74,7 +79,10 @@ use esp_hal::ram;
 use esp_hal::rtc_cntl::SocResetReason;
 use esp_hal::system::reset_reason;
 use esp_hal::timer::timg::TimerGroup;
+#[cfg(feature = "c153")]
+use m5stack_papermono::SKU;
 use m5stack_papermono_lite::pins;
+#[cfg(not(feature = "c153"))]
 use m5stack_papermono_lite::SKU;
 use papermono_log::{Hello, IMAGE_EMBASSY};
 
@@ -98,6 +106,17 @@ const _: () = {
     assert!(pins::SYS_I2C_SDA == 47);
     assert!(pins::SYS_I2C_SCL == 48);
     assert!(pins::BUZZER == 42);
+};
+
+#[cfg(feature = "c153")]
+const _: () = {
+    assert!(m5stack_papermono::lora::IRQ == 5);
+    assert!(m5stack_papermono::nfc::IRQ == 6);
+    assert!(m5stack_papermono::lora::BUSY == 21);
+    assert!(m5stack_papermono::lora::SPI_MOSI == 38);
+    assert!(m5stack_papermono::lora::SPI_CLK == 39);
+    assert!(m5stack_papermono::lora::SPI_MISO == 40);
+    assert!(m5stack_papermono::lora::NSS == 41);
 };
 
 /// Main asynchronous entry point invoked by the Embassy executor.
@@ -214,6 +233,19 @@ async fn main(spawner: Spawner) -> ! {
 
         // Bring up system expander rails and configure touch digitizer.
         let _ = touch_bus::bring_up(&mut i2c).await;
+
+        // Safe SX1262 LoRa module discovery probe on PaperMono (C153).
+        #[cfg(feature = "c153")]
+        probe_lora(
+            &mut i2c,
+            peripherals.SPI3,
+            peripherals.GPIO38,
+            peripherals.GPIO39,
+            peripherals.GPIO40,
+            peripherals.GPIO41,
+            &sx_busy,
+        )
+        .await;
 
         // Optional PDM microphone sampling task.
         #[cfg(feature = "mic")]
@@ -335,5 +367,124 @@ fn reset_token(reason: Option<SocResetReason>) -> &'static str {
         Some(SocResetReason::CoreUsbJtag) => "core_usb_jtag",
         Some(SocResetReason::CorePwrGlitch) => "core_pwr_glitch",
         None => "unknown",
+    }
+}
+
+#[cfg(all(feature = "touch", feature = "c153"))]
+static LORA_SAMPLE: core::sync::atomic::AtomicU16 = core::sync::atomic::AtomicU16::new(0);
+
+#[cfg(all(feature = "touch", feature = "c153"))]
+fn store_lora(sample: papermono_log::LoraStatusSample) {
+    let raw = if sample.ack {
+        0x8000 | ((sample.raw as u16) << 8) | ((sample.mode as u16) << 4) | (sample.cmd as u16)
+    } else {
+        0
+    };
+    LORA_SAMPLE.store(raw, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Retrieves the most recent Stamp LoRa-1262 (SX1262) status on PaperMono (`C153`).
+#[cfg(all(feature = "touch", feature = "c153"))]
+pub fn last_lora() -> Option<papermono_log::LoraStatusSample> {
+    let raw = LORA_SAMPLE.load(core::sync::atomic::Ordering::Relaxed);
+    if (raw & 0x8000) == 0 {
+        None
+    } else {
+        Some(papermono_log::LoraStatusSample {
+            ack: true,
+            raw: ((raw >> 8) & 0xFF) as u8,
+            mode: ((raw >> 4) & 0x07) as u8,
+            cmd: (raw & 0x07) as u8,
+        })
+    }
+}
+
+/// Queries the SX1262 LoRa transceiver status byte over SPI3.
+///
+/// Hardware sequencing follows Semtech SX1262 datasheet Section 13.5.1
+/// and M5Stack PaperMono schematic:
+/// 1. Asserts NSS high (inactive).
+/// 2. Holds reset low while enabling `3V3_L2_LoRa` rail via M5PM1 G2 push-pull.
+/// 3. Releases SX1262 reset via M5IOE1 `PYG10` (`IOE1_RESET`).
+/// 4. Leaves RF switch (`PYG2`) grounded to prevent transmission.
+/// 5. Awaits BUSY pin going low (transceiver ready).
+/// 6. Sends `CMD_GET_STATUS` (`0xC0`), logs and stores decoded `RadioStatus`.
+/// 7. Parks the radio rails safely (asserts reset low, turns off PMIC G2).
+#[cfg(all(feature = "touch", feature = "c153"))]
+async fn probe_lora(
+    i2c: &mut ioe::SysI2c,
+    spi3: esp_hal::peripherals::SPI3<'_>,
+    mosi: esp_hal::peripherals::GPIO38<'_>,
+    sclk: esp_hal::peripherals::GPIO39<'_>,
+    miso: esp_hal::peripherals::GPIO40<'_>,
+    nss_pin: esp_hal::peripherals::GPIO41<'_>,
+    busy: &Input<'_>,
+) {
+    use esp_hal::gpio::{Level, Output, OutputConfig};
+    use esp_hal::spi::master::{Config, Spi};
+    use esp_hal::time::Rate;
+    use m5stack_papermono::lora;
+    use m5stack_papermono_lite::addresses;
+
+    let mut nss = Output::new(nss_pin, Level::High, OutputConfig::default());
+
+    // 1. Hold reset low while powering up the 3V3_L2_LoRa rail to guarantee a clean reset.
+    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
+    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_ANTENNA_SWITCH, false);
+    {
+        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
+        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, true);
+    }
+    Timer::after(Duration::from_millis(10)).await;
+
+    // 2. Release hardware reset line (high).
+    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, true);
+    Timer::after(Duration::from_millis(20)).await;
+
+    // 3. Await BUSY pin going low (transceiver ready).
+    let mut ready = false;
+    for _ in 0..20 {
+        if busy.is_low() {
+            ready = true;
+            break;
+        }
+        Timer::after(Duration::from_millis(5)).await;
+    }
+
+    if ready {
+        if let Ok(spi) = Spi::new(spi3, Config::default().with_frequency(Rate::from_mhz(8))) {
+            let mut spi = spi.with_sck(sclk).with_mosi(mosi).with_miso(miso);
+
+            nss.set_low();
+            let mut buf = [lora::CMD_GET_STATUS, 0x00];
+            let res = spi.transfer(&mut buf);
+            nss.set_high();
+
+            if res.is_ok() {
+                let status = lora::RadioStatus::from_byte(buf[1]);
+                let sample = papermono_log::LoraStatusSample {
+                    ack: true,
+                    raw: buf[1],
+                    mode: (buf[1] >> 4) & 0x07,
+                    cmd: (buf[1] >> 1) & 0x07,
+                };
+                store_lora(sample);
+                esp_println::println!(
+                    "simple-debug: lora ack=1 raw={:02x} mode={:?} cmd={:?}",
+                    buf[1],
+                    status.chip_mode,
+                    status.command_status
+                );
+            }
+        }
+    } else {
+        esp_println::println!("simple-debug: lora ack=0 busy_timeout");
+    }
+
+    // 4. Safely park radio (assert reset low, turn off PMIC G2 rail).
+    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
+    {
+        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
+        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, false);
     }
 }

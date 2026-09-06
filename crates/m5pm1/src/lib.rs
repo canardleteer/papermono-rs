@@ -53,6 +53,8 @@ pub const SYS_CMD_KEY: u8 = 0xA0;
 pub const SYS_CMD_SHUTDOWN: u8 = SYS_CMD_KEY | 0x01;
 /// Catalog id `m5pm1`, GPIO Register, `GPIO_MODE` (0x10).
 pub const GPIO_MODE: u8 = 0x10;
+/// Catalog id `m5pm1`, GPIO Register, `GPIO_OUT` (0x11).
+pub const GPIO_OUT: u8 = 0x11;
 /// Catalog id `m5pm1`, GPIO Register, `GPIO_IN` (0x12).
 pub const GPIO_IN: u8 = 0x12;
 /// Catalog id `m5pm1`, GPIO Register, `GPIO_DRV` (0x13).
@@ -230,6 +232,29 @@ impl<I2C: I2c> M5pm1<I2C> {
         let new_cfg = if on { cfg | LED_EN } else { cfg & !LED_EN };
         self.write_at(PWR_CFG, new_cfg)
     }
+
+    /// Sets the digital output state of a PMIC GPIO pin (`0..=4`).
+    ///
+    /// Configures the pin drive mode to push-pull ([`GPIO_DRV`], bit = 0), sets
+    /// output direction ([`GPIO_MODE`], bit = 1), and writes the desired level
+    /// ([`GPIO_OUT`]).
+    pub fn set_gpio_output(&mut self, pin: u8, high: bool) -> Result<(), I2C::Error> {
+        if pin > 4 {
+            return Ok(());
+        }
+        let mask = 1 << pin;
+        let drv = self.read_at(GPIO_DRV)?;
+        if drv & mask != 0 {
+            self.write_at(GPIO_DRV, drv & !mask)?;
+        }
+        let mode = self.read_at(GPIO_MODE)?;
+        if mode & mask == 0 {
+            self.write_at(GPIO_MODE, mode | mask)?;
+        }
+        let out = self.read_at(GPIO_OUT)?;
+        let new_out = if high { out | mask } else { out & !mask };
+        self.write_at(GPIO_OUT, new_out)
+    }
 }
 
 #[cfg(test)]
@@ -298,6 +323,35 @@ mod tests {
         let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
         pm1.set_led(false).unwrap();
         pm1.set_led(true).unwrap();
+        pm1.release().done();
+    }
+
+    #[test]
+    fn set_gpio_output_sets_mode_and_level() {
+        let txns = [
+            // set_gpio_output(2, true) with drv=0x1f, mode=0x00, out=0x00
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_DRV]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x1F]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_DRV, 0x1B]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_MODE]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x00]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_MODE, 0x04]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_OUT]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x00]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_OUT, 0x04]),
+            // set_gpio_output(2, false) with drv already 0x1B, mode already 0x04
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_DRV]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x1B]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_MODE]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x04]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_OUT]),
+            Transaction::read(DEFAULT_ADDRESS, std::vec![0x04]),
+            Transaction::write(DEFAULT_ADDRESS, std::vec![GPIO_OUT, 0x00]),
+        ];
+        let i2c = Mock::new(&txns);
+        let mut pm1 = M5pm1::new(i2c, DEFAULT_ADDRESS);
+        pm1.set_gpio_output(2, true).unwrap();
+        pm1.set_gpio_output(2, false).unwrap();
         pm1.release().done();
     }
 }

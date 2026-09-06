@@ -170,6 +170,34 @@ pub fn leftover(sample: &papermono_log::LeftoverSample) {
     }
 }
 
+/// Emits ST25R3916 NFC IC identity on PaperMono (`C153`).
+#[cfg(all(feature = "touch", feature = "c153"))]
+pub fn nfc(sample: &papermono_log::NfcIdentitySample) {
+    let mut buf = [0u8; papermono_log::NFC_CAPACITY];
+    if let Ok(line) = papermono_log::format_nfc(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits detected ISO14443-A NFC tag summary on PaperMono (`C153`).
+#[cfg(all(feature = "touch", feature = "c153"))]
+#[allow(dead_code)]
+pub fn nfc_tag(sample: &papermono_log::NfcTagSample) {
+    let mut buf = [0u8; papermono_log::NFC_TAG_CAPACITY];
+    if let Ok(line) = papermono_log::format_nfc_tag(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits Stamp LoRa-1262 (SX1262) status on PaperMono (`C153`).
+#[cfg(all(feature = "touch", feature = "c153"))]
+pub fn lora(sample: &papermono_log::LoraStatusSample) {
+    let mut buf = [0u8; papermono_log::LORA_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora(sample, &mut buf) {
+        emit(line);
+    }
+}
+
 /// Emits battery charging status and IP2315 registers.
 #[cfg(feature = "touch")]
 pub fn charge(sample: &papermono_log::ChargeSample) {

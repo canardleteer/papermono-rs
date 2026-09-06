@@ -79,6 +79,34 @@ fn flag(bit: bool, mask: u16) -> u16 {
     }
 }
 
+#[cfg(feature = "c153")]
+static NFC_ID: core::sync::atomic::AtomicU16 = core::sync::atomic::AtomicU16::new(0);
+
+#[cfg(feature = "c153")]
+fn store_nfc_id(ack: bool, id: u8, rev: u8) {
+    let raw = if ack {
+        0x8000 | ((id as u16) << 8) | (rev as u16)
+    } else {
+        0
+    };
+    NFC_ID.store(raw, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Retrieves the most recent ST25R3916 NFC IC identity on PaperMono (`C153`).
+#[cfg(feature = "c153")]
+pub fn last_nfc() -> Option<papermono_log::NfcIdentitySample> {
+    let raw = NFC_ID.load(core::sync::atomic::Ordering::Relaxed);
+    if (raw & 0x8000) == 0 {
+        None
+    } else {
+        Some(papermono_log::NfcIdentitySample {
+            ack: true,
+            id: ((raw >> 8) & 0x7F) as u8,
+            rev: (raw & 0xFF) as u8,
+        })
+    }
+}
+
 fn store_i2c(sample: I2cSample) {
     let bits = flag(sample.pm1, PM1)
         | flag(sample.ioe, IOE)
@@ -165,11 +193,50 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
             Timer::after(Duration::from_millis(20)).await;
         }
     }
+    #[cfg(not(feature = "c153"))]
     let nfc = ioe::probe_read(
         i2c,
         addresses::ST25R3916_LEFTOVER,
         addresses::ST25R3916_LEFTOVER_DEVICE_ID,
     );
+    #[cfg(feature = "c153")]
+    let nfc = if ioe_ack {
+        // Safe, unattended ST25R3916 NFC discovery on PaperMono (C153):
+        // 1. Assert M5IOE1 PYG4 (IOE1_ENABLE) to power the ST25R3916.
+        let _ = ioe::set_push_pull_output(i2c, m5stack_papermono::nfc::IOE1_ENABLE, true);
+        Timer::after(Duration::from_millis(50)).await;
+        // 2. Query IC identity (command 0x7F) at I2C address 0x50.
+        let ack = if ioe::probe_addr(i2c, m5stack_papermono::nfc::ADDRESS) {
+            let mut id_buf = [0u8; 1];
+            if i2c
+                .write_read(
+                    m5stack_papermono::nfc::ADDRESS,
+                    &[m5stack_papermono::nfc::CMD_READ_IC_IDENTITY],
+                    &mut id_buf,
+                )
+                .is_ok()
+            {
+                let id = m5stack_papermono::nfc::IcIdentity::from_byte(id_buf[0]);
+                store_nfc_id(true, id.ic_type, id.ic_rev);
+                esp_println::println!(
+                    "simple-debug: nfc ack=1 id={:02x} rev={}",
+                    id.ic_type,
+                    id.ic_rev
+                );
+            } else {
+                store_nfc_id(true, 0, 0);
+            }
+            true
+        } else {
+            store_nfc_id(false, 0, 0);
+            false
+        };
+        // 3. Keep RF transmitter safely off (de-assert PYG4).
+        let _ = ioe::set_push_pull_output(i2c, m5stack_papermono::nfc::IOE1_ENABLE, false);
+        ack
+    } else {
+        false
+    };
     let charge = charge_once(i2c, ioe_ack).await;
     store_charge(charge);
     let chg = charge.then;
@@ -197,6 +264,7 @@ pub async fn bring_up(i2c: &mut SysI2c) -> Option<u8> {
         ioe_um,
         tf,
     });
+    crate::nfc::init_status(nfc);
     ioe_addr
 }
 

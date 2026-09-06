@@ -19,7 +19,7 @@ pub mod lora;
 pub mod nfc;
 
 pub use lora::{ChipMode, CommandStatus, RadioStatus, CMD_GET_STATUS};
-pub use nfc::{IcIdentity, CMD_READ_IC_IDENTITY, IC_TYPE_ST25R3916};
+pub use nfc::{IcIdentity, Iso14443aCard, St25r3916, CMD_READ_IC_IDENTITY, IC_TYPE_ST25R3916};
 
 /// Official SKU code for this crate (`C153`).
 pub const SKU: &str = "C153";

@@ -32,6 +32,9 @@ simple-debug: wifi_survey count=10 ch1=2 ch6=5 ch11=2 other=1
 simple-debug: wifi_ap state=active ssid=PaperMono-AP pass=mono2026 ip=192.168.4.1
 simple-debug: wifi_http req=1 path=/ src=192.168.4.2
 simple-debug: imu pose=Portrait0 x=0 y=-16384 z=0
+simple-debug: nfc ack=1 id=05 rev=1
+simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c
+simple-debug: lora ack=1 raw=24 mode=2 cmd=2
 ```
 
 `hello image=` is `simple-debug` or `embassy-debug`. Split glued
@@ -39,10 +42,11 @@ CDC lines on `simple-debug:` as well as newline.
 
 `Scene` carousel (embassy-debug buttons A/B): `splash` →
 `shapes` → `legend` → `bluetooth` → `wifi_survey` → `wifi_ap` →
-`tones` → `targets`. SoftAP CDC may include the fixed demo
+`nfc` → `tones` → `targets`. SoftAP CDC may include the fixed demo
 SSID/password; do not add foreign MAC/BSSID/IRK fields. `imu`
 lines (when `--features orient`) report enclosure pose plus raw
-BMI270 XYZ for axis calibration.
+BMI270 XYZ for axis calibration. `nfc_tag` lines mask middle
+UID bytes on serial for user privacy.
 
 `hello` / `git` / `gpio` repeat every 10 s so a late CDC attach
 still sees identity. Heartbeat is 1 Hz. Edges are 50 ms polls.

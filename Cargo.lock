@@ -872,6 +872,7 @@ dependencies = [
  "esp-println",
  "esp-radio",
  "esp-rtos",
+ "m5stack-papermono",
  "m5stack-papermono-lite",
  "papermono-log",
  "sha2 0.10.9",
@@ -2238,6 +2239,8 @@ dependencies = [
 name = "m5stack-papermono"
 version = "0.1.0"
 dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-mock",
  "m5stack-papermono-lite",
 ]
 
@@ -3111,6 +3114,7 @@ dependencies = [
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-println",
+ "m5stack-papermono",
  "m5stack-papermono-lite",
  "papermono-log",
 ]

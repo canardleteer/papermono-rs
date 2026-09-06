@@ -24,12 +24,21 @@ pub fn run(repo_root: &Path) -> Result<(), Error> {
 
     require_cargo_esp()?;
     fw_clippy(repo_root, "simple-debug-fw", &[])?;
+    fw_clippy(repo_root, "simple-debug-fw", &["--features", "c153"])?;
+    fw_clippy(repo_root, "simple-debug-fw", &["--all-features"])?;
     fw_clippy(repo_root, "embassy-debug-fw", &[])?;
+    fw_clippy(repo_root, "embassy-debug-fw", &["--features", "c153"])?;
+    fw_clippy(repo_root, "embassy-debug-fw", &["--all-features"])?;
     fw_clippy(repo_root, "embassy-debug-fw", &["--no-default-features"])?;
     fw_clippy(
         repo_root,
         "embassy-debug-fw",
         &["--no-default-features", "--features", "touch"],
+    )?;
+    fw_clippy(
+        repo_root,
+        "embassy-debug-fw",
+        &["--no-default-features", "--features", "c153,touch"],
     )?;
     fw_clippy(
         repo_root,

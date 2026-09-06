@@ -123,12 +123,11 @@ a row that asks anyone to invent an unread register map.
 
 ### nyc-flash-id
 
-**Lite partial:** chip ESP32-S3 v0.2, crystal 40 MHz, flash
+**Lite and C153 confirmed:** chip ESP32-S3 v0.2, crystal 40 MHz, flash
 **16 MB**, secure boot and flash encryption disabled. Written
 in [measure.md](../references/measure.md). Still need JEDEC
 manufacturer bytes, PSRAM size (Features did not name it),
-eFuse flash mode/voltage, and the same row on **`C153`** (prepared
-on `feat/papermono-discovery`).
+and eFuse flash mode/voltage.
 
 With the unit in download mode and a human ask, run `esptool.py
 flash-id` / `espflash board-info`. Record **SKU**, chip rev,
@@ -137,22 +136,21 @@ Do not print MAC.
 
 ### nyc-usb-vid
 
-**Lite run and download are written** (`303a:1001`, Espressif
+**Lite and C153 run and download are written** (`303a:1001`, Espressif
 USB JTAG/serial debug unit). Lite run (2026-09-02): one
 ACM + vendor JTAG; no second CDC; no CH343;
-`probe-rs list` → `EspJtag`. Still need **PaperMono
-(`C153`)** run and download (target `303a:1001`, prepared on
-`feat/papermono-discovery`). Do not commit iSerial. Write
+`probe-rs list` → `EspJtag`. C153 run and download mode confirmed
+identical (`303a:1001`, 2026-09-05). Do not commit iSerial. Write
 [flashing.md](../references/flashing.md).
 
 ### nyc-download-mode
 
-**Lite written (2026-09-02):** hold until first blink is
+**Lite and C153 written:** hold until first blink is
 about **2 s** (operator stopwatch; matches the official
 note). The blinking die is the small **red** next to the
 power button (`LED_EN_PP`), not the RGB window. USB IDs
-did not change. `detect-connected --probe` (`NoReset`)
-already returned board-info. `C153` not measured.
+do not change. `detect-connected --probe` (`NoReset`) and
+`backup-factory-firmware` succeed across both SKUs.
 Write [flashing.md](../references/flashing.md),
 [power-and-sleep.md](../references/power-and-sleep.md).
 
@@ -168,12 +166,13 @@ SPIRAM; that is intent, not a log.
 
 ### nyc-partition-table
 
-**Lite partial:** table at `0x8000` matches UserDemo
+**Lite and C153 confirmed:** table at `0x8000` matches UserDemo
 `partitions.csv` (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`,
-factory `0x10000`/`0xF00000`). Written in
-[measure.md](../references/measure.md) /
-[flashing.md](../references/flashing.md). Still need **`C153`**.
-Do not commit the dump.
+factory `0x10000`/`0xF00000`). Verified on Lite 2026-09-01 and
+on C153 2026-09-05 (`id-e3e5915e`). Factory app descriptor names
+project `PaperMono-UserDemo`, IDF `v5.5.1`, version `c78f6c5-dirty`
+on both. Written in [measure.md](../references/measure.md) /
+[flashing.md](../references/flashing.md). Do not commit the dump.
 
 ### nyc-nvs-phy
 
@@ -467,29 +466,29 @@ Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) only.
 
 ### nyc-lora-ack
 
-C153 only. **Blocked until a `C153` is in hand.** Discovery
-primitives and status decoding are implemented in `crates/m5stack-papermono`
-(`lora` module, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). After
-Stamp rails ([nyc-stamp-lora](#nyc-stamp-lora)): mux
-GPIO39–41 off JTAG, honor BUSY, SPI status of the **SX1262
-die**. Product band 868–923 MHz; UserDemo 868.0 MHz is the
-EU demo default. Crate: `lora-phy` `Sx1262` is a later
-pass-with-wrapper; rails stay in `m5stack-papermono`.
+C153 only. **Confirmed live on `C153`** via `embassy-debug-fw` (`--features c153`).
+Discovery primitives and status decoding in `crates/m5stack-papermono`
+(`lora` module, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). With M5PM1 `G2`
+configured as push-pull output (`GPIO_DRV` `0x13`), `3V3_L2_LoRa` powers up,
+`SX_NRST` (`PYG10`) is released, `SX_BUSY` (`GPIO21`) goes low, and the SX1262
+responds to `CMD_GET_STATUS` with `raw=0xAA` (`mode=2` `STBY_RC`, `cmd=5`).
+Product band 868–923 MHz; UserDemo 868.0 MHz is the EU demo default. Crate:
+`lora-phy` `Sx1262` is a later pass-with-wrapper; rails stay in `m5stack-papermono`.
 Tracked on branch `feat/papermono-discovery`.
 [pin-map.md](../references/pin-map.md),
 [docs/CRATES.md](../../../../docs/CRATES.md).
 
 ### nyc-nfc-ack
 
-C153 only. **Blocked until a `C153` is in hand.** Discovery
-primitives and identity parsing are implemented in `crates/m5stack-papermono`
-(`nfc` module, `CMD_READ_IC_IDENTITY` `0x7F`, `IcIdentity`). NFC
-rail on (M5IOE1 `PYG4` high), `0x50` ACK, UserDemo `probeNfcIdentity`
-(`0x7F` / type `0x05`; cite those constants, not an unread register
-map). Park RF. Do not leave the field on in default images.
-Also closes the NFC half of [nyc-i2c-ack](#nyc-i2c-ack).
-No usable `st25r3916` crate; do not wrap `st25r95`. Lite:
-[nyc-lite-nfc-pads](#nyc-lite-nfc-pads) and `nfc=0` only.
+C153 only. **Confirmed live on `C153`** via `embassy-debug-fw` (`--features c153`).
+Discovery primitives, identity parsing, and ISO14443-A poller in
+`crates/m5stack-papermono` (`nfc` module, `CMD_READ_IC_IDENTITY` `0x7F`,
+`IcIdentity`, `St25r3916`). With M5IOE1 `PYG4` asserted, ST25R3916 ACKs at I2C
+address `0x50`, responds to command `0x7F` with `id=0x05` (ST25R3916), `rev=2`
+(`nfc ack=1 id=05 rev=2`), and executes ISO14443-A polling, anticollision, and
+UID reading (`simple-debug: nfc_tag type=iso14443a`). RF is kept safely
+parked between polls. Also closes the NFC half of [nyc-i2c-ack](#nyc-i2c-ack).
+Lite: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) and `nfc=0` only.
 Tracked on branch `feat/papermono-discovery`.
 [pin-map.md](../references/pin-map.md),
 [user-demo.md](../references/user-demo.md),

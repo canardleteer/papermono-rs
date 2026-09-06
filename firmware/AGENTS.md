@@ -23,18 +23,19 @@ excludes `simple-debug-fw` and `embassy-debug-fw`.
 
 | Path | Stack | First SKU | Status |
 | --- | --- | --- | --- |
-| `simple-debug/` | blocking `esp-hal` | Lite (`m5stack-papermono-lite`) | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
-| `embassy-debug/` | `esp-hal` + Embassy | Lite (`m5stack-papermono-lite`) | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep` + `radio`. `mic` opt-in. Eight OTP cards (BLE + Wi-Fi survey/SoftAP), no LUT |
+| `simple-debug/` | blocking `esp-hal` | Lite baseline (`C153-Lite`), or Full with `--features c153` | Member. USB-Serial/JTAG hello / hb / edge. No I2C / EPD / latch |
+| `embassy-debug/` | `esp-hal` + Embassy | Lite baseline (`C153-Lite`), or Full with `--features c153` | Member. `image=embassy-debug`. Default `touch` + `panel` + `sleep` + `radio` + `orient`. `mic` opt-in. Eight OTP cards, no LUT. `--features c153` adds NFC and LoRa discovery |
 
 `esp-idf-hal` remains a valid stack (hardware skill `rust.md`); it
 is not a first image. Default images depend on
-`m5stack-papermono-lite` only. A C153 image depends on
-`m5stack-papermono` when it uses NFC or LoRa. SKU split:
+`m5stack-papermono-lite` only. Compiling with `--features c153` brings in
+`m5stack-papermono` for NFC and LoRa. SKU split:
 [crates/AGENTS.md](../crates/AGENTS.md).
 
-Envelope for the first images:
+Envelope for the default builds:
 
-- No NFC, no LoRa
+- No NFC, no LoRa (default images leave lines quiescent;
+  `--features c153` enables discovery probes)
 - No waveform LUT (OTP first)
 - GPIO45/46 are PDM, not a power latch
 - Park IP2315 off the system I2C bus except a gated charge

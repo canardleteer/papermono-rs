@@ -1,8 +1,11 @@
-//! PaperMono-Lite simple-debug tutorial firmware.
+//! PaperMono simple-debug tutorial firmware.
 //!
 //! # Purpose & Architecture
 //! This firmware serves as an introductory, bare-metal proof-of-life reference
-//! implementation for the M5Stack PaperMono-Lite (`C153-Lite`). It demonstrates
+//! implementation for the M5Stack PaperMono-Lite (`C153-Lite`) and PaperMono (`C153`).
+//! Core functionality is shared across both models, operating as a clean Lite baseline
+//! by default. Compiling with `--features c153` activates the PaperMono (`C153`)
+//! board identity and verifies Full-model pin configurations. It demonstrates
 //! fundamental embedded Rust concepts described in *The Embedded Rust Book* and
 //! *The Rust on ESP Book*:
 //!
@@ -56,7 +59,10 @@ use esp_hal::main;
 use esp_hal::rtc_cntl::SocResetReason;
 use esp_hal::system::reset_reason;
 use esp_println::print;
+#[cfg(feature = "c153")]
+use m5stack_papermono::SKU;
 use m5stack_papermono_lite::pins;
+#[cfg(not(feature = "c153"))]
 use m5stack_papermono_lite::SKU;
 use papermono_log::{
     format_edge, format_git, format_gpio, format_heartbeat, format_hello, Edge, GpioSample, Hello,
@@ -77,6 +83,17 @@ const _: () = {
     assert!(pins::TOUCH_INT == 4);
     assert!(pins::IOE1_IRQ == 7);
     assert!(pins::EPD_BUSY == 18);
+};
+
+#[cfg(feature = "c153")]
+const _: () = {
+    assert!(m5stack_papermono::lora::IRQ == 5);
+    assert!(m5stack_papermono::nfc::IRQ == 6);
+    assert!(m5stack_papermono::lora::BUSY == 21);
+    assert!(m5stack_papermono::lora::SPI_MOSI == 38);
+    assert!(m5stack_papermono::lora::SPI_CLK == 39);
+    assert!(m5stack_papermono::lora::SPI_MISO == 40);
+    assert!(m5stack_papermono::lora::NSS == 41);
 };
 
 /// Firmware entry point executed after the ESP-IDF second-stage bootloader transfers control.

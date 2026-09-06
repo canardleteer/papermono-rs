@@ -214,9 +214,12 @@ impl From<FirmwareImageArg> for FirmwareImage {
 pub struct BuildFwCliArgs {
     /// `simple-debug` or `embassy-debug`.
     pub image: FirmwareImageArg,
-    /// Cargo features on that package (`mic` / `radio` / `sleep` on embassy-debug).
+    /// Cargo features on that package (`mic` / `radio` / `sleep` / `c153` on embassy-debug).
     #[arg(long)]
     pub features: Vec<String>,
+    /// Pass `--all-features` to build with all features enabled.
+    #[arg(long)]
+    pub all_features: bool,
     /// Build the debug profile instead of `--profile release-fw`.
     #[arg(long)]
     pub debug: bool,
@@ -267,6 +270,7 @@ impl Cli {
                     &BuildFwArgs {
                         image: args.image.into(),
                         features: args.features,
+                        all_features: args.all_features,
                         release: !args.debug,
                         no_default_features: args.no_default_features,
                     },
@@ -632,6 +636,18 @@ mod tests {
             super::Command::BuildFw(args) => {
                 assert_eq!(args.features, ["touch"]);
                 assert!(args.no_default_features);
+                assert!(!args.all_features);
+            }
+            other => panic!("expected BuildFw, got {other:?}"),
+        }
+
+        let all_features =
+            Cli::try_parse_from(["xtask", "build-fw", "embassy-debug", "--all-features"])
+                .expect("all-features");
+        match all_features.command {
+            super::Command::BuildFw(args) => {
+                assert!(args.all_features);
+                assert!(!args.no_default_features);
             }
             other => panic!("expected BuildFw, got {other:?}"),
         }

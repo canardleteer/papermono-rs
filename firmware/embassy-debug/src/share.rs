@@ -62,8 +62,9 @@ const fn scene_byte(scene: Scene) -> u8 {
         Scene::Bluetooth => 3,
         Scene::WifiSurvey => 4,
         Scene::WifiAp => 5,
-        Scene::Tones => 6,
-        Scene::Targets => 7,
+        Scene::Nfc => 6,
+        Scene::Tones => 7,
+        Scene::Targets => 8,
     }
 }
 
@@ -76,8 +77,9 @@ const fn from_scene_byte(byte: u8) -> Option<Scene> {
         3 => Some(Scene::Bluetooth),
         4 => Some(Scene::WifiSurvey),
         5 => Some(Scene::WifiAp),
-        6 => Some(Scene::Tones),
-        7 => Some(Scene::Targets),
+        6 => Some(Scene::Nfc),
+        7 => Some(Scene::Tones),
+        8 => Some(Scene::Targets),
         _ => None,
     }
 }
