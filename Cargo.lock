@@ -3200,6 +3200,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "st25r3916"
+version = "0.1.0"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-mock",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
