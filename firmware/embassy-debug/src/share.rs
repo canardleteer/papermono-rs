@@ -57,14 +57,16 @@ pub fn last_scene() -> Option<Scene> {
 const fn scene_byte(scene: Scene) -> u8 {
     match scene {
         Scene::Splash => 0,
-        Scene::Shapes => 1,
-        Scene::Legend => 2,
-        Scene::Bluetooth => 3,
-        Scene::WifiSurvey => 4,
-        Scene::WifiAp => 5,
-        Scene::Nfc => 6,
-        Scene::Tones => 7,
-        Scene::Targets => 8,
+        Scene::LoraScan => 1,
+        Scene::Lora => 2,
+        Scene::Nfc => 3,
+        Scene::WifiAp => 4,
+        Scene::WifiSurvey => 5,
+        Scene::Bluetooth => 6,
+        Scene::Legend => 7,
+        Scene::Shapes => 8,
+        Scene::Tones => 9,
+        Scene::Targets => 10,
     }
 }
 
@@ -72,14 +74,16 @@ const fn scene_byte(scene: Scene) -> u8 {
 const fn from_scene_byte(byte: u8) -> Option<Scene> {
     match byte {
         0 => Some(Scene::Splash),
-        1 => Some(Scene::Shapes),
-        2 => Some(Scene::Legend),
-        3 => Some(Scene::Bluetooth),
-        4 => Some(Scene::WifiSurvey),
-        5 => Some(Scene::WifiAp),
-        6 => Some(Scene::Nfc),
-        7 => Some(Scene::Tones),
-        8 => Some(Scene::Targets),
+        1 => Some(Scene::LoraScan),
+        2 => Some(Scene::Lora),
+        3 => Some(Scene::Nfc),
+        4 => Some(Scene::WifiAp),
+        5 => Some(Scene::WifiSurvey),
+        6 => Some(Scene::Bluetooth),
+        7 => Some(Scene::Legend),
+        8 => Some(Scene::Shapes),
+        9 => Some(Scene::Tones),
+        10 => Some(Scene::Targets),
         _ => None,
     }
 }

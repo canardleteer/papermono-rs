@@ -48,10 +48,22 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
 4. **RF Safety**: Do not configure continuous transmission or unmodulated
    carrier in standard diagnostic runs. Keep transmission duty cycles compliant
    with local regulatory provisions (868 MHz EU / 915 MHz US).
-5. **Secondary Provenance (UserDemo vs Schematic)**:
-   The official factory demo firmware
-   ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
-   uses RadioLib SX1262 with `DIO2` configured as the RF switch, operating at
-   868.0 MHz with 8 MHz SPI. The schematic routes `PYB_LoRa_ANT_SW` to M5IOE1
-   `PYG2`. Both descriptions are retained; firmware should respect the
-   schematic switch line while allowing optional DIO2 switching.
+5. **Antenna Path and Switch Configuration**:
+   The schematic routes `PYB_LoRa_ANT_SW` to M5IOE1 `PYG2`. On hardware,
+   this line controls an RF switch that gates the built-in FPC antenna to
+   the module's RF front-end: `PYG2` MUST be driven HIGH to connect the
+   antenna (driving it LOW disconnects the antenna, severely attenuating
+   signals). In addition, SX1262 `DIO2` must be configured as the internal
+   RF switch control (`set_dio2_as_rf_switch_ctrl(true)`), TCXO powered at
+   3.0 V via DIO3 (`set_dio3_as_tcxo_ctrl`), and internal regulator set to
+   `REGULATOR_LDO`.
+6. **Confirmed Live Verification**:
+   Hardware verified live on PaperMono (`C153`) (2026-09-05):
+   - SPI interface, status queries (`0xC0` → `0xAA` `STBY_RC`), and power
+     gating via M5PM1 `G2` and M5IOE1 `PYG10`.
+   - Bench-safe test TX pings clamped to +14 dBm (25 mW) with 60 mA OCP.
+   - Live over-the-air packet demodulation of 50-byte Meshtastic LongFast
+     broadcast frames on 906.875 MHz (SF11 / BW 250 kHz / CR 4/5 /
+     Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, confirming the
+     complete RF receive chain through the built-in FPC antenna.
+   - Continuous 104-channel US915 sweeper with double-duty scanning.

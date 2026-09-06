@@ -323,3 +323,30 @@ pub fn imu(pose: &str, x: i16, y: i16, z: i16) {
         emit(line);
     }
 }
+
+/// Emits Stamp LoRa-1262 packet transmission telemetry (`LoraTxSample`).
+#[allow(dead_code)]
+pub fn lora_tx(sample: &papermono_log::LoraTxSample) {
+    let mut buf = [0u8; papermono_log::LORA_TX_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_tx(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits Stamp LoRa-1262 packet reception telemetry (`LoraRxSample`).
+#[allow(dead_code)]
+pub fn lora_rx(sample: &papermono_log::LoraRxSample) {
+    let mut buf = [0u8; papermono_log::LORA_RX_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_rx(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits Stamp LoRa-1262 US915 channel scan telemetry (`LoraScanSample`).
+#[allow(dead_code)]
+pub fn lora_scan(sample: &papermono_log::LoraScanSample) {
+    let mut buf = [0u8; papermono_log::LORA_SCAN_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_scan(sample, &mut buf) {
+        emit(line);
+    }
+}

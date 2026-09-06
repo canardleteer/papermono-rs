@@ -454,26 +454,34 @@ part. Dedicated summary: [stamp-lora-1262.md](stamp-lora-1262.md).
 | PaperMono band | do not copy 150–960 MHz | **868–923 MHz**, built-in FPC |
 | Nets | SPI MOSI/MISO/CLK, NSS, BUSY, IRQ | plus `LoRa_EN` (PM1 G2), `SX_NRST` (IOE PYG10), `SX_ANT_SW` (IOE PYG2) |
 
-Official HTML does **not** close silicon. On `C153`: EN /
-NRST / ANT_SW polarity, which Stamp variant is populated,
-TCXO vs crystal, SPI Hz, antenna path. UserDemo RadioLib
-(868.0 MHz, 8 MHz SPI, TCXO 3.0 V, LDO, DIO2 as RF switch)
-is intent. Name DIO2 vs `SX_ANT_SW` in
-[sources.md](../references/sources.md); do not flatten.
+**Confirmed live on `C153`:** `LoRa_EN` (M5PM1 `G2`) push-pull active
+high; `SX_NRST` (M5IOE1 `PYG10`) push-pull active low; `SX_ANT_SW`
+(M5IOE1 `PYG2`) push-pull active high (must be driven HIGH to
+connect the built-in FPC antenna; driving LOW disconnects it); TCXO at
+3.0 V via DIO3 (`TCXO_CTRL_3_0V`); internal regulator mode `REGULATOR_LDO`;
+and DIO2 configured as internal RF switch. Over-the-air packet reception
+confirmed on US915 band with built-in FPC antenna.
 Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) only.
 [pin-map.md](../references/pin-map.md),
+[stamp-lora-1262.md](stamp-lora-1262.md),
 [datasheets.md](datasheets.md).
 
 ### nyc-lora-ack
 
 C153 only. **Confirmed live on `C153`** via `embassy-debug-fw` (`--features c153`).
-Discovery primitives and status decoding in `crates/m5stack-papermono`
-(`lora` module, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). With M5PM1 `G2`
-configured as push-pull output (`GPIO_DRV` `0x13`), `3V3_L2_LoRa` powers up,
-`SX_NRST` (`PYG10`) is released, `SX_BUSY` (`GPIO21`) goes low, and the SX1262
-responds to `CMD_GET_STATUS` with `raw=0xAA` (`mode=2` `STBY_RC`, `cmd=5`).
-Product band 868–923 MHz; UserDemo 868.0 MHz is the EU demo default. Crate:
-`lora-phy` `Sx1262` is a later pass-with-wrapper; rails stay in `m5stack-papermono`.
+Discovery primitives, driver, and status decoding in `crates/m5stack-papermono`
+(`lora` module, `Sx1262`, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). With M5PM1
+`G2` configured as push-pull output (`GPIO_DRV` `0x13`), `3V3_L2_LoRa` powers
+up, `SX_NRST` (`PYG10`) is released, `SX_BUSY` (`GPIO21`) goes low, and the
+SX1262 responds to `CMD_GET_STATUS` with `raw=0xAA` (`mode=2` `STBY_RC`,
+`cmd=5`). Interactive test cards in `embassy-debug-fw` provide user-controlled
+915 MHz test ping (`lora_tx`, clamped to +14 dBm / 25 mW with 60 mA OCP),
+up to 60 s sniffer window (`lora_rx` on 906.875 MHz / 917.625 MHz), and a
+104-channel US915 sweeper (`lora_scan`) with double-duty scanning and
+buzzer beep feedback. Confirmed live over-the-air demodulation of 50-byte
+Meshtastic LongFast broadcast frames on 906.875 MHz at -107 dBm RSSI and
+-16 dB SNR with acoustic tone feedback. Zero continuous background TX;
+radio immediately returns to standby and powers down.
 Tracked on branch `feat/papermono-discovery`.
 [pin-map.md](../references/pin-map.md),
 [docs/CRATES.md](../../../../docs/CRATES.md).

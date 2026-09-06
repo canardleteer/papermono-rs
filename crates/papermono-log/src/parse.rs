@@ -66,6 +66,12 @@ pub enum LineKind {
     NfcTag,
     /// Stamp LoRa-1262 (SX1262) status (`lora`).
     Lora,
+    /// Stamp LoRa-1262 (SX1262) packet transmission report (`lora_tx`).
+    LoraTx,
+    /// Stamp LoRa-1262 (SX1262) packet reception report (`lora_rx`).
+    LoraRx,
+    /// Stamp LoRa-1262 (SX1262) US915 channel scan report (`lora_scan`).
+    LoraScan,
     /// Prefix matched, first token unknown.
     Unknown,
 }
@@ -177,6 +183,9 @@ pub fn classify(body: &str) -> LineKind {
         "nfc" => LineKind::Nfc,
         "nfc_tag" => LineKind::NfcTag,
         "lora" => LineKind::Lora,
+        "lora_tx" => LineKind::LoraTx,
+        "lora_rx" => LineKind::LoraRx,
+        "lora_scan" => LineKind::LoraScan,
         _ => LineKind::Unknown,
     }
 }
@@ -379,6 +388,27 @@ mod tests {
                 .unwrap()
                 .kind,
             LineKind::Lora
+        );
+        assert_eq!(
+            records("simple-debug: lora_tx freq=915.000 pwr=14 sf=7 bw=125 time_ms=58 status=ok\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::LoraTx
+        );
+        assert_eq!(
+            records("simple-debug: lora_rx freq=917.625 rssi=-84 snr=7 len=16 preview=ff..0a\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::LoraRx
+        );
+        assert_eq!(
+            records("simple-debug: lora_scan slot=62 freq=917.625 rssi=-84 packets=3\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::LoraScan
         );
     }
 

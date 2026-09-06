@@ -1,11 +1,12 @@
 # `papermono-rs`
 
 > [!NOTE]
-> PaperMono (`C153`) discovery is now underway on the `feat/papermono-discovery`
-> branch! The factory backup of our physical `C153` unit has been captured and
-> verified, confirming identical 16 MB flash geometry and partition tables to
-> PaperMono-Lite. Firmware packages now support both models with shared core
-> functionality, unlocking Full-model NFC and LoRa discovery via `--features c153`.
+> PaperMono (`C153`) hardware discovery is now underway on the
+> `feat/papermono-discovery` branch! Both ST25R3916 ISO14443-A contactless
+> card reading and Stamp LoRa-1262 (SX1262) over-the-air packet reception
+> and channel sweeping have been confirmed live on physical `C153` silicon.
+> Firmware packages support both models with shared core functionality,
+> unlocking Full-model NFC and LoRa features via `--features c153`.
 
 Embedded Rust tooling and crates for the
 [M5Stack PaperMono](https://docs.m5stack.com/en/core/PaperMono) and

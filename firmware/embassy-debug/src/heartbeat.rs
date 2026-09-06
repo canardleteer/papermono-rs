@@ -54,7 +54,7 @@ pub struct Inputs {
     /// Leftover NFC IRQ pin on Lite (`GPIO6`).
     pub nfc_irq: Input<'static>,
     /// Leftover SX1262 BUSY pin on Lite (`GPIO21`).
-    pub sx_busy: Input<'static>,
+    pub sx_busy: Option<Input<'static>>,
 }
 
 /// Helper function to read either a directly owned hardware pin or fall back to an atomic mirror.
@@ -156,7 +156,7 @@ pub async fn run(pins: Inputs, hello: Hello) {
             cdc::leftover(&LeftoverSample {
                 lora_irq: lora_irq.is_high(),
                 nfc_irq: nfc_irq.is_high(),
-                sx_busy: sx_busy.is_high(),
+                sx_busy: sx_busy.as_ref().map(|p| p.is_high()).unwrap_or(false),
             });
             #[cfg(feature = "radio")]
             if let Some(n) = crate::radio::last_wifi() {

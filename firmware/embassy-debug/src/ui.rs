@@ -3,8 +3,8 @@
 //! # Architecture & Navigation Model
 //! This module coordinates the high-level interactive user experience:
 //!
-//! - **Eight-Card Finite State Machine**: Cycles sequentially through the UI scenes:
-//!   `Splash` ↔ `Shapes` ↔ `Legend` ↔ `Bluetooth` ↔ `WifiSurvey` ↔ `WifiAp` ↔ `Tones` ↔ `Targets`.
+//! - **Eleven-Card Finite State Machine**: Cycles sequentially through the UI scenes:
+//!   `Splash` ↔ `LoraScan` ↔ `Lora` ↔ `Nfc` ↔ `WifiAp` ↔ `WifiSurvey` ↔ `Bluetooth` ↔ `Legend` ↔ `Shapes` ↔ `Tones` ↔ `Targets`.
 //! - **Physical Button Controls**:
 //!   - `BUTTON A` (`GPIO2`): Short press (release edge) switches to previous card.
 //!     Long press (>2 s) triggers low-power sleep; long press (~1 s) triggers an
@@ -341,7 +341,13 @@ struct DrawnRevs {
 const fn scene_allows_soft_refresh(scene: Scene) -> bool {
     matches!(
         scene,
-        Scene::Legend | Scene::Bluetooth | Scene::WifiSurvey | Scene::WifiAp | Scene::Nfc
+        Scene::Legend
+            | Scene::Bluetooth
+            | Scene::WifiSurvey
+            | Scene::WifiAp
+            | Scene::Nfc
+            | Scene::Lora
+            | Scene::LoraScan
     )
 }
 
@@ -714,6 +720,128 @@ async fn wait_nav(
                                 crate::cdc::nfc_tag(&sample);
                             }
                         }
+                        return Some(Nav::Refresh);
+                    }
+                }
+
+                if ctx.scene == Scene::Lora {
+                    let maybe_page = display::framebuffer_to_page(sample.x, sample.y, ctx.rotation);
+                    let is_tx_hit = maybe_page
+                        .is_some_and(|(px, py)| draw::lora_tx_btn_hit(px, py, ctx.rotation));
+                    let is_rx_hit = maybe_page
+                        .is_some_and(|(px, py)| draw::lora_rx_btn_hit(px, py, ctx.rotation));
+
+                    if is_tx_hit {
+                        crate::beep::click();
+
+                        // 1. Immediately highlight TX button box on glass:
+                        let (bx, by, bw, bh) = draw::lora_tx_btn_rect(ctx.rotation);
+                        draw::invert_page_rect(
+                            &mut planes.bw,
+                            &mut planes.red,
+                            bx,
+                            by,
+                            bw,
+                            bh,
+                            ctx.rotation,
+                        );
+                        panel
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .await;
+
+                        // 2. Perform safe single-burst transmission:
+                        if let Some(sample) = crate::lora::transmit_ping(i2c).await {
+                            crate::beep::click();
+                            crate::cdc::lora_tx(&sample);
+                        }
+                        return Some(Nav::Refresh);
+                    } else if is_rx_hit {
+                        crate::beep::click();
+
+                        // 1. Set listening state and render listening card on glass:
+                        let target_freq = crate::lora::current_sniffer_freq_hz();
+                        crate::lora::set_listening_state(target_freq / 1_000);
+                        draw::render(
+                            ctx.scene,
+                            &mut planes.bw,
+                            &mut planes.red,
+                            None,
+                            ctx.rotation,
+                        );
+                        panel
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .await;
+
+                        // 2. Perform up to 60s sniffer window (aborted by touch or buttons):
+                        match crate::lora::listen_rx(i2c, btn_a, btn_b, tp).await {
+                            Ok(Some(sample)) => {
+                                crate::beep::click();
+                                crate::cdc::lora_rx(&sample);
+                            }
+                            Ok(None) => {}
+                            Err(_) => {}
+                        }
+                        return Some(Nav::Refresh);
+                    }
+                }
+
+                #[cfg(feature = "c153")]
+                if ctx.scene == Scene::LoraScan {
+                    let maybe_page = display::framebuffer_to_page(sample.x, sample.y, ctx.rotation);
+                    let hit_scan = maybe_page
+                        .is_some_and(|(px, py)| draw::lora_scan_action_hit(px, py, ctx.rotation));
+
+                    if hit_scan {
+                        crate::beep::click();
+
+                        // 1. Immediately indicate active scan state and render [ STOP SCAN ]:
+                        crate::lora::set_scanning(true);
+                        draw::render(
+                            ctx.scene,
+                            &mut planes.bw,
+                            &mut planes.red,
+                            None,
+                            ctx.rotation,
+                        );
+                        panel
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .await;
+
+                        // Debounce initial tap:
+                        for _ in 0..20 {
+                            if tp.is_high() {
+                                break;
+                            }
+                            Timer::after(Duration::from_millis(20)).await;
+                        }
+
+                        // Run continuous scan sweeps across the 104 channels:
+                        while crate::lora::run_scan_sweep(i2c, btn_a, btn_b, tp).await {
+                            draw::render(
+                                ctx.scene,
+                                &mut planes.bw,
+                                &mut planes.red,
+                                None,
+                                ctx.rotation,
+                            );
+                            panel
+                                .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                                .await;
+                            if btn_a.is_low() || btn_b.is_low() || tp.is_low() {
+                                break;
+                            }
+                        }
+
+                        crate::lora::set_scanning(false);
+
+                        // Debounce stop tap:
+                        for _ in 0..20 {
+                            if tp.is_high() {
+                                break;
+                            }
+                            Timer::after(Duration::from_millis(20)).await;
+                        }
+
                         return Some(Nav::Refresh);
                     }
                 }

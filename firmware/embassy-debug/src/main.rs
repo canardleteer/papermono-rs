@@ -50,6 +50,8 @@ mod draw;
 mod heartbeat;
 #[cfg(feature = "touch")]
 mod ioe;
+#[cfg(feature = "touch")]
+pub mod lora;
 #[cfg(feature = "mic")]
 mod mic;
 #[cfg(feature = "touch")]
@@ -236,16 +238,34 @@ async fn main(spawner: Spawner) -> ! {
 
         // Safe SX1262 LoRa module discovery probe on PaperMono (C153).
         #[cfg(feature = "c153")]
-        probe_lora(
-            &mut i2c,
-            peripherals.SPI3,
-            peripherals.GPIO38,
-            peripherals.GPIO39,
-            peripherals.GPIO40,
-            peripherals.GPIO41,
-            &sx_busy,
-        )
-        .await;
+        {
+            use esp_hal::gpio::{Level, Output, OutputConfig};
+            use esp_hal::spi::master::{Config, Spi};
+            use esp_hal::time::Rate;
+
+            let nss = Output::new(peripherals.GPIO41, Level::High, OutputConfig::default());
+            if let Ok(spi) = Spi::new(
+                peripherals.SPI3,
+                Config::default().with_frequency(Rate::from_mhz(8)),
+            ) {
+                let spi = spi
+                    .with_sck(peripherals.GPIO39)
+                    .with_mosi(peripherals.GPIO38)
+                    .with_miso(peripherals.GPIO40);
+                lora::init_hardware(spi, nss, sx_busy).await;
+                if lora::probe_and_park(&mut i2c).await {
+                    let card_state = lora::card_state();
+                    if let lora::LoraCardState::Idle { raw_status, .. } = card_state {
+                        store_lora(papermono_log::LoraStatusSample {
+                            ack: true,
+                            raw: raw_status,
+                            mode: (raw_status >> 4) & 0x07,
+                            cmd: (raw_status >> 1) & 0x07,
+                        });
+                    }
+                }
+            }
+        }
 
         // Optional PDM microphone sampling task.
         #[cfg(feature = "mic")]
@@ -290,6 +310,11 @@ async fn main(spawner: Spawner) -> ! {
             // Spawn the interactive UI card navigator task.
             spawner.spawn(ui::run(i2c, panel, btn_a, btn_b, tp, busy, lpwr).unwrap());
 
+            #[cfg(feature = "c153")]
+            let heartbeat_sx_busy = None;
+            #[cfg(not(feature = "c153"))]
+            let heartbeat_sx_busy = Some(sx_busy);
+
             // Spawn the background heartbeat and telemetry reporter task.
             spawner.spawn(
                 heartbeat::run(
@@ -303,7 +328,7 @@ async fn main(spawner: Spawner) -> ! {
                         busy: None,
                         lora_irq,
                         nfc_irq,
-                        sx_busy,
+                        sx_busy: heartbeat_sx_busy,
                     },
                     hello,
                 )
@@ -318,6 +343,11 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     // Fallback heartbeat task if panel feature is disabled.
+    #[cfg(feature = "c153")]
+    let fallback_sx_busy = None;
+    #[cfg(not(feature = "c153"))]
+    let fallback_sx_busy = Some(sx_busy);
+
     spawner.spawn(
         heartbeat::run(
             heartbeat::Inputs {
@@ -330,7 +360,7 @@ async fn main(spawner: Spawner) -> ! {
                 busy: Some(busy),
                 lora_irq,
                 nfc_irq,
-                sx_busy,
+                sx_busy: fallback_sx_busy,
             },
             hello,
         )
@@ -396,95 +426,5 @@ pub fn last_lora() -> Option<papermono_log::LoraStatusSample> {
             mode: ((raw >> 4) & 0x07) as u8,
             cmd: (raw & 0x07) as u8,
         })
-    }
-}
-
-/// Queries the SX1262 LoRa transceiver status byte over SPI3.
-///
-/// Hardware sequencing follows Semtech SX1262 datasheet Section 13.5.1
-/// and M5Stack PaperMono schematic:
-/// 1. Asserts NSS high (inactive).
-/// 2. Holds reset low while enabling `3V3_L2_LoRa` rail via M5PM1 G2 push-pull.
-/// 3. Releases SX1262 reset via M5IOE1 `PYG10` (`IOE1_RESET`).
-/// 4. Leaves RF switch (`PYG2`) grounded to prevent transmission.
-/// 5. Awaits BUSY pin going low (transceiver ready).
-/// 6. Sends `CMD_GET_STATUS` (`0xC0`), logs and stores decoded `RadioStatus`.
-/// 7. Parks the radio rails safely (asserts reset low, turns off PMIC G2).
-#[cfg(all(feature = "touch", feature = "c153"))]
-async fn probe_lora(
-    i2c: &mut ioe::SysI2c,
-    spi3: esp_hal::peripherals::SPI3<'_>,
-    mosi: esp_hal::peripherals::GPIO38<'_>,
-    sclk: esp_hal::peripherals::GPIO39<'_>,
-    miso: esp_hal::peripherals::GPIO40<'_>,
-    nss_pin: esp_hal::peripherals::GPIO41<'_>,
-    busy: &Input<'_>,
-) {
-    use esp_hal::gpio::{Level, Output, OutputConfig};
-    use esp_hal::spi::master::{Config, Spi};
-    use esp_hal::time::Rate;
-    use m5stack_papermono::lora;
-    use m5stack_papermono_lite::addresses;
-
-    let mut nss = Output::new(nss_pin, Level::High, OutputConfig::default());
-
-    // 1. Hold reset low while powering up the 3V3_L2_LoRa rail to guarantee a clean reset.
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_ANTENNA_SWITCH, false);
-    {
-        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
-        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, true);
-    }
-    Timer::after(Duration::from_millis(10)).await;
-
-    // 2. Release hardware reset line (high).
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, true);
-    Timer::after(Duration::from_millis(20)).await;
-
-    // 3. Await BUSY pin going low (transceiver ready).
-    let mut ready = false;
-    for _ in 0..20 {
-        if busy.is_low() {
-            ready = true;
-            break;
-        }
-        Timer::after(Duration::from_millis(5)).await;
-    }
-
-    if ready {
-        if let Ok(spi) = Spi::new(spi3, Config::default().with_frequency(Rate::from_mhz(8))) {
-            let mut spi = spi.with_sck(sclk).with_mosi(mosi).with_miso(miso);
-
-            nss.set_low();
-            let mut buf = [lora::CMD_GET_STATUS, 0x00];
-            let res = spi.transfer(&mut buf);
-            nss.set_high();
-
-            if res.is_ok() {
-                let status = lora::RadioStatus::from_byte(buf[1]);
-                let sample = papermono_log::LoraStatusSample {
-                    ack: true,
-                    raw: buf[1],
-                    mode: (buf[1] >> 4) & 0x07,
-                    cmd: (buf[1] >> 1) & 0x07,
-                };
-                store_lora(sample);
-                esp_println::println!(
-                    "simple-debug: lora ack=1 raw={:02x} mode={:?} cmd={:?}",
-                    buf[1],
-                    status.chip_mode,
-                    status.command_status
-                );
-            }
-        }
-    } else {
-        esp_println::println!("simple-debug: lora ack=0 busy_timeout");
-    }
-
-    // 4. Safely park radio (assert reset low, turn off PMIC G2 rail).
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
-    {
-        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
-        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, false);
     }
 }

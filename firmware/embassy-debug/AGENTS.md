@@ -58,25 +58,44 @@ SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
 Do not send `Partial` after `GrayFull` without `MonoFull`.
 Do not start a new waveform while BUSY is high.
 
-Eight cards: splash Ferris + `papermono-rs`, shapes (procedural
-3-degree Koch snowflake with microsecond benchmark), legend
-(A / B / sleep / red power / right lamp / live battery % gauge with
-60 s auto-refresh), bluetooth (BLE peripheral pairing with 6-digit
-passkey display and success/fail reason), wifi_survey (2.4 GHz
-channel occupancy + top APs; touch `[ START SURVEY ]`), wifi_ap
+Eleven cards: splash Ferris + `papermono-rs`, lora_scan
+(US915 LoRa channel energy sweeper + packet detection
+across 104 slots; touch `[ START SCAN ]`), lora (Stamp
+LoRa-1262 transceiver test ping + up to 60 s packet sniffer;
+touch `[ TX PING ]` / `[ LISTEN RX ]`), nfc (ST25R3916 near
+field communication tag poll; touch `[ POLL TAG ]`), wifi_ap
 (WPA2 SoftAP `PaperMono-AP` / `mono2026` + DHCP + JSON HTTP at
 `http://192.168.4.1/`; touch `[ START HOTSPOT ]`; mutually
-exclusive with survey), four-gray tones, target walk. Short A
-previous, short B next (down-press); button presses during EPD
-paint are queued so clicks are never dropped; wrap. Right-edge
-contact sets PWM0 from Y (top bright); left-edge contact sets
-buzzer volume from Y (top loud); both sliders respect screen
-orientation. Hold A 2 s triggers sleep notice and light sleep;
-hold A or B 1 s wakes. Hold A ~1 s dumps PCM only when `mic` is
-on. GPIO42 passive buzzer provides click feedback on button
-navigation and touchscreen hits. Active channel survey runs
-continuously until touching `[ STOP SURVEY ]` (transitions
-through `[ STOPPING... ]` to complete).
+exclusive with survey), wifi_survey (2.4 GHz channel occupancy
+and top APs; touch `[ START SURVEY ]`), bluetooth (BLE peripheral
+pairing with 6-digit passkey display and success/fail reason),
+legend (A / B / sleep / red power / right lamp / live battery %
+gauge with 60 s auto-refresh), shapes (procedural 3-degree Koch
+snowflake with microsecond benchmark), four-gray tones, target
+walk. Short A previous, short B next (down-press); button
+presses during EPD paint are queued so clicks are never
+dropped; wrap. Right-edge contact sets PWM0 from Y (top bright);
+left-edge contact sets buzzer volume from Y (top loud); both
+sliders respect screen orientation. Hold A 2 s triggers sleep
+notice and light sleep; hold A or B 1 s wakes. Hold A ~1 s dumps
+PCM only when `mic` is on. GPIO42 passive buzzer provides click
+feedback on button navigation and touchscreen hits. Active channel
+survey runs continuously until touching `[ STOP SURVEY ]`
+(transitions through `[ STOPPING... ]` to complete).
+
+## Carousel Order Guidance
+
+`Splash` is the landing card (index 0). The forward walk
+(`next()` / BUTTON B / down-press) displays newer interactive
+feature cards first in reverse chronological order of feature
+introduction (`LoraScan` → `Lora` → `Nfc` → `WifiAp` →
+`WifiSurvey` → `Bluetooth` → `Legend` → `Shapes`), followed by
+baseline display calibration cards (`Tones` → `Targets`),
+wrapping back to `Splash`. When developing or validating new
+firmware features, place newly added interactive test cards
+immediately after `Splash` in the forward walk. This minimizes
+operator button presses needed to reach active development tests
+on hardware.
 
 Splash art: [assets/SOURCE.md](assets/SOURCE.md). Observed
 Lite glass: [docs/assets/first-ferris.png](../../docs/assets/first-ferris.png),
@@ -183,6 +202,49 @@ and same-card orientation remaps use
 Lite SoftAP host-verified 2026-09-04:
 [measure.md](../../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 `C153` still open.
+
+## LoRa verification workflow (`c153`)
+
+On `C153`, the Stamp LoRa-1262 (Semtech SX1262) transceiver is
+exercised via two interactive cards:
+
+1. **LoRa Sweeper (`lora_scan`)**:
+   - Sweeps across all 104 US915 channels (902.125 MHz to 927.875 MHz).
+   - Touch `[ START SCAN ]` to begin continuous sweeping passes (~2.5 s/pass).
+   - Applies double-duty scanning with doubled dwell time (25 ms vs 10 ms)
+     on expected primary channels (slots 61..=63 and slot 19).
+   - Generates acoustic tone feedback via GPIO42 passive buzzer: a 25 ms
+     click on elevated RSSI activity (above -105 dBm) and an 80 ms tone on
+     packet detection.
+   - Emits `simple-debug: lora_scan slot=... freq=... rssi=... packets=...`
+     telemetry at the completion of each pass over CDC.
+   - Touch anywhere on the panel to stop sweeping (`[ STOP SCAN ]`).
+
+2. **LoRa Transceiver (`lora`)**:
+   - Touch `[ TX PING ]` for a bench-safe test transmission: 915.0 MHz,
+     clamped to +14 dBm (25 mW), 60 mA hardware OCP current limit, 58 ms
+     airtime, with immediate return to Standby RC and power-down. Emits
+     `lora_tx` telemetry over CDC.
+   - Touch `[ LISTEN RX ]` for an extended packet sniffer window (up to 60 s).
+     Listens on 906.875 MHz (US915 slot 19) or secondary channel using
+     SF11 / BW 250 kHz / CR 4/5 / Sync Word `0x24B4`. Emits an 80 ms tone
+     and logs `lora_rx freq=... rssi=... snr=... len=... preview=...` over
+     CDC upon receiving a packet. Touch or buttons abort early.
+
+## NFC verification workflow (`c153`)
+
+On `C153`, the ST25R3916 near-field communication controller is
+exercised via the `nfc` card:
+
+- Touch `[ POLL TAG ]` to initiate ISO14443-A polling.
+- Powers the chip via M5IOE1 `PYG4`, confirms 3.3 V supply configuration,
+  waits for crystal oscillator stability, and energizes the 13.56 MHz RF field.
+- Transmits 7-bit short-frame WUPA/REQA commands, performs anticollision
+  cascades (CL1 / CL2), reads SAK, and extracts the card UID.
+- Masks middle UID bytes on serial for privacy (`nfc_tag type=iso14443a`).
+- Renders tag details (UID, SAK, cascade level) on the e-paper panel.
+- Immediately de-energizes the RF field and parks the peripheral between
+  polls to conserve power and prevent bus contention.
 
 ## IMU page rotation (`orient`)
 

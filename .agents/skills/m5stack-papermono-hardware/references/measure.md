@@ -19,10 +19,10 @@ open a port unless a human asked.
 Vendor C++ trees are wiring evidence in
 [cpp-platformio.md](cpp-platformio.md).
 
-**PaperMono (`C153`) USB, chip rev, 16 MB flash size, and
-partition table were measured live (2026-09-05).** JEDEC
-manufacturer bytes, PSRAM, and NFC/LoRa silicon status stay
-open. Official HTML **M5GFX LUT Refresh Speed** times are
+**PaperMono (`C153`) USB, chip rev, 16 MB flash size, partition
+table, ST25R3916 NFC, and Stamp LoRa-1262 / SX1262 transceiver
+were measured live (2026-09-05).** JEDEC manufacturer bytes and
+PSRAM stay open. Official HTML **M5GFX LUT Refresh Speed** times are
 laboratory results for **PaperMono**, reference only
 ([display.md](display.md)). They are not a row on this page.
 PaperMono-Lite (`C153-Lite`) has run- and download-mode USB IDs
@@ -116,6 +116,8 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | BMI270 orient axis map | `C153-Lite` | 2026-09-04 embassy-debug `--features orient`. Glass toward operator: USB-C down = −X → `Portrait0`; +X `Portrait180`; +Y `Landscape0` (USB right); −Y `Landscape180` (USB left). X↔Y vs sticky LSM6; landscape Y signs flipped after first glass check. Bosch 8 KiB config + `INTERNAL_STATUS` `0x21` required (max-FIFO blob → XYZ zero). [sensors.md](sensors.md) |
 | Card nav release arming | `C153-Lite` | 2026-09-04 embassy-debug. Button B on press-down + hold through Shapes paint required a second press. Fix: arm after A/B high; Prev/Next on release; buttons before IMU; 3-sample orient hysteresis. [embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md) |
 | Nav queuing & touch in 4 orientations | `C153-Lite` | 2026-09-05 embassy-debug. Concurrent button polling queues navigation clicks during EPD paint. FT6336 power-cycle on bring-up prevents warm-reboot NAK at `0x38`. Touch regions and gutters scoped in page coordinates across all four rotations (`Portrait0`, `Portrait180`, `Landscape0`, `Landscape180`). [touch.md](touch.md) |
+| ST25R3916 NFC ISO14443-A | `C153` | 2026-09-05 embassy-debug live. Powered via M5IOE1 `PYG4`, responds at I2C `0x50` with IC identity `0x05`, rev `2`. Executes short-frame WUPA/REQA, anticollision cascade CL1/CL2, SAK read, and UID detection for physical ISO14443-A contactless cards. UID masked on CDC (`nfc_tag`). RF field safely parked between polls. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
+| Stamp LoRa-1262 transceiver | `C153` | 2026-09-05 embassy-debug live. Powered via M5PM1 `G2` (`3V3_L2_LoRa`), reset on M5IOE1 `PYG10`, antenna switch on M5IOE1 `PYG2` (driven HIGH to connect built-in FPC antenna; LOW disconnects). Dedicated SPI (GPIO38/39/40/41 muxed off JTAG), BUSY on GPIO21. Responds to `CMD_GET_STATUS` (`raw=0xAA`, `STBY_RC`). Bench-safe test TX ping (+14 dBm / 25 mW, 60 mA OCP). Over-the-air packet reception of live 50-byte Meshtastic LongFast broadcast frames on 906.875 MHz (SF11 / BW 250 kHz / CR 4/5 / Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, with acoustic tone feedback. Continuous 104-channel US915 sweeper with double-duty scanning. Zero background TX. [stamp-lora-1262.md](../resources/stamp-lora-1262.md) |
 
 ## Factory image (Lite stock, measured table)
 

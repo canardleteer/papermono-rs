@@ -18,7 +18,10 @@ pub use m5stack_papermono_lite::{
 pub mod lora;
 pub mod nfc;
 
-pub use lora::{ChipMode, CommandStatus, RadioStatus, CMD_GET_STATUS};
+pub use lora::{
+    us915_channel_freq_hz, ChipMode, CommandStatus, PacketStatus, RadioStatus, Sx1262, SxError,
+    CMD_GET_STATUS, SYNC_WORD_MESHTASTIC, US915_NUM_CHANNELS,
+};
 pub use nfc::{IcIdentity, Iso14443aCard, St25r3916, CMD_READ_IC_IDENTITY, IC_TYPE_ST25R3916};
 
 /// Official SKU code for this crate (`C153`).

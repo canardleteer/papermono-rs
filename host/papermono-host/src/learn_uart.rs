@@ -258,6 +258,9 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::Nfc => "nfc",
         LineKind::NfcTag => "nfc_tag",
         LineKind::Lora => "lora",
+        LineKind::LoraTx => "lora_tx",
+        LineKind::LoraRx => "lora_rx",
+        LineKind::LoraScan => "lora_scan",
         LineKind::Unknown => "unknown",
     }
 }

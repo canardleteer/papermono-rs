@@ -23,22 +23,27 @@
 //!   [`embedded_graphics::draw_target::DrawTarget`] trait via [`GrayInk`],
 //!   allowing standard text, shapes, and primitives to be rendered in page
 //!   space into the dual-plane framebuffers.
-//! - **Eight-Card Walkthrough**:
+//! - **Eleven-Card Walkthrough**:
 //!   1. `Splash`: Displays the Rust Ferris mascot and navigation hints.
-//!   2. `Shapes`: Verifies geometry rendering (procedural 3-degree Koch
-//!      snowflake with microsecond benchmark, triangles, boxes).
-//!   3. `Legend`: Provides an on-device quick-reference visual guide for
-//!      physical buttons, sleep/wake, and touch rails.
-//!   4. `Bluetooth`: Displays 6-digit BLE passkey PIN for phone pairing and
-//!      reports success or failure reason.
-//!   5. `WifiSurvey`: Scans 2.4 GHz 802.11 channels, displays channel
-//!      distribution and top discovered APs.
-//!   6. `WifiAp`: Runs WPA2-Personal SoftAP with DHCP and serves JSON system
+//!   2. `LoraScan`: Sweeps 104 channels across the US915 band for Meshtastic
+//!      activity and packet bursts.
+//!   3. `Lora`: Interactive LoRa transceiver card with bench-safe TX ping
+//!      and packet sniffer.
+//!   4. `Nfc`: ST25R3916 near field communication tag detection and polling.
+//!   5. `WifiAp`: Runs WPA2-Personal SoftAP with DHCP and serves JSON system
 //!      stats over HTTP.
-//!   7. `Tones`: 4-gray bands (stacked portrait / four-across landscape)
-//!      demonstrating OTP grayscale palette accuracy.
-//!   8. `Targets`: Monochromatic calibration points for digitizer latency
-//!      and accuracy testing.
+//!   6. `WifiSurvey`: Scans 2.4 GHz 802.11 channels, displays channel
+//!      distribution and top discovered APs.
+//!   7. `Bluetooth`: Displays 6-digit BLE passkey PIN for phone pairing and
+//!      reports success or failure reason.
+//!   8. `Legend`: Provides an on-device quick-reference visual guide for
+//!      physical buttons, sleep/wake, and touch rails.
+//!   9. `Shapes`: Verifies geometry rendering (procedural 3-degree Koch
+//!      snowflake with microsecond benchmark, triangles, boxes).
+//!   10. `Tones`: 4-gray bands (stacked portrait / four-across landscape)
+//!       demonstrating OTP grayscale palette accuracy.
+//!   11. `Targets`: Monochromatic calibration points for digitizer latency
+//!       and accuracy testing.
 
 use core::fmt::Write;
 use embassy_time::Instant;
@@ -103,6 +108,14 @@ pub fn render(
         }
         Scene::Nfc => {
             draw_nfc(bw, red, rotation);
+            None
+        }
+        Scene::LoraScan => {
+            draw_lora_scan(bw, red, rotation);
+            None
+        }
+        Scene::Lora => {
+            draw_lora(bw, red, rotation);
             None
         }
         Scene::Tones => {
@@ -207,6 +220,84 @@ pub fn nfc_action_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
     px >= x0 && px < x1 && py >= y0 && py < y1
 }
 
+/// Layout geometry of the LoRa scanner [ START SCAN ] / [ STOP SCAN ] action button in page space.
+#[allow(dead_code)]
+#[must_use]
+pub fn lora_scan_action_rect(rotation: PageRotation) -> (u16, u16, u16, u16) {
+    let (pw, ph) = rotation.page_size();
+    let x = 60;
+    let w = pw.saturating_sub(120);
+    let h = 56;
+    let y = if rotation.is_portrait() {
+        ph.saturating_sub(140)
+    } else {
+        ph.saturating_sub(100)
+    };
+    (x, y, w, h)
+}
+
+/// Page-space touch hit test for the LoRa scanner action button.
+#[allow(dead_code)]
+#[must_use]
+pub fn lora_scan_action_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
+    let (x, y, w, h) = lora_scan_action_rect(rotation);
+    let x0 = x.saturating_sub(10);
+    let y0 = y.saturating_sub(10);
+    let x1 = x.saturating_add(w).saturating_add(10);
+    let y1 = y.saturating_add(h).saturating_add(10);
+    px >= x0 && px < x1 && py >= y0 && py < y1
+}
+
+/// Layout geometry of the LoRa [ TX PING ] action button in page space.
+#[must_use]
+pub fn lora_tx_btn_rect(rotation: PageRotation) -> (u16, u16, u16, u16) {
+    let (pw, ph) = rotation.page_size();
+    if rotation.is_portrait() {
+        let w = (pw.saturating_sub(100)) / 2;
+        (40, ph.saturating_sub(140), w, 56)
+    } else {
+        let w = (pw.saturating_sub(100)) / 2;
+        (40, ph.saturating_sub(100), w, 56)
+    }
+}
+
+/// Layout geometry of the LoRa [ LISTEN RX ] action button in page space.
+#[must_use]
+pub fn lora_rx_btn_rect(rotation: PageRotation) -> (u16, u16, u16, u16) {
+    let (pw, ph) = rotation.page_size();
+    if rotation.is_portrait() {
+        let w = (pw.saturating_sub(100)) / 2;
+        let x = 40 + w + 20;
+        (x, ph.saturating_sub(140), w, 56)
+    } else {
+        let w = (pw.saturating_sub(100)) / 2;
+        let x = 40 + w + 20;
+        (x, ph.saturating_sub(100), w, 56)
+    }
+}
+
+/// Page-space touch hit test for the LoRa [ TX PING ] button.
+#[must_use]
+pub fn lora_tx_btn_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
+    let (x, y, w, h) = lora_tx_btn_rect(rotation);
+    let x0 = x.saturating_sub(10);
+    let y0 = y.saturating_sub(10);
+    let x1 = x.saturating_add(w).saturating_add(10);
+    let y1 = y.saturating_add(h).saturating_add(10);
+    px >= x0 && px < x1 && py >= y0 && py < y1
+}
+
+/// Page-space touch hit test for the LoRa [ LISTEN RX ] button.
+#[must_use]
+pub fn lora_rx_btn_hit(px: u16, py: u16, rotation: PageRotation) -> bool {
+    let (x, y, w, h) = lora_rx_btn_rect(rotation);
+    let x0 = x.saturating_sub(10);
+    let y0 = y.saturating_sub(10);
+    let x1 = x.saturating_add(w).saturating_add(10);
+    let y1 = y.saturating_add(h).saturating_add(10);
+    px >= x0 && px < x1 && py >= y0 && py < y1
+}
+
 /// Inverts pixels within a page-space rectangle across both grayscale planes.
 ///
 /// Because bitwise XOR is self-inverting (`x ^ 1 ^ 1 == x`), calling this function
@@ -298,7 +389,7 @@ fn draw_splash(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     .draw(&mut GrayInk::new(bw, red, rotation));
 }
 
-/// Renders Card 2: Geometric test patterns validating aspect ratio, display orientation, and procedural rendering.
+/// Renders Card 8: Geometric test patterns validating aspect ratio, display orientation, and procedural rendering.
 ///
 /// Portrait keeps the historical 480×800 stack. Landscape shifts Koch left and
 /// the triangle/rect primitives right so the 800×480 page is not a squeezed
@@ -386,7 +477,7 @@ fn draw_shapes(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) -> u32 {
     elapsed_us
 }
 
-/// Renders Card 3: Legend displaying hardware pinout, button functions, sleep controls, and battery telemetry.
+/// Renders Card 7: Legend displaying hardware pinout, button functions, sleep controls, and battery telemetry.
 ///
 /// Portrait is a stacked key/value document (historical). Landscape puts key
 /// at `x = 24` and value at `x = 220` with a ~36 px row step so eight rows
@@ -554,7 +645,7 @@ fn draw_legend(
     .draw(&mut ink);
 }
 
-/// Renders Card 4: Bluetooth Low Energy peripheral pairing with PIN display and status.
+/// Renders Card 6: Bluetooth Low Energy peripheral pairing with PIN display and status.
 ///
 /// # Visual Hierarchy
 /// Portrait keeps the historical 480×800 geometry documented below. Landscape
@@ -1396,7 +1487,7 @@ fn draw_wifi_survey(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     .draw(&mut ink);
 }
 
-/// Renders Card 6: WPA2-Personal Wi-Fi SoftAP and embedded HTTP web server status.
+/// Renders Card 4: WPA2-Personal Wi-Fi SoftAP and embedded HTTP web server status.
 ///
 /// Portrait keeps the historical 480×800 document. Landscape compresses vertical
 /// spacing, shortens guide lines to ≤40 glyphs, and anchors the touch button via
@@ -1998,7 +2089,7 @@ impl WifiCardLayout {
     }
 }
 
-/// Renders Card 7: ST25R3916 Near Field Communication (NFC) tag detection and identity.
+/// Renders Card 3: ST25R3916 Near Field Communication (NFC) tag detection and identity.
 fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     use crate::nfc::NfcCardState;
 
@@ -2304,6 +2395,841 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     let _ = Text::with_alignment(
         btn_label,
         Point::new(cx, btn_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Footer
+    let footer_y = ph.saturating_sub(25);
+    let _ = Text::with_alignment(
+        "Btn A: prev   Btn B: next",
+        Point::new(cx, i32::from(footer_y)),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 2: Stamp LoRa-1262 (SX1262) US915 channel scan and packet monitor.
+fn draw_lora_scan(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
+    clear(bw, red, display::GRAY_WHITE, rotation);
+    let scan_data = crate::lora::lora_scan_data();
+    let (pw, ph) = rotation.page_size();
+    let cx = i32::from(pw) / 2;
+    let (btn_x, btn_y, btn_w, btn_h) = lora_scan_action_rect(rotation);
+
+    let rule_x = 40;
+    let rule_w = pw.saturating_sub(80);
+    let header_bar_y = if rotation.is_portrait() { 52 } else { 42 };
+
+    // 1. Structural lines and frames
+    fill_rect(
+        bw,
+        red,
+        rule_x,
+        header_bar_y,
+        rule_w,
+        2,
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    let banner_y = header_bar_y + 16;
+    let banner_h = 36;
+    stroke_rect(
+        bw,
+        red,
+        rule_x,
+        banner_y,
+        rule_w,
+        banner_h,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        rule_x.saturating_add(2),
+        banner_y.saturating_add(2),
+        rule_w.saturating_sub(4),
+        banner_h.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    // Guide section rule in portrait
+    if rotation.is_portrait() {
+        let guide_div_y = 350;
+        fill_rect(
+            bw,
+            red,
+            rule_x,
+            guide_div_y,
+            rule_w,
+            1,
+            display::GRAY_LIGHT,
+            rotation,
+        );
+    }
+
+    // Action button double-stroke frames
+    stroke_rect(
+        bw,
+        red,
+        btn_x,
+        btn_y,
+        btn_w,
+        btn_h,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        btn_x.saturating_add(2),
+        btn_y.saturating_add(2),
+        btn_w.saturating_sub(4),
+        btn_h.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    // 2. Text rendering with GrayInk
+    let mut ink = GrayInk::new(bw, red, rotation);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    let title_y = if rotation.is_portrait() { 40 } else { 30 };
+    let _ = Text::with_alignment(
+        "US915 LORA CHANNEL SCAN",
+        Point::new(cx, title_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let mut banner_buf = [0u8; 64];
+    let banner_str = {
+        let mut w = BufWriter {
+            buf: &mut banner_buf,
+            pos: 0,
+        };
+        if scan_data.scanning {
+            let _ = write!(
+                w,
+                "[ SCANNING 104 CHANNELS (PASS {}) ]",
+                scan_data.sweeps + 1
+            );
+        } else if scan_data.sweeps > 0 {
+            let _ = write!(w, "[ SCAN PAUSED - {} PASSES COMPLETE ]", scan_data.sweeps);
+        } else {
+            let _ = write!(w, "[ SCAN IDLE - TAP START ]");
+        }
+        let pos = w.pos;
+        core::str::from_utf8(&banner_buf[..pos]).unwrap_or("[ SCAN IDLE ]")
+    };
+    let banner_text_y = i32::from(banner_y) + 24;
+    let _ = Text::with_alignment(
+        banner_str,
+        Point::new(cx, banner_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Metrics & Details
+    let content_start_y = i32::from(banner_y + banner_h) + 26;
+    let mut line_buf = [0u8; 64];
+
+    // Summary line 1: Sweeps & Total Packets
+    {
+        let mut w = BufWriter {
+            buf: &mut line_buf,
+            pos: 0,
+        };
+        let _ = write!(
+            w,
+            "Sweeps: {}  |  Packets Heard: {}",
+            scan_data.sweeps, scan_data.total_packets
+        );
+        let pos = w.pos;
+        if let Ok(s) = core::str::from_utf8(&line_buf[..pos]) {
+            let _ =
+                Text::new(s, Point::new(i32::from(rule_x), content_start_y), style).draw(&mut ink);
+        }
+    }
+
+    // Summary line 2: Target Slot 62 (917.625 MHz)
+    {
+        let hits_62 = scan_data.hits[62];
+        let mut w = BufWriter {
+            buf: &mut line_buf,
+            pos: 0,
+        };
+        let _ = write!(w, "Slot 62 (917.625 MHz): {} hits", hits_62);
+        let pos = w.pos;
+        if let Ok(s) = core::str::from_utf8(&line_buf[..pos]) {
+            let _ = Text::new(
+                s,
+                Point::new(i32::from(rule_x), content_start_y + 28),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Summary line 3: Target Slot 19 (906.875 MHz - default LongFast)
+    {
+        let hits_19 = scan_data.hits[19];
+        let mut w = BufWriter {
+            buf: &mut line_buf,
+            pos: 0,
+        };
+        let _ = write!(w, "Slot 19 (906.875 MHz): {} hits (LongFast)", hits_19);
+        let pos = w.pos;
+        if let Ok(s) = core::str::from_utf8(&line_buf[..pos]) {
+            let _ = Text::new(
+                s,
+                Point::new(i32::from(rule_x), content_start_y + 56),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Summary line 4: Peak Activity
+    {
+        let mut w = BufWriter {
+            buf: &mut line_buf,
+            pos: 0,
+        };
+        if scan_data.peak_rssi > -115 {
+            let peak_freq = crate::lora::us915_channel_freq_hz(scan_data.peak_slot) / 1_000;
+            let _ = write!(
+                w,
+                "Peak: Slot {} ({}.{:03} MHz)  {} dBm",
+                scan_data.peak_slot,
+                peak_freq / 1000,
+                peak_freq % 1000,
+                scan_data.peak_rssi
+            );
+        } else {
+            let _ = write!(w, "Peak: Quiet ambient floor (< -115 dBm)");
+        }
+        let pos = w.pos;
+        if let Ok(s) = core::str::from_utf8(&line_buf[..pos]) {
+            let _ = Text::new(
+                s,
+                Point::new(i32::from(rule_x), content_start_y + 84),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Summary line 5: Current probing slot
+    {
+        let mut w = BufWriter {
+            buf: &mut line_buf,
+            pos: 0,
+        };
+        let cur_freq = crate::lora::us915_channel_freq_hz(scan_data.current_slot) / 1_000;
+        let _ = write!(
+            w,
+            "Probing: Slot {} ({}.{:03} MHz)",
+            scan_data.current_slot,
+            cur_freq / 1000,
+            cur_freq % 1000
+        );
+        let pos = w.pos;
+        if let Ok(s) = core::str::from_utf8(&line_buf[..pos]) {
+            let _ = Text::new(
+                s,
+                Point::new(i32::from(rule_x), content_start_y + 112),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Guide section in portrait
+    if rotation.is_portrait() {
+        let _ = Text::new(
+            "US915 Meshtastic Scanner Guide:",
+            Point::new(i32::from(rule_x), 380),
+            style,
+        )
+        .draw(&mut ink);
+
+        let steps = [
+            "1. US915 splits 902-928 MHz into 104 channels.",
+            "2. Spacing is 250 kHz with SF11 modulation.",
+            "3. Tap [ START SCAN ] to sweep all 104 slots.",
+            "4. Elevated RSSI or packet bursts log to CDC.",
+            "5. Slot 62 & 19 track primary mesh channels.",
+        ];
+        let mut step_y = 415;
+        for s in steps {
+            let _ = Text::new(s, Point::new(i32::from(rule_x), step_y), style).draw(&mut ink);
+            step_y += 30;
+        }
+    }
+
+    // Button label
+    let btn_label = if scan_data.scanning {
+        "[ STOP SCAN ]"
+    } else {
+        "[ START SCAN ]"
+    };
+    let btn_text_y = i32::from(btn_y) + 36;
+    let _ = Text::with_alignment(
+        btn_label,
+        Point::new(cx, btn_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Footer
+    let footer_y = ph.saturating_sub(25);
+    let _ = Text::with_alignment(
+        "Btn A: prev   Btn B: next",
+        Point::new(cx, i32::from(footer_y)),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+}
+
+/// Renders Card 3: Stamp LoRa-1262 (SX1262) transceiver test and verification.
+fn draw_lora(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
+    use crate::lora::LoraCardState;
+
+    clear(bw, red, display::GRAY_WHITE, rotation);
+    let state = crate::lora::card_state();
+    let (pw, ph) = rotation.page_size();
+    let cx = i32::from(pw) / 2;
+    let (tx_bx, tx_by, tx_bw, tx_bh) = lora_tx_btn_rect(rotation);
+    let (rx_bx, rx_by, rx_bw, rx_bh) = lora_rx_btn_rect(rotation);
+
+    let rule_x = 40;
+    let rule_w = pw.saturating_sub(80);
+    let header_bar_y = if rotation.is_portrait() { 52 } else { 42 };
+
+    // 1. Structural lines and frames
+    fill_rect(
+        bw,
+        red,
+        rule_x,
+        header_bar_y,
+        rule_w,
+        2,
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    let banner_y = header_bar_y + 16;
+    let banner_h = 36;
+    stroke_rect(
+        bw,
+        red,
+        rule_x,
+        banner_y,
+        rule_w,
+        banner_h,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        rule_x.saturating_add(2),
+        banner_y.saturating_add(2),
+        rule_w.saturating_sub(4),
+        banner_h.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    // Guide section rule in portrait
+    if rotation.is_portrait() {
+        let guide_div_y = 350;
+        fill_rect(
+            bw,
+            red,
+            rule_x,
+            guide_div_y,
+            rule_w,
+            1,
+            display::GRAY_LIGHT,
+            rotation,
+        );
+    }
+
+    // Action button double-stroke frames
+    stroke_rect(
+        bw,
+        red,
+        tx_bx,
+        tx_by,
+        tx_bw,
+        tx_bh,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        tx_bx.saturating_add(2),
+        tx_by.saturating_add(2),
+        tx_bw.saturating_sub(4),
+        tx_bh.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    stroke_rect(
+        bw,
+        red,
+        rx_bx,
+        rx_by,
+        rx_bw,
+        rx_bh,
+        display::GRAY_BLACK,
+        rotation,
+    );
+    stroke_rect(
+        bw,
+        red,
+        rx_bx.saturating_add(2),
+        rx_by.saturating_add(2),
+        rx_bw.saturating_sub(4),
+        rx_bh.saturating_sub(4),
+        display::GRAY_BLACK,
+        rotation,
+    );
+
+    let mut ink = GrayInk::new(bw, red, rotation);
+    let style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+
+    let title_y = header_bar_y.saturating_sub(10);
+    let _ = Text::with_alignment(
+        "LORA-1262 TRANSCEIVER",
+        Point::new(cx, i32::from(title_y)),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let banner_text_y = i32::from(banner_y) + 24;
+    let banner_str = match state {
+        LoraCardState::Unpopulated => "[ HARDWARE UNPOPULATED ]",
+        LoraCardState::Idle { .. } => "[ STANDBY (RC) - READY ]",
+        LoraCardState::Transmitted { ok, .. } => {
+            if ok {
+                "[ TEST PING TRANSMITTED ]"
+            } else {
+                "[ TX TIMEOUT / ERROR ]"
+            }
+        }
+        LoraCardState::Received { .. } => "[ PACKET DETECTED ]",
+        LoraCardState::ListenQuiet { .. } => "[ NO PACKET HEARD ]",
+        LoraCardState::Listening { .. } => "[ LISTENING (SF11 / 60s) ]",
+    };
+
+    let _ = Text::with_alignment(
+        banner_str,
+        Point::new(cx, banner_text_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    // Content box
+    let content_x = rule_x.saturating_add(10);
+    let mut line_y = i32::from(banner_y + banner_h) + 28;
+    let step_y = if rotation.is_portrait() { 34 } else { 26 };
+
+    match state {
+        LoraCardState::Unpopulated => {
+            let _ = Text::new(
+                "Model:    PaperMono-Lite (C153-Lite)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "LoRa:     Not populated on Lite SKU",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+            let _ = Text::new(
+                "Features: Available on PaperMono (C153)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        LoraCardState::Idle { raw_status, .. } => {
+            let mut buf1 = [0u8; 64];
+            let mut w1 = BufWriter {
+                buf: &mut buf1,
+                pos: 0,
+            };
+            let _ = write!(w1, "Transceiver: SX1262 (Status: 0x{raw_status:02x})");
+            if let Ok(s) = core::str::from_utf8(&w1.buf[..w1.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Ping Freq:   915.000 MHz (+14 dBm safe)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Sniffer 1:   917.625 MHz (Slot 63)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Sniffer 2:   906.875 MHz (Slot 20)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Safety:      Zero continuous background TX",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        LoraCardState::Transmitted {
+            freq_khz,
+            pwr_dbm,
+            time_ms,
+            ok,
+        } => {
+            let mut buf1 = [0u8; 64];
+            let mut w1 = BufWriter {
+                buf: &mut buf1,
+                pos: 0,
+            };
+            let _ = write!(
+                w1,
+                "Frequency:   {}.{:03} MHz",
+                freq_khz / 1000,
+                freq_khz % 1000
+            );
+            if let Ok(s) = core::str::from_utf8(&w1.buf[..w1.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf2 = [0u8; 64];
+            let mut w2 = BufWriter {
+                buf: &mut buf2,
+                pos: 0,
+            };
+            let _ = write!(w2, "TX Power:    +{pwr_dbm} dBm (bench safe)");
+            if let Ok(s) = core::str::from_utf8(&w2.buf[..w2.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf3 = [0u8; 64];
+            let mut w3 = BufWriter {
+                buf: &mut buf3,
+                pos: 0,
+            };
+            let _ = write!(w3, "Airtime:     {time_ms} ms");
+            if let Ok(s) = core::str::from_utf8(&w3.buf[..w3.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf4 = [0u8; 64];
+            let mut w4 = BufWriter {
+                buf: &mut buf4,
+                pos: 0,
+            };
+            let status_msg = if ok {
+                "TxDone confirmed"
+            } else {
+                "Timeout / No IRQ"
+            };
+            let _ = write!(w4, "Status:      {status_msg}");
+            if let Ok(s) = core::str::from_utf8(&w4.buf[..w4.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Safety:      Returned to standby & parked",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        LoraCardState::Received {
+            freq_khz,
+            rssi,
+            snr,
+            len,
+            preview,
+        } => {
+            let mut buf1 = [0u8; 64];
+            let mut w1 = BufWriter {
+                buf: &mut buf1,
+                pos: 0,
+            };
+            let _ = write!(
+                w1,
+                "Frequency:   {}.{:03} MHz",
+                freq_khz / 1000,
+                freq_khz % 1000
+            );
+            if let Ok(s) = core::str::from_utf8(&w1.buf[..w1.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf2 = [0u8; 64];
+            let mut w2 = BufWriter {
+                buf: &mut buf2,
+                pos: 0,
+            };
+            let _ = write!(w2, "Packet RSSI: {rssi} dBm");
+            if let Ok(s) = core::str::from_utf8(&w2.buf[..w2.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf3 = [0u8; 64];
+            let mut w3 = BufWriter {
+                buf: &mut buf3,
+                pos: 0,
+            };
+            let _ = write!(w3, "Signal SNR:  {snr} dB");
+            if let Ok(s) = core::str::from_utf8(&w3.buf[..w3.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf4 = [0u8; 64];
+            let mut w4 = BufWriter {
+                buf: &mut buf4,
+                pos: 0,
+            };
+            let _ = write!(w4, "Length:      {len} bytes");
+            if let Ok(s) = core::str::from_utf8(&w4.buf[..w4.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf5 = [0u8; 64];
+            let mut w5 = BufWriter {
+                buf: &mut buf5,
+                pos: 0,
+            };
+            let _ = write!(
+                w5,
+                "Preview:     {:02x} {:02x} {:02x} {:02x}",
+                preview[0], preview[1], preview[2], preview[3]
+            );
+            if let Ok(s) = core::str::from_utf8(&w5.buf[..w5.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+        }
+        LoraCardState::ListenQuiet {
+            freq_khz,
+            ambient_rssi,
+        } => {
+            let mut buf1 = [0u8; 64];
+            let mut w1 = BufWriter {
+                buf: &mut buf1,
+                pos: 0,
+            };
+            let _ = write!(
+                w1,
+                "Frequency:   {}.{:03} MHz",
+                freq_khz / 1000,
+                freq_khz % 1000
+            );
+            if let Ok(s) = core::str::from_utf8(&w1.buf[..w1.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let mut buf2 = [0u8; 64];
+            let mut w2 = BufWriter {
+                buf: &mut buf2,
+                pos: 0,
+            };
+            let _ = write!(w2, "Noise Floor: {ambient_rssi} dBm");
+            if let Ok(s) = core::str::from_utf8(&w2.buf[..w2.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Listen Time: Up to 60s",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Result:      No packets heard / quiet",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Safety:      Returned to standby & parked",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+        LoraCardState::Listening { freq_khz } => {
+            let mut buf1 = [0u8; 64];
+            let mut w1 = BufWriter {
+                buf: &mut buf1,
+                pos: 0,
+            };
+            let _ = write!(
+                w1,
+                "Frequency:   {}.{:03} MHz",
+                freq_khz / 1000,
+                freq_khz % 1000
+            );
+            if let Ok(s) = core::str::from_utf8(&w1.buf[..w1.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Modulation:  LoRa SF11 / BW 250 kHz",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Sync Word:   0x2B44 (Meshtastic)",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Window:      Up to 60s continuous",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+            line_y += step_y;
+
+            let _ = Text::new(
+                "Abort:       Tap screen or press A/B",
+                Point::new(i32::from(content_x), line_y),
+                style,
+            )
+            .draw(&mut ink);
+        }
+    }
+
+    // Guide section in portrait
+    if rotation.is_portrait() {
+        let guide_x = rule_x.saturating_add(10);
+        let mut gy = 375;
+        let _ = Text::new(
+            "USAGE & TESTING GUIDE",
+            Point::new(i32::from(guide_x), gy),
+            style,
+        )
+        .draw(&mut ink);
+        gy += 30;
+        let _ = Text::new(
+            "- [TX PING]: 915 MHz test burst",
+            Point::new(i32::from(guide_x), gy),
+            style,
+        )
+        .draw(&mut ink);
+        gy += 26;
+        let _ = Text::new(
+            "- [LISTEN RX]: 60s sniffer window",
+            Point::new(i32::from(guide_x), gy),
+            style,
+        )
+        .draw(&mut ink);
+        gy += 26;
+        let _ = Text::new(
+            "- Taps alternate 917.625 & 906.875 MHz",
+            Point::new(i32::from(guide_x), gy),
+            style,
+        )
+        .draw(&mut ink);
+        gy += 26;
+        let _ = Text::new(
+            "- Telemetry streams over USB CDC",
+            Point::new(i32::from(guide_x), gy),
+            style,
+        )
+        .draw(&mut ink);
+    }
+
+    // Render action buttons
+    let tx_label_y = i32::from(tx_by) + 34;
+    let tx_label_x = i32::from(tx_bx) + i32::from(tx_bw) / 2;
+    let _ = Text::with_alignment(
+        "[ TX PING ]",
+        Point::new(tx_label_x, tx_label_y),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut ink);
+
+    let rx_label_y = i32::from(rx_by) + 34;
+    let rx_label_x = i32::from(rx_bx) + i32::from(rx_bw) / 2;
+    let rx_btn_text = match state {
+        LoraCardState::Listening { .. } => "[ STOP RX ]",
+        _ => "[ LISTEN RX ]",
+    };
+    let _ = Text::with_alignment(
+        rx_btn_text,
+        Point::new(rx_label_x, rx_label_y),
         style,
         Alignment::Center,
     )

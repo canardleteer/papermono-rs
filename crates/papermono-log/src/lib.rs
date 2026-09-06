@@ -94,6 +94,15 @@ pub const NFC_CAPACITY: usize = 48;
 /// Bytes reserved for a LoRa status line (`lora ack=1 raw=02 mode=2 cmd=1`).
 pub const LORA_CAPACITY: usize = 64;
 
+/// Bytes reserved for a LoRa transmission result line (`lora_tx freq=...`).
+pub const LORA_TX_CAPACITY: usize = 96;
+
+/// Bytes reserved for a LoRa packet reception report line (`lora_rx freq=...`).
+pub const LORA_RX_CAPACITY: usize = 96;
+
+/// Bytes reserved for a LoRa channel scan report line (`lora_scan slot=...`).
+pub const LORA_SCAN_CAPACITY: usize = 96;
+
 /// Bytes reserved for an NFC tag detection line (`nfc_tag type=iso14443a ...`).
 pub const NFC_TAG_CAPACITY: usize = 96;
 
@@ -267,6 +276,53 @@ pub struct NfcTagSample {
     pub uid_last: u8,
 }
 
+/// Stamp LoRa-1262 (SX1262) packet transmission result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraTxSample {
+    /// Frequency in thousands of hertz (e.g. 915000 for 915.000 MHz).
+    pub freq_khz: u32,
+    /// Configured output power in dBm (e.g. 14).
+    pub pwr_dbm: i8,
+    /// LoRa spreading factor (e.g. 7).
+    pub sf: u8,
+    /// LoRa bandwidth in kHz (e.g. 125).
+    pub bw_khz: u16,
+    /// Airtime / execution duration in milliseconds.
+    pub time_ms: u32,
+    /// Success flag (`true` if TxDone IRQ was confirmed).
+    pub ok: bool,
+}
+
+/// Stamp LoRa-1262 (SX1262) packet reception report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraRxSample {
+    /// Frequency in thousands of hertz (e.g. 917625 for 917.625 MHz).
+    pub freq_khz: u32,
+    /// Packet RSSI in dBm (e.g. -84).
+    pub rssi: i16,
+    /// Packet SNR in dB (e.g. 7).
+    pub snr: i8,
+    /// Payload length in bytes.
+    pub len: u8,
+    /// First byte of payload preview.
+    pub first_byte: u8,
+    /// Last byte of payload preview.
+    pub last_byte: u8,
+}
+
+/// Stamp LoRa-1262 (SX1262) US915 channel scan activity report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraScanSample {
+    /// Channel slot number (0..103).
+    pub slot: u8,
+    /// Frequency in thousands of hertz (e.g. 917625 for 917.625 MHz).
+    pub freq_khz: u32,
+    /// Measured RSSI in dBm.
+    pub rssi: i16,
+    /// Channel hit count or total packets detected.
+    pub packets: u16,
+}
+
 /// One gated M5PM1 / IP2315 charge sample. Millivolts only.
 ///
 /// `ip` is ACK while the gate is on (expect `false` under permanent bus
@@ -370,6 +426,10 @@ pub enum Scene {
     WifiAp,
     /// ST25R3916 near field communication tag detection and polling.
     Nfc,
+    /// Stamp LoRa-1262 (SX1262) transceiver test and verification card.
+    Lora,
+    /// Stamp LoRa-1262 (SX1262) US915 channel activity and packet scanner.
+    LoraScan,
     /// Four OTP gray boxes.
     Tones,
     /// Dots + midline slides + mono-full white clear.
@@ -378,14 +438,22 @@ pub enum Scene {
 
 impl Scene {
     /// Walk order for BUTTON B (next).
-    pub const ALL: [Self; 9] = [
+    ///
+    /// The carousel starts at `Splash` (index 0). When walking forward
+    /// (`next()` / BUTTON B / down), newer interactive feature cards appear
+    /// first in reverse chronological order (`LoraScan`, `Lora`, `Nfc`, `WifiAp`,
+    /// `WifiSurvey`, `Bluetooth`, `Legend`, `Shapes`), followed by baseline
+    /// display calibration cards (`Tones`, `Targets`), wrapping back to `Splash`.
+    pub const ALL: [Self; 11] = [
         Self::Splash,
-        Self::Shapes,
-        Self::Legend,
-        Self::Bluetooth,
-        Self::WifiSurvey,
-        Self::WifiAp,
+        Self::LoraScan,
+        Self::Lora,
         Self::Nfc,
+        Self::WifiAp,
+        Self::WifiSurvey,
+        Self::Bluetooth,
+        Self::Legend,
+        Self::Shapes,
         Self::Tones,
         Self::Targets,
     ];
@@ -395,12 +463,14 @@ impl Scene {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Splash => "splash",
-            Self::Shapes => "shapes",
-            Self::Legend => "legend",
-            Self::Bluetooth => "bluetooth",
-            Self::WifiSurvey => "wifi_survey",
-            Self::WifiAp => "wifi_ap",
+            Self::LoraScan => "lora_scan",
+            Self::Lora => "lora",
             Self::Nfc => "nfc",
+            Self::WifiAp => "wifi_ap",
+            Self::WifiSurvey => "wifi_survey",
+            Self::Bluetooth => "bluetooth",
+            Self::Legend => "legend",
+            Self::Shapes => "shapes",
             Self::Tones => "tones",
             Self::Targets => "targets",
         }
@@ -410,13 +480,15 @@ impl Scene {
     #[must_use]
     pub const fn next(self) -> Self {
         match self {
-            Self::Splash => Self::Shapes,
-            Self::Shapes => Self::Legend,
-            Self::Legend => Self::Bluetooth,
-            Self::Bluetooth => Self::WifiSurvey,
-            Self::WifiSurvey => Self::WifiAp,
-            Self::WifiAp => Self::Nfc,
-            Self::Nfc => Self::Tones,
+            Self::Splash => Self::LoraScan,
+            Self::LoraScan => Self::Lora,
+            Self::Lora => Self::Nfc,
+            Self::Nfc => Self::WifiAp,
+            Self::WifiAp => Self::WifiSurvey,
+            Self::WifiSurvey => Self::Bluetooth,
+            Self::Bluetooth => Self::Legend,
+            Self::Legend => Self::Shapes,
+            Self::Shapes => Self::Tones,
             Self::Tones => Self::Targets,
             Self::Targets => Self::Splash,
         }
@@ -427,13 +499,15 @@ impl Scene {
     pub const fn prev(self) -> Self {
         match self {
             Self::Splash => Self::Targets,
-            Self::Shapes => Self::Splash,
-            Self::Legend => Self::Shapes,
-            Self::Bluetooth => Self::Legend,
-            Self::WifiSurvey => Self::Bluetooth,
-            Self::WifiAp => Self::WifiSurvey,
-            Self::Nfc => Self::WifiAp,
-            Self::Tones => Self::Nfc,
+            Self::LoraScan => Self::Splash,
+            Self::Lora => Self::LoraScan,
+            Self::Nfc => Self::Lora,
+            Self::WifiAp => Self::Nfc,
+            Self::WifiSurvey => Self::WifiAp,
+            Self::Bluetooth => Self::WifiSurvey,
+            Self::Legend => Self::Bluetooth,
+            Self::Shapes => Self::Legend,
+            Self::Tones => Self::Shapes,
             Self::Targets => Self::Tones,
         }
     }
@@ -601,6 +675,72 @@ pub fn format_nfc_tag<'a>(
         format_args!(
             "{}: nfc_tag type=iso14443a atqa={:04x} sak={:02x} len={} uid={:02x}..{:02x}",
             LOG_PREFIX, sample.atqa, sample.sak, sample.uid_len, sample.uid_first, sample.uid_last,
+        ),
+    )
+}
+
+/// Writes `lora_tx` transmission result without a trailing newline.
+pub fn format_lora_tx<'a>(
+    sample: &LoraTxSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    let status_str = if sample.ok { "ok" } else { "err" };
+    write_into(
+        buf,
+        format_args!(
+            "{}: lora_tx freq={}.{:03} pwr={} sf={} bw={} time_ms={} status={}",
+            LOG_PREFIX,
+            sample.freq_khz / 1000,
+            sample.freq_khz % 1000,
+            sample.pwr_dbm,
+            sample.sf,
+            sample.bw_khz,
+            sample.time_ms,
+            status_str,
+        ),
+    )
+}
+
+/// Writes `lora_rx` packet reception report without a trailing newline.
+///
+/// Middle payload bytes are masked on serial for privacy.
+pub fn format_lora_rx<'a>(
+    sample: &LoraRxSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: lora_rx freq={}.{:03} rssi={} snr={} len={} preview={:02x}..{:02x}",
+            LOG_PREFIX,
+            sample.freq_khz / 1000,
+            sample.freq_khz % 1000,
+            sample.rssi,
+            sample.snr,
+            sample.len,
+            sample.first_byte,
+            sample.last_byte,
+        ),
+    )
+}
+
+/// Formats a LoRa channel scan telemetry line into `buf`.
+///
+/// Format: `simple-debug: lora_scan slot=<slot> freq=<MHz> rssi=<dBm> packets=<n>`.
+pub fn format_lora_scan<'a>(
+    sample: &LoraScanSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: lora_scan slot={} freq={}.{:03} rssi={} packets={}",
+            LOG_PREFIX,
+            sample.slot,
+            sample.freq_khz / 1000,
+            sample.freq_khz % 1000,
+            sample.rssi,
+            sample.packets,
         ),
     )
 }
@@ -1340,22 +1480,28 @@ mod tests {
 
     #[test]
     fn scene_wraps_and_formats() {
-        assert_eq!(Scene::Splash.next(), Scene::Shapes);
-        assert_eq!(Scene::Shapes.next(), Scene::Legend);
-        assert_eq!(Scene::Legend.next(), Scene::Bluetooth);
-        assert_eq!(Scene::Bluetooth.next(), Scene::WifiSurvey);
-        assert_eq!(Scene::WifiSurvey.next(), Scene::WifiAp);
-        assert_eq!(Scene::WifiAp.next(), Scene::Nfc);
-        assert_eq!(Scene::Nfc.next(), Scene::Tones);
+        assert_eq!(Scene::Splash.next(), Scene::LoraScan);
+        assert_eq!(Scene::LoraScan.next(), Scene::Lora);
+        assert_eq!(Scene::Lora.next(), Scene::Nfc);
+        assert_eq!(Scene::Nfc.next(), Scene::WifiAp);
+        assert_eq!(Scene::WifiAp.next(), Scene::WifiSurvey);
+        assert_eq!(Scene::WifiSurvey.next(), Scene::Bluetooth);
+        assert_eq!(Scene::Bluetooth.next(), Scene::Legend);
+        assert_eq!(Scene::Legend.next(), Scene::Shapes);
+        assert_eq!(Scene::Shapes.next(), Scene::Tones);
         assert_eq!(Scene::Tones.next(), Scene::Targets);
         assert_eq!(Scene::Targets.next(), Scene::Splash);
         assert_eq!(Scene::Splash.prev(), Scene::Targets);
         assert_eq!(Scene::Targets.prev(), Scene::Tones);
-        assert_eq!(Scene::Tones.prev(), Scene::Nfc);
-        assert_eq!(Scene::Nfc.prev(), Scene::WifiAp);
-        assert_eq!(Scene::WifiAp.prev(), Scene::WifiSurvey);
-        assert_eq!(Scene::WifiSurvey.prev(), Scene::Bluetooth);
-        assert_eq!(Scene::Bluetooth.prev(), Scene::Legend);
+        assert_eq!(Scene::Tones.prev(), Scene::Shapes);
+        assert_eq!(Scene::Shapes.prev(), Scene::Legend);
+        assert_eq!(Scene::Legend.prev(), Scene::Bluetooth);
+        assert_eq!(Scene::Bluetooth.prev(), Scene::WifiSurvey);
+        assert_eq!(Scene::WifiSurvey.prev(), Scene::WifiAp);
+        assert_eq!(Scene::WifiAp.prev(), Scene::Nfc);
+        assert_eq!(Scene::Nfc.prev(), Scene::Lora);
+        assert_eq!(Scene::Lora.prev(), Scene::LoraScan);
+        assert_eq!(Scene::LoraScan.prev(), Scene::Splash);
         assert!(Scene::Tones.uses_gray());
         assert!(!Scene::Splash.uses_gray());
         assert!(!Scene::Legend.uses_gray());
@@ -1363,17 +1509,27 @@ mod tests {
         assert!(!Scene::WifiSurvey.uses_gray());
         assert!(!Scene::WifiAp.uses_gray());
         assert!(!Scene::Nfc.uses_gray());
+        assert!(!Scene::Lora.uses_gray());
+        assert!(!Scene::LoraScan.uses_gray());
         assert!(!Scene::Shapes.uses_gray());
         assert!(!Scene::Targets.uses_gray());
-        assert_eq!(Scene::ALL.len(), 9);
+        assert_eq!(Scene::ALL.len(), 11);
         let mut buf = [0u8; SCENE_CAPACITY];
         assert_eq!(
             format_scene(Scene::Splash, &mut buf).unwrap(),
             "simple-debug: scene=splash"
         );
         assert_eq!(
+            format_scene(Scene::LoraScan, &mut buf).unwrap(),
+            "simple-debug: scene=lora_scan"
+        );
+        assert_eq!(
             format_scene(Scene::Nfc, &mut buf).unwrap(),
             "simple-debug: scene=nfc"
+        );
+        assert_eq!(
+            format_scene(Scene::Lora, &mut buf).unwrap(),
+            "simple-debug: scene=lora"
         );
         assert_eq!(
             format_scene(Scene::Bluetooth, &mut buf).unwrap(),
@@ -1460,6 +1616,61 @@ mod tests {
         assert_eq!(
             line,
             "simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c"
+        );
+    }
+
+    #[test]
+    fn lora_tx_and_rx_formatting() {
+        let mut tx_buf = [0u8; LORA_TX_CAPACITY];
+        let tx_line = format_lora_tx(
+            &LoraTxSample {
+                freq_khz: 915_000,
+                pwr_dbm: 14,
+                sf: 7,
+                bw_khz: 125,
+                time_ms: 58,
+                ok: true,
+            },
+            &mut tx_buf,
+        )
+        .unwrap();
+        assert_eq!(
+            tx_line,
+            "simple-debug: lora_tx freq=915.000 pwr=14 sf=7 bw=125 time_ms=58 status=ok"
+        );
+
+        let mut rx_buf = [0u8; LORA_RX_CAPACITY];
+        let rx_line = format_lora_rx(
+            &LoraRxSample {
+                freq_khz: 917_625,
+                rssi: -84,
+                snr: 7,
+                len: 16,
+                first_byte: 0xFF,
+                last_byte: 0x0A,
+            },
+            &mut rx_buf,
+        )
+        .unwrap();
+        assert_eq!(
+            rx_line,
+            "simple-debug: lora_rx freq=917.625 rssi=-84 snr=7 len=16 preview=ff..0a"
+        );
+
+        let mut scan_buf = [0u8; LORA_SCAN_CAPACITY];
+        let scan_line = format_lora_scan(
+            &LoraScanSample {
+                slot: 62,
+                freq_khz: 917_625,
+                rssi: -84,
+                packets: 3,
+            },
+            &mut scan_buf,
+        )
+        .unwrap();
+        assert_eq!(
+            scan_line,
+            "simple-debug: lora_scan slot=62 freq=917.625 rssi=-84 packets=3"
         );
     }
 

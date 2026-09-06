@@ -16,10 +16,11 @@ On the unit:
 - BUTTON A previous card (short press release), BUTTON B next
   (press down). Presses during panel refreshes are queued so
   rapid navigation clicks are never dropped. The walk is splash →
-  shapes (procedural 3-degree Koch snowflake benchmark) →
-  legend (pinout, touch rails, sleep/wake instructions) →
-  bluetooth (BLE passkey pairing) → wifi survey (channel scan) →
-  wifi hotspot (WPA2 SoftAP + JSON HTTP) → four-gray tones →
+  lora_scan (channel energy & packet sweeper) →
+  lora (test ping + packet sniffer) → nfc (ISO14443-A tag poll) →
+  wifi hotspot (WPA2 SoftAP + JSON HTTP) → wifi survey (channel scan) →
+  bluetooth (BLE passkey pairing) → legend (pinout, touch rails, sleep) →
+  shapes (procedural 3-degree Koch snowflake benchmark) → four-gray tones →
   touch targets.
 - Slide the right edge for the lamp (top bright, bottom dim).
 - Slide the left edge for passive buzzer volume (top loudest, bottom silent;
@@ -107,18 +108,20 @@ embassy-debug`.
 
 ### Step 4: Change cards
 
-Short-press BUTTON B. The glass should walk splash → shapes (procedural
-3-degree Koch snowflake with on-screen and CDC microsecond benchmark) →
-legend (pinout, touch rails, sleep/wake instructions, and live battery gauge
-with 60 s auto-refresh) → bluetooth (BLE peripheral pairing with 6-digit PIN
-passkey and success/fail status) → wifi survey (tap `[ START SURVEY ]` for
-2.4 GHz channel occupancy) → wifi hotspot (tap `[ START HOTSPOT ]` for
-SSID `PaperMono-AP`, password `mono2026`, URL `http://192.168.4.1/`) →
-nfc (tap `[ POLL TAG ]` for ISO14443-A UID reading and Flipper Zero /
-contactless card testing) → tones → targets, then wrap. Survey and hotspot
-cannot run together: starting one stops the other. BUTTON A walks the other
-way. CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
-`wifi_http`, and `nfc_tag`.
+Short-press BUTTON B. The glass walks forward: splash → lora_scan
+(tap `[ START SCAN ]` to sweep 104 US915 channels for energy and packets) →
+lora (tap `[ TX PING ]` for bench-safe 915 MHz burst or `[ LISTEN RX ]` for
+up to 60 s sniffer window) → nfc (tap `[ POLL TAG ]` for ISO14443-A UID
+reading and contactless card testing) → wifi hotspot (tap `[ START HOTSPOT ]`
+for SSID `PaperMono-AP`, password `mono2026`, URL `http://192.168.4.1/`) →
+wifi survey (tap `[ START SURVEY ]` for 2.4 GHz channel occupancy) →
+bluetooth (BLE peripheral pairing with 6-digit PIN passkey and status) →
+legend (pinout, touch rails, sleep instructions, live battery gauge) →
+shapes (procedural 3-degree Koch snowflake with benchmark) → tones → targets,
+then wrap. Survey and hotspot cannot run together: starting one stops the other.
+BUTTON A walks the other way. CDC prints `scene=`, `snowflake us=`,
+`wifi_survey`, `wifi_ap`, `wifi_http`, `nfc_tag`, `lora_tx`, `lora_rx`, and
+`lora_scan`.
 
 ### Step 5: Slide the lamp
 
