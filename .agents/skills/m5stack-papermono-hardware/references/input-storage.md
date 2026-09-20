@@ -59,9 +59,10 @@ ST25R3916 `0x50` (sheet `50h`), IRQ GPIO6. `C153` schematic:
 `I2C_EN=VDD; I2C mode`. UserDemo SKU probe and NFC app keep
 the field off except while scanning
 ([user-demo.md](user-demo.md)). The built-in NFC antenna coil
-is located at the rear bottom right of the enclosure (when
-viewing the e-paper panel face-up in portrait with USB-C at
-bottom). SX1262 GPIOs 38/40/39/41/21/5
+is located at the rear of the enclosure behind the bottom-left
+corner when viewing the e-paper panel face-up in portrait with
+USB-C at bottom (or bottom-right when looking directly at the
+rear case). SX1262 GPIOs 38/40/39/41/21/5
 (spec ≤16 MHz). Product table names that bus SPI1; UserDemo
 uses `SPI3_HOST` at 8 MHz, RadioLib begin at 868.0 MHz (EU
 demo vs product 868–923). Mux GPIO39–41 off JTAG before SPI.

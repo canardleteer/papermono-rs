@@ -2462,7 +2462,7 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
         .draw(&mut ink);
 
         let steps = [
-            "1. Hold card at bottom-right rear.",
+            "1. Hold card behind bottom-left.",
             "2. Tap [ POLL TAG ] button below.",
             "3. Flipper: 'Detect Reader' detects 13.56M.",
             "4. Flipper: Emulate NTAG -> reads 7B UID.",
