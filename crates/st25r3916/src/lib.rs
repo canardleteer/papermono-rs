@@ -22,8 +22,10 @@ pub mod commands;
 pub mod error;
 pub mod framing;
 pub mod initiator;
+pub mod isodep;
 pub mod memory;
 pub mod registers;
+pub mod smartcard;
 pub mod target;
 
 pub use commands::*;
@@ -39,8 +41,17 @@ pub use initiator::{
     ISO14443A_NVB_SELECT, RX_CONF1_Z600K, RX_CONF2_DEFAULT, RX_CONF3_STABILITY, RX_CONF4_STABILITY,
     TX_DRIVER_DEFAULT,
 };
+pub use isodep::{
+    build_rats, fsi_to_bytes, Ats, IBlock, IsoDepError, IsoDepErrorKind, IsoDepSession, Pcb,
+    RBlock, SBlock, SBlockKind, DEFAULT_FWT_POLL_ITERATIONS, FSDI_256_BYTES, MAX_ISODEP_FRAME,
+    RATS_CMD_START,
+};
 pub use memory::{NfcFParams, PtMemory};
 pub use registers::*;
+pub use smartcard::{
+    manufacturer_name, probe_fido, probe_openpgp, probe_piv, probe_smart_card, FidoCardInfo,
+    OpenPgpCardInfo, PivCardInfo, SmartCardApp, YubiKeyProfiles, AID_FIDO, AID_OPENPGP, AID_PIV,
+};
 pub use target::{
     NfcATargetConfig, NfcATargetKind, NfcFBitRate, NfcFTargetConfig, Nfcip1CommunicationMode,
     Nfcip1TargetConfig, TargetInterrupts, TargetModulation,
@@ -171,6 +182,109 @@ impl<I2C: I2c> St25r3916<I2C> {
         let timer = self.read_reg(registers::REG_TIMER_NFC_IRQ)?;
         let err = self.read_reg(registers::REG_ERROR_IRQ)?;
         Ok((main, timer, err))
+    }
+
+    /// Loads transmit data into the internal FIFO in consecutive 32-byte chunks.
+    ///
+    /// ST25R3916 Section 4.3.4 Table 11: "FIFO load operation (`0x80`)".
+    pub fn write_fifo_chunked(&mut self, data: &[u8]) -> Result<(), I2C::Error> {
+        let mut offset = 0;
+        while offset < data.len() {
+            let chunk = (data.len() - offset).min(32);
+            self.write_fifo(&data[offset..offset + chunk])?;
+            offset += chunk;
+        }
+        Ok(())
+    }
+
+    /// Returns the full 10-bit FIFO byte count from status registers 1 & 2 (`0x1E`, `0x1F`).
+    ///
+    /// ST25R3916 Section 4.5.38 and Section 4.5.39.
+    pub fn fifo_bytes_full(&mut self) -> Result<usize, I2C::Error> {
+        let low = self.read_reg(registers::REG_FIFO_STATUS1)? as usize;
+        let high = (self.read_reg(registers::REG_FIFO_STATUS2)? & 0x07) as usize;
+        Ok((high << 8) | low)
+    }
+
+    /// Configures the number of bytes to transmit in registers 1 & 2 (`0x22`, `0x23`).
+    ///
+    /// ST25R3916 Section 4.5.42 and Section 4.5.43.
+    pub fn set_num_tx_bytes(&mut self, n_bytes: usize) -> Result<(), I2C::Error> {
+        let b1 = (n_bytes >> 5) as u8;
+        let b2 = ((n_bytes & 0x1F) << 3) as u8;
+        self.write_reg(registers::REG_NUM_TX_BYTES1, b1)?;
+        self.write_reg(registers::REG_NUM_TX_BYTES2, b2)
+    }
+
+    /// Transmits a frame with hardware-calculated CRC-16 (A-type EDC).
+    ///
+    /// ST25R3916 Section 4.4.4 Table 13: "Transmit with CRC" direct command (`0xC4`).
+    pub fn transmit_frame_crc(&mut self, data: &[u8]) -> Result<(), I2C::Error> {
+        self.set_num_tx_bytes(data.len())?;
+        let _ = self.read_reg(registers::REG_MAIN_IRQ);
+        self.direct_cmd(commands::CMD_CLEAR_FIFO)?;
+        self.write_fifo_chunked(data)?;
+        self.direct_cmd(commands::CMD_TRANSMIT_WITH_CRC)
+    }
+
+    /// Receives a response frame with hardware CRC-16 validation into `buf`.
+    ///
+    /// The ST25R3916 receiver places the entire RF frame, including the 2-byte CRC-16 (EDC),
+    /// into the FIFO. This method checks for receive completion (`MAIN_IRQ_RXE`), reads the FIFO,
+    /// clears any overflow, and strips the trailing 2-byte hardware CRC-16, returning the payload length.
+    ///
+    /// ST25R3916 Section 4.5.34: "Main interrupt register" (`0x1A`), `MAIN_IRQ_RXE`.
+    pub fn receive_frame_crc(
+        &mut self,
+        buf: &mut [u8],
+        max_poll_iterations: u32,
+    ) -> Result<Option<usize>, I2C::Error> {
+        let mut n = 0;
+        let mut poll = 0;
+        while poll < max_poll_iterations {
+            n = self.fifo_bytes_full()?;
+            if n > 0 {
+                let irq = self.read_reg(registers::REG_MAIN_IRQ)?;
+                if (irq & registers::MAIN_IRQ_RXE) != 0 {
+                    n = self.fifo_bytes_full()?;
+                    break;
+                }
+            }
+            poll += 1;
+        }
+        if n < 2 {
+            if n > 0 {
+                self.direct_cmd(commands::CMD_CLEAR_FIFO)?;
+            }
+            return Ok(None);
+        }
+        let read_len = n.min(buf.len() + 2);
+        let mut raw = [0u8; 260];
+        let fetch_len = read_len.min(raw.len());
+        self.read_fifo(&mut raw[..fetch_len])?;
+        if n > fetch_len {
+            self.direct_cmd(commands::CMD_CLEAR_FIFO)?;
+        }
+        if fetch_len < 2 {
+            return Ok(None);
+        }
+        let payload_len = (fetch_len - 2).min(buf.len());
+        buf[..payload_len].copy_from_slice(&raw[..payload_len]);
+        Ok(Some(payload_len))
+    }
+
+    /// Activates ISO/IEC 14443-4 transmission protocol by issuing RATS and receiving ATS.
+    pub fn activate_isodep(&mut self) -> Result<isodep::Ats, isodep::IsoDepError<I2C::Error>> {
+        let (ats, _session) = isodep::IsoDepSession::activate(self, None)?;
+        Ok(ats)
+    }
+
+    /// Probes an activated ISO-DEP smart card for standard applications (FIDO CTAP, PIV, OpenPGP).
+    pub fn probe_smart_card(
+        &mut self,
+        ats: &isodep::Ats,
+    ) -> Result<smartcard::SmartCardApp, isodep::IsoDepError<I2C::Error>> {
+        smartcard::probe_smart_card(self, ats)
     }
 }
 

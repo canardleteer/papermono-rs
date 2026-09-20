@@ -147,13 +147,13 @@ pub const OP_CONTROL_EN: u8 = 0x80;
 pub const OP_CONTROL_RX_EN: u8 = 0x40;
 
 /// Section 4.5.3 `Operation control register`: enable transmitter bit (`tx_en`).
-pub const OP_CONTROL_TX_EN: u8 = 0x20;
+pub const OP_CONTROL_TX_EN: u8 = 1 << 3;
 
 /// Section 4.5.4 `Mode definition register`: Target mode bit (`targ = 1`).
 pub const MODE_TARG: u8 = 0x80;
 
-/// Section 4.5.4 `Mode definition register`: Initiator ISO14443-A mode (`om = 0000b`).
-pub const MODE_INITIATOR_ISO14443A: u8 = 0x00;
+/// Section 4.5.4 `Mode definition register`: Initiator ISO14443-A mode (`om = 0001b`).
+pub const MODE_INITIATOR_ISO14443A: u8 = 0x01 << 3;
 
 /// Section 4.5.4 `Mode definition register`: Passive target ISO14443-A mode (`targ = 1`, `om = 0001b`).
 pub const MODE_TARGET_ISO14443A: u8 = MODE_TARG | 0x08;
@@ -167,17 +167,26 @@ pub const MODE_TARGET_NFCIP1_ACTIVE: u8 = MODE_TARG | 0x38;
 /// Section 4.5.4 `Mode definition register`: Target Bit rate detection mode (`targ = 1`, `om = 1000b`).
 pub const MODE_TARGET_BITRATE_DETECT: u8 = MODE_TARG | 0x40;
 
-/// Section 4.5.4 `Mode definition register`: automatic response handling flag (`nfc_ar = 10b`).
-pub const MODE_NFC_AR8_AUTO: u8 = 0x02;
+/// Section 4.5.4 `Mode definition register`: automatic response handling flag (`nfc_ar0 = 1b`).
+pub const MODE_NFC_AR8_AUTO: u8 = 1 << 0;
 
-/// Section 4.5.34 `Main interrupt register`: TX end interrupt flag (`I_txe`).
-pub const MAIN_IRQ_TXE: u8 = 0x80;
+/// Section 4.5.34 `Main interrupt register`: Oscillator stable interrupt flag (`I_osc`).
+pub const MAIN_IRQ_OSC: u8 = 1 << 7;
+
+/// Section 4.5.34 `Main interrupt register`: FIFO water level interrupt flag (`I_wl`).
+pub const MAIN_IRQ_WL: u8 = 1 << 6;
 
 /// Section 4.5.34 `Main interrupt register`: RX start interrupt flag (`I_rxs`).
-pub const MAIN_IRQ_RXS: u8 = 0x40;
+pub const MAIN_IRQ_RXS: u8 = 1 << 5;
 
 /// Section 4.5.34 `Main interrupt register`: RX end interrupt flag (`I_rxe`).
-pub const MAIN_IRQ_RXE: u8 = 0x20;
+pub const MAIN_IRQ_RXE: u8 = 1 << 4;
+
+/// Section 4.5.34 `Main interrupt register`: TX end interrupt flag (`I_txe`).
+pub const MAIN_IRQ_TXE: u8 = 1 << 3;
+
+/// Section 4.5.34 `Main interrupt register`: Collision detected interrupt flag (`I_col`).
+pub const MAIN_IRQ_COL: u8 = 1 << 2;
 
 /// Section 4.5.35 `Timer and NFC interrupt register`: No-response timer timeout flag (`I_nre`).
 pub const TIMER_NFC_IRQ_NRE: u8 = 0x08;
@@ -255,7 +264,7 @@ pub const PASSIVE_TARGET_MOD_PT_RES_MASK: u8 = 0x0F;
 pub const PASSIVE_TARGET_MOD_PTM_RES_MASK: u8 = 0xF0;
 
 /// Section 4.5.62 `Auxiliary display register`: oscillator stable flag (`osc_ok`).
-pub const AUX_DISPLAY_OSC_OK: u8 = 0x80;
+pub const AUX_DISPLAY_OSC_OK: u8 = 1 << 4;
 
 /// Section 4.5.62 `Auxiliary display register`: transmitter active flag (`tx_on`).
 pub const AUX_DISPLAY_TX_ON: u8 = 1 << 5;

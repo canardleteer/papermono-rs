@@ -106,6 +106,9 @@ pub const LORA_SCAN_CAPACITY: usize = 96;
 /// Bytes reserved for an NFC tag detection line (`nfc_tag type=iso14443a ...`).
 pub const NFC_TAG_CAPACITY: usize = 96;
 
+/// Bytes reserved for an NFC smart card application line (`nfc_app app=fido ver=2.0`).
+pub const NFC_APP_CAPACITY: usize = 96;
+
 /// Bytes reserved for a snowflake render timing line (`snowflake us=12345`).
 pub const SNOWFLAKE_CAPACITY: usize = 48;
 
@@ -274,6 +277,32 @@ pub struct NfcTagSample {
     pub uid_first: u8,
     /// Last byte of UID.
     pub uid_last: u8,
+}
+
+/// High-level smart card application kind detected over ISO-DEP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NfcAppKind {
+    /// FIDO2 / CTAP / U2F security key.
+    Fido,
+    /// NIST SP 800-73-4 Personal Identity Verification.
+    Piv,
+    /// OpenPGP smart card application.
+    OpenPgp,
+    /// YubiKey authenticator (detected via ATS historical bytes).
+    YubiKey,
+    /// Generic or unidentified ISO-DEP application.
+    IsoDep,
+}
+
+/// Discovered smart card application summary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NfcAppSample {
+    /// Application kind.
+    pub kind: NfcAppKind,
+    /// Major version (e.g. 2 for FIDO2, 3 for OpenPGP 3.4).
+    pub ver_major: u8,
+    /// Minor version (e.g. 0 for FIDO2.0, 4 for OpenPGP 3.4).
+    pub ver_minor: u8,
 }
 
 /// Stamp LoRa-1262 (SX1262) packet transmission result.
@@ -731,6 +760,27 @@ pub fn format_nfc_tag<'a>(
         format_args!(
             "{}: nfc_tag type=iso14443a atqa={:04x} sak={:02x} len={} uid={:02x}..{:02x}",
             LOG_PREFIX, sample.atqa, sample.sak, sample.uid_len, sample.uid_first, sample.uid_last,
+        ),
+    )
+}
+
+/// Writes `nfc_app` smart card application discovery report without a trailing newline.
+pub fn format_nfc_app<'a>(
+    sample: &NfcAppSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    let app_str = match sample.kind {
+        NfcAppKind::Fido => "fido",
+        NfcAppKind::Piv => "piv",
+        NfcAppKind::OpenPgp => "openpgp",
+        NfcAppKind::YubiKey => "yubikey",
+        NfcAppKind::IsoDep => "isodep",
+    };
+    write_into(
+        buf,
+        format_args!(
+            "{}: nfc_app app={} ver={}.{}",
+            LOG_PREFIX, app_str, sample.ver_major, sample.ver_minor,
         ),
     )
 }
@@ -1685,6 +1735,32 @@ mod tests {
             line,
             "simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c"
         );
+    }
+
+    #[test]
+    fn nfc_app_formats_smart_card_app() {
+        let mut buf = [0u8; NFC_APP_CAPACITY];
+        let line = format_nfc_app(
+            &NfcAppSample {
+                kind: NfcAppKind::Fido,
+                ver_major: 2,
+                ver_minor: 0,
+            },
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(line, "simple-debug: nfc_app app=fido ver=2.0");
+
+        let yubi_line = format_nfc_app(
+            &NfcAppSample {
+                kind: NfcAppKind::YubiKey,
+                ver_major: 5,
+                ver_minor: 0,
+            },
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(yubi_line, "simple-debug: nfc_app app=yubikey ver=5.0");
     }
 
     #[test]

@@ -2191,7 +2191,7 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     let (banner_str, btn_label) = match state {
         NfcCardState::Unpopulated => ("[ HARDWARE UNPOPULATED ]", "[ NOT AVAILABLE ]"),
         NfcCardState::Idle => ("[ NFC READY - TAP TO SCAN ]", "[ POLL TAG ]"),
-        NfcCardState::Detected(_) => ("[ TAG DETECTED ]", "[ POLL AGAIN ]"),
+        NfcCardState::Detected(_, _) => ("[ TAG DETECTED ]", "[ POLL AGAIN ]"),
         NfcCardState::NoTag => ("[ NO TAG DETECTED ]", "[ POLL AGAIN ]"),
     };
 
@@ -2268,7 +2268,7 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
             .draw(&mut ink);
         }
         #[cfg(feature = "c153")]
-        NfcCardState::Detected(card) => {
+        NfcCardState::Detected(card, app) => {
             let _ = Text::new(
                 "Protocol:   ISO/IEC 14443-A",
                 Point::new(i32::from(content_x), line_y),
@@ -2322,20 +2322,104 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
             }
             line_y += step_y;
 
-            let type_str = if card.uid_len == 7 {
-                "Type: NFC Forum Type 2 / NTAG"
-            } else if card.sak == 0x08 {
-                "Type: MIFARE Classic 1K"
-            } else if card.sak == 0x20 || card.sak == 0x28 {
-                "Type: ISO14443-4 / Contactless"
-            } else {
-                "Type: ISO14443-A Transponder"
+            let mut type_buf = [0u8; 48];
+            let mut w_type = BufWriter {
+                buf: &mut type_buf,
+                pos: 0,
             };
-            let _ =
-                Text::new(type_str, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            match app {
+                crate::nfc::DetectedApp::Fido {
+                    ver_major,
+                    ver_minor,
+                } => {
+                    let _ = write!(w_type, "App:  FIDO CTAP ({}.{})", ver_major, ver_minor);
+                }
+                crate::nfc::DetectedApp::Piv {
+                    uuid_first,
+                    uuid_last,
+                } => {
+                    let _ = write!(
+                        w_type,
+                        "App:  PIV Card (ID: {:02X}..{:02X})",
+                        uuid_first, uuid_last
+                    );
+                }
+                crate::nfc::DetectedApp::OpenPgp {
+                    ver_major,
+                    ver_minor,
+                    ..
+                } => {
+                    let mfr = app.openpgp_manufacturer();
+                    let _ = write!(
+                        w_type,
+                        "App:  OpenPGP {}.{} ({})",
+                        ver_major, ver_minor, mfr
+                    );
+                }
+                crate::nfc::DetectedApp::YubiKey { .. } => {
+                    let _ = write!(w_type, "Type: YubiKey 5 Series (NFC)");
+                }
+                crate::nfc::DetectedApp::IsoDep => {
+                    let _ = write!(w_type, "Type: ISO14443-4 T=CL Smart Card");
+                }
+                crate::nfc::DetectedApp::None => {
+                    if card.uid_len == 7 {
+                        let _ = write!(w_type, "Type: NFC Forum Type 2 / NTAG");
+                    } else if card.sak == 0x08 {
+                        let _ = write!(w_type, "Type: MIFARE Classic 1K");
+                    } else {
+                        let _ = write!(w_type, "Type: ISO14443-A Transponder");
+                    }
+                }
+            }
+            if let Ok(s) = core::str::from_utf8(&w_type.buf[..w_type.pos]) {
+                let _ =
+                    Text::new(s, Point::new(i32::from(content_x), line_y), style).draw(&mut ink);
+            }
+
+            if let crate::nfc::DetectedApp::YubiKey {
+                has_fido,
+                has_piv,
+                has_openpgp,
+            } = app
+            {
+                line_y += step_y;
+                let mut apps_buf = [0u8; 48];
+                let mut w_apps = BufWriter {
+                    buf: &mut apps_buf,
+                    pos: 0,
+                };
+                let _ = write!(w_apps, "Apps: ");
+                let mut any = false;
+                if has_fido {
+                    let _ = write!(w_apps, "FIDO2");
+                    any = true;
+                }
+                if has_piv {
+                    if any {
+                        let _ = write!(w_apps, ", ");
+                    }
+                    let _ = write!(w_apps, "PIV");
+                    any = true;
+                }
+                if has_openpgp {
+                    if any {
+                        let _ = write!(w_apps, ", ");
+                    }
+                    let _ = write!(w_apps, "OpenPGP");
+                    any = true;
+                }
+                if !any {
+                    let _ = write!(w_apps, "ISO-DEP");
+                }
+                if let Ok(s) = core::str::from_utf8(&w_apps.buf[..w_apps.pos]) {
+                    let _ = Text::new(s, Point::new(i32::from(content_x), line_y), style)
+                        .draw(&mut ink);
+                }
+            }
         }
         #[cfg(not(feature = "c153"))]
-        NfcCardState::Detected(_) => {}
+        NfcCardState::Detected(_, _) => {}
         NfcCardState::NoTag => {
             let _ = Text::new(
                 "Controller: ST25R3916",
@@ -2378,11 +2462,11 @@ fn draw_nfc(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
         .draw(&mut ink);
 
         let steps = [
-            "1. Hold contactless card or Flipper near.",
+            "1. Hold card at bottom-right rear.",
             "2. Tap [ POLL TAG ] button below.",
             "3. Flipper: 'Detect Reader' detects 13.56M.",
             "4. Flipper: Emulate NTAG -> reads 7B UID.",
-            "5. Credit card: reads 4B random UID.",
+            "5. FIDO/PIV/OpenPGP: identifies smart card.",
         ];
         let mut step_y = 415;
         for s in steps {

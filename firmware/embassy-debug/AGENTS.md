@@ -252,7 +252,12 @@ exercised via the `nfc` card:
 - Transmits 7-bit short-frame WUPA/REQA commands, performs anticollision
   cascades (CL1 / CL2), reads SAK, and extracts the card UID.
 - Masks middle UID bytes on serial for privacy (`nfc_tag type=iso14443a`).
-- Renders tag details (UID, SAK, cascade level) on the e-paper panel.
+- If SAK indicates ISO/IEC 14443-4 compliance, issues RATS activation and
+  probes for smart card applications: FIDO CTAP (`authenticatorGetInfo`),
+  PIV (CHUID Card UUID), and OpenPGP Card (version and manufacturer ID),
+  logging `nfc_app app=...`.
+- Renders tag details (UID, SAK, cascade level, smart card application) on
+  the e-paper panel.
 - Immediately de-energizes the RF field and parks the peripheral between
   polls to conserve power and prevent bus contention.
 

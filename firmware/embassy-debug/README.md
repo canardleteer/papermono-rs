@@ -114,16 +114,16 @@ Short-press BUTTON B. The glass walks forward: splash → lora_scan
 (tap `[ START SCAN ]` to sweep 104 US915 channels for energy and packets) →
 lora (tap `[ TX PING ]` for bench-safe 915 MHz burst or `[ LISTEN RX ]` for
 up to 60 s sniffer window) → nfc (tap `[ POLL TAG ]` for ISO14443-A UID
-reading and contactless card testing) → wifi hotspot (tap `[ START HOTSPOT ]`
-for SSID `PaperMono-AP`, password `mono2026`, URL `http://192.168.4.1/`) →
-wifi survey (tap `[ START SURVEY ]` for 2.4 GHz channel occupancy) →
-bluetooth (BLE peripheral pairing with 6-digit PIN passkey and status) →
-legend (pinout, touch rails, sleep instructions, live battery gauge) →
-shapes (procedural 3-degree Koch snowflake with benchmark) → tones → targets,
-then wrap. Survey and hotspot cannot run together: starting one stops the other.
-BUTTON A walks the other way. CDC prints `scene=`, `snowflake us=`,
-`wifi_survey`, `wifi_ap`, `wifi_http`, `nfc_tag`, `lora_tx`, `lora_rx`, and
-`lora_scan`.
+reading and smart card authentication testing) → wifi hotspot (tap
+`[ START HOTSPOT ]` for SSID `PaperMono-AP`, password `mono2026`, URL
+`http://192.168.4.1/`) → wifi survey (tap `[ START SURVEY ]` for 2.4 GHz
+channel occupancy) → bluetooth (BLE peripheral pairing with 6-digit PIN
+passkey and status) → legend (pinout, touch rails, sleep instructions, live
+battery gauge) → shapes (procedural 3-degree Koch snowflake with
+benchmark) → tones → targets, then wrap. Survey and hotspot cannot run
+together: starting one stops the other. BUTTON A walks the other way.
+CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
+`wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, and `lora_scan`.
 
 ### Step 5: Slide the lamp
 

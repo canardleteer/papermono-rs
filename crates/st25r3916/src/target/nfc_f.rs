@@ -131,7 +131,7 @@ mod tests {
             Transaction::write(ADDR, std::vec![REG_BIT_RATE, 0x11]),
             Transaction::write(
                 ADDR,
-                std::vec![REG_MODE_DEFINITION, MODE_TARGET_FELICA | 0x02],
+                std::vec![REG_MODE_DEFINITION, MODE_TARGET_FELICA | MODE_NFC_AR8_AUTO],
             ),
             Transaction::write(ADDR, std::vec![REG_OP_CONTROL, 0xC0]),
         ];

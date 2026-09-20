@@ -52,6 +52,101 @@ use m5stack_papermono::nfc::{self, St25r3916};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Iso14443aCard;
 
+/// Discovered high-level smart card application or ISO-DEP profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectedApp {
+    /// Standard NFC transponder without ISO-DEP.
+    None,
+    /// FIDO2 / CTAP / U2F authenticator key.
+    Fido {
+        /// Major CTAP version.
+        ver_major: u8,
+        /// Minor CTAP version.
+        ver_minor: u8,
+    },
+    /// NIST SP 800-73-4 Personal Identity Verification card.
+    Piv {
+        /// First byte of Card UUID (or 0).
+        uuid_first: u8,
+        /// Last byte of Card UUID (or 0).
+        uuid_last: u8,
+    },
+    /// OpenPGP smart card application.
+    OpenPgp {
+        /// Specification major version.
+        ver_major: u8,
+        /// Specification minor version.
+        ver_minor: u8,
+        /// 2-byte manufacturer ID.
+        manufacturer_id: u16,
+    },
+    /// YubiKey authenticator (detected via ATS historical bytes or multi-profile probe).
+    YubiKey {
+        /// FIDO2 / CTAP / U2F profile present.
+        has_fido: bool,
+        /// NIST SP 800-73-4 PIV profile present.
+        has_piv: bool,
+        /// OpenPGP smart card profile present.
+        has_openpgp: bool,
+    },
+    /// Unidentified ISO/IEC 14443-4 T=CL smart card.
+    IsoDep,
+}
+
+impl DetectedApp {
+    /// Converts to a `papermono_log::NfcAppSample` if a smart card application is present.
+    #[must_use]
+    pub fn to_log_sample(&self) -> Option<papermono_log::NfcAppSample> {
+        match self {
+            Self::None => None,
+            Self::Fido {
+                ver_major,
+                ver_minor,
+            } => Some(papermono_log::NfcAppSample {
+                kind: papermono_log::NfcAppKind::Fido,
+                ver_major: *ver_major,
+                ver_minor: *ver_minor,
+            }),
+            Self::Piv { .. } => Some(papermono_log::NfcAppSample {
+                kind: papermono_log::NfcAppKind::Piv,
+                ver_major: 1,
+                ver_minor: 0,
+            }),
+            Self::OpenPgp {
+                ver_major,
+                ver_minor,
+                ..
+            } => Some(papermono_log::NfcAppSample {
+                kind: papermono_log::NfcAppKind::OpenPgp,
+                ver_major: *ver_major,
+                ver_minor: *ver_minor,
+            }),
+            Self::YubiKey { .. } => Some(papermono_log::NfcAppSample {
+                kind: papermono_log::NfcAppKind::YubiKey,
+                ver_major: 5,
+                ver_minor: 0,
+            }),
+            Self::IsoDep => Some(papermono_log::NfcAppSample {
+                kind: papermono_log::NfcAppKind::IsoDep,
+                ver_major: 4,
+                ver_minor: 0,
+            }),
+        }
+    }
+
+    /// Looks up human-readable manufacturer name for OpenPGP cards.
+    #[must_use]
+    pub fn openpgp_manufacturer(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "c153")]
+            Self::OpenPgp {
+                manufacturer_id, ..
+            } => m5stack_papermono::nfc::manufacturer_name(*manufacturer_id),
+            _ => "Unknown",
+        }
+    }
+}
+
 /// High-level UI status of the NFC card interface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NfcCardState {
@@ -60,7 +155,7 @@ pub enum NfcCardState {
     /// Controller detected and ready for an on-demand poll.
     Idle,
     /// A contactless tag was detected in the active RF field.
-    Detected(Iso14443aCard),
+    Detected(Iso14443aCard, DetectedApp),
     /// Tag polling concluded without detecting any transponder.
     NoTag,
 }
@@ -89,6 +184,16 @@ static DETECTED_UID: [AtomicU8; 10] = [
     AtomicU8::new(0),
     AtomicU8::new(0),
 ];
+#[cfg(feature = "c153")]
+static DETECTED_APP_TYPE: AtomicU8 = AtomicU8::new(0);
+#[cfg(feature = "c153")]
+static DETECTED_APP_V1: AtomicU8 = AtomicU8::new(0);
+#[cfg(feature = "c153")]
+static DETECTED_APP_V2: AtomicU8 = AtomicU8::new(0);
+#[cfg(feature = "c153")]
+static DETECTED_APP_EXTRA1: AtomicU8 = AtomicU8::new(0);
+#[cfg(feature = "c153")]
+static DETECTED_APP_EXTRA2: AtomicU8 = AtomicU8::new(0);
 
 /// Initializes the NFC state tracking for the active board SKU.
 pub fn init_status(has_nfc: bool) {
@@ -121,12 +226,47 @@ pub fn card_state() -> NfcCardState {
             for (i, slot) in DETECTED_UID.iter().enumerate() {
                 uid[i] = slot.load(Ordering::Relaxed);
             }
-            NfcCardState::Detected(Iso14443aCard {
-                atqa: [(atqa_raw & 0xFF) as u8, (atqa_raw >> 8) as u8],
-                sak,
-                uid_len,
-                uid,
-            })
+            let app_type = DETECTED_APP_TYPE.load(Ordering::Relaxed);
+            let v1 = DETECTED_APP_V1.load(Ordering::Relaxed);
+            let v2 = DETECTED_APP_V2.load(Ordering::Relaxed);
+            let ex1 = DETECTED_APP_EXTRA1.load(Ordering::Relaxed);
+            let ex2 = DETECTED_APP_EXTRA2.load(Ordering::Relaxed);
+
+            let app = match app_type {
+                1 => DetectedApp::Fido {
+                    ver_major: v1,
+                    ver_minor: v2,
+                },
+                2 => DetectedApp::Piv {
+                    uuid_first: ex1,
+                    uuid_last: ex2,
+                },
+                3 => {
+                    let mfr_id = ((ex1 as u16) << 8) | (ex2 as u16);
+                    DetectedApp::OpenPgp {
+                        ver_major: v1,
+                        ver_minor: v2,
+                        manufacturer_id: mfr_id,
+                    }
+                }
+                4 => DetectedApp::IsoDep,
+                5 => DetectedApp::YubiKey {
+                    has_fido: (v1 & 0x01) != 0,
+                    has_piv: (v1 & 0x02) != 0,
+                    has_openpgp: (v1 & 0x04) != 0,
+                },
+                _ => DetectedApp::None,
+            };
+
+            NfcCardState::Detected(
+                Iso14443aCard {
+                    atqa: [(atqa_raw & 0xFF) as u8, (atqa_raw >> 8) as u8],
+                    sak,
+                    uid_len,
+                    uid,
+                },
+                app,
+            )
         }
         #[cfg(not(feature = "c153"))]
         2 => NfcCardState::NoTag,
@@ -136,13 +276,59 @@ pub fn card_state() -> NfcCardState {
 
 /// Stores a newly detected contactless tag into shared memory.
 #[cfg(feature = "c153")]
-fn store_detected(card: &Iso14443aCard) {
+fn store_detected(card: &Iso14443aCard, app: DetectedApp) {
     let atqa_raw = (card.atqa[0] as u16) | ((card.atqa[1] as u16) << 8);
     DETECTED_ATQA.store(atqa_raw, Ordering::Relaxed);
     DETECTED_SAK.store(card.sak, Ordering::Relaxed);
     DETECTED_UID_LEN.store(card.uid_len as u8, Ordering::Relaxed);
     for (i, b) in card.uid.iter().enumerate() {
         DETECTED_UID[i].store(*b, Ordering::Relaxed);
+    }
+    match app {
+        DetectedApp::None => {
+            DETECTED_APP_TYPE.store(0, Ordering::Relaxed);
+        }
+        DetectedApp::Fido {
+            ver_major,
+            ver_minor,
+        } => {
+            DETECTED_APP_TYPE.store(1, Ordering::Relaxed);
+            DETECTED_APP_V1.store(ver_major, Ordering::Relaxed);
+            DETECTED_APP_V2.store(ver_minor, Ordering::Relaxed);
+        }
+        DetectedApp::Piv {
+            uuid_first,
+            uuid_last,
+        } => {
+            DETECTED_APP_TYPE.store(2, Ordering::Relaxed);
+            DETECTED_APP_EXTRA1.store(uuid_first, Ordering::Relaxed);
+            DETECTED_APP_EXTRA2.store(uuid_last, Ordering::Relaxed);
+        }
+        DetectedApp::OpenPgp {
+            ver_major,
+            ver_minor,
+            manufacturer_id,
+        } => {
+            DETECTED_APP_TYPE.store(3, Ordering::Relaxed);
+            DETECTED_APP_V1.store(ver_major, Ordering::Relaxed);
+            DETECTED_APP_V2.store(ver_minor, Ordering::Relaxed);
+            DETECTED_APP_EXTRA1.store((manufacturer_id >> 8) as u8, Ordering::Relaxed);
+            DETECTED_APP_EXTRA2.store((manufacturer_id & 0xFF) as u8, Ordering::Relaxed);
+        }
+        DetectedApp::IsoDep => {
+            DETECTED_APP_TYPE.store(4, Ordering::Relaxed);
+        }
+        DetectedApp::YubiKey {
+            has_fido,
+            has_piv,
+            has_openpgp,
+        } => {
+            DETECTED_APP_TYPE.store(5, Ordering::Relaxed);
+            let flags = (if has_fido { 0x01 } else { 0 })
+                | (if has_piv { 0x02 } else { 0 })
+                | (if has_openpgp { 0x04 } else { 0 });
+            DETECTED_APP_V1.store(flags, Ordering::Relaxed);
+        }
     }
     NFC_STATE_CODE.store(2, Ordering::Relaxed);
 }
@@ -156,7 +342,7 @@ pub fn set_no_tag() {
 ///
 /// Hardware power rail `PYG4` is energized for the duration of this call and guaranteed
 /// de-asserted upon return. The RF field is active for under 60 milliseconds.
-pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCard> {
+pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<(Iso14443aCard, DetectedApp)> {
     #[cfg(feature = "c153")]
     {
         // 1. Energize the ST25R3916 power gate via M5IOE1 expander pin PYG4.
@@ -189,7 +375,16 @@ pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCar
                     // (matching M5PaperMono-UserDemo NFC_A_SCAN_WINDOW_MS) to give the human
                     // ample time to hold a card or Flipper Zero against the antenna.
                     let mut detected_atqa = None;
-                    for _attempt in 0..35 {
+                    for attempt in 0..35 {
+                        // After first half of attempts, if no tag detected with stability gain,
+                        // boost sensitivity to sensitivity-priority (0 dB reduction)
+                        // to support small-antenna transponders like YubiKeys / keyfobs.
+                        if attempt == 18 {
+                            let _ = st.write_reg(nfc::REG_RECEIVER_CONF3, 0x00);
+                            let _ = st.write_reg(nfc::REG_RECEIVER_CONF4, 0x00);
+                            let _ = st.direct_cmd(nfc::CMD_RESET_RX_GAIN);
+                        }
+
                         let _ = st.send_reqa();
                         Timer::after(Duration::from_millis(5)).await;
                         if let Ok(Some(atqa)) = st.read_atqa() {
@@ -252,6 +447,92 @@ pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCar
                                             card.uid_len = 4;
                                             card.sak = sak1;
 
+                                            // If card supports ISO/IEC 14443-4, perform RATS and probe smart card apps.
+                                            let mut detected_app = DetectedApp::None;
+                                            if card.is_iso14443_4() {
+                                                esp_println::println!(
+                                                    "simple-debug: nfc_poll step=rats_activate"
+                                                );
+                                                match st.activate_isodep() {
+                                                    Ok(ats) => {
+                                                        esp_println::println!(
+                                                            "simple-debug: nfc_poll step=ats fwi={} fsc={} hist_len={} hist={:02x?}",
+                                                            ats.fwi(),
+                                                            ats.fsc,
+                                                            ats.historical_bytes.len(),
+                                                            ats.historical_bytes.as_slice()
+                                                        );
+                                                        match st.probe_smart_card(&ats) {
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Fido(fido_info)) => {
+                                                                esp_println::println!("simple-debug: nfc_poll app=fido");
+                                                                let (v_maj, v_min) = if fido_info.is_fido2() { (2, 0) } else { (1, 0) };
+                                                                detected_app = DetectedApp::Fido {
+                                                                    ver_major: v_maj,
+                                                                    ver_minor: v_min,
+                                                                };
+                                                            }
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Piv(piv_info)) => {
+                                                                esp_println::println!("simple-debug: nfc_poll app=piv");
+                                                                let (u0, u1) = if let Some(uuid) = piv_info.card_uuid {
+                                                                    (uuid[0], uuid[15])
+                                                                } else {
+                                                                    (0, 0)
+                                                                };
+                                                                detected_app = DetectedApp::Piv {
+                                                                    uuid_first: u0,
+                                                                    uuid_last: u1,
+                                                                };
+                                                            }
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::OpenPgp(pgp_info)) => {
+                                                                esp_println::println!(
+                                                                    "simple-debug: nfc_poll app=openpgp v={}.{} mfr={:04x}",
+                                                                    pgp_info.version_major(),
+                                                                    pgp_info.version_minor(),
+                                                                    pgp_info.manufacturer_id()
+                                                                );
+                                                                detected_app = DetectedApp::OpenPgp {
+                                                                    ver_major: pgp_info.version_major(),
+                                                                    ver_minor: pgp_info.version_minor(),
+                                                                    manufacturer_id: pgp_info.manufacturer_id(),
+                                                                };
+                                                            }
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::YubiKey(ref profiles)) => {
+                                                                let has_fido = profiles.fido.is_some();
+                                                                let has_piv = profiles.piv.is_some();
+                                                                let has_openpgp = profiles.openpgp.is_some();
+                                                                esp_println::println!(
+                                                                    "simple-debug: nfc_poll app=yubikey fido={} piv={} openpgp={} sw_fido={:04x} sw_piv={:04x} sw_pgp={:04x}",
+                                                                    has_fido,
+                                                                    has_piv,
+                                                                    has_openpgp,
+                                                                    profiles.fido_sw,
+                                                                    profiles.piv_sw,
+                                                                    profiles.openpgp_sw
+                                                                );
+                                                                detected_app = DetectedApp::YubiKey {
+                                                                    has_fido,
+                                                                    has_piv,
+                                                                    has_openpgp,
+                                                                };
+                                                            }
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Generic(_)) => {
+                                                                esp_println::println!("simple-debug: nfc_poll app=isodep");
+                                                                detected_app = DetectedApp::IsoDep;
+                                                            }
+                                                            Err(_) => {
+                                                                esp_println::println!("simple-debug: nfc_poll app=probe_err");
+                                                                detected_app = DetectedApp::IsoDep;
+                                                            }
+                                                        }
+                                                    }
+                                                    Err(_) => {
+                                                        esp_println::println!(
+                                                            "simple-debug: nfc_poll step=rats_err"
+                                                        );
+                                                    }
+                                                }
+                                            }
+
                                             // Safely park RF field and power gate.
                                             let _ = st.disable_field();
                                             let _ = crate::ioe::set_push_pull_output(
@@ -259,8 +540,8 @@ pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCar
                                                 nfc::IOE1_ENABLE,
                                                 false,
                                             );
-                                            store_detected(&card);
-                                            return Some(card);
+                                            store_detected(&card, detected_app);
+                                            return Some((card, detected_app));
                                         } else {
                                             // 7-byte double-size UID: query Cascade Level 2.
                                             Timer::after(Duration::from_millis(5)).await;
@@ -291,6 +572,89 @@ pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCar
                                                             card.uid_len = 7;
                                                             card.sak = sak2;
 
+                                                            // If card supports ISO/IEC 14443-4, perform RATS and probe smart card apps.
+                                                            let mut detected_app =
+                                                                DetectedApp::None;
+                                                            if card.is_iso14443_4() {
+                                                                esp_println::println!("simple-debug: nfc_poll step=rats_activate");
+                                                                match st.activate_isodep() {
+                                                                    Ok(ats) => {
+                                                                        esp_println::println!(
+                                                                            "simple-debug: nfc_poll step=ats fwi={} fsc={} hist_len={} hist={:02x?}",
+                                                                            ats.fwi(),
+                                                                            ats.fsc,
+                                                                            ats.historical_bytes.len(),
+                                                                            ats.historical_bytes.as_slice()
+                                                                        );
+                                                                        match st.probe_smart_card(&ats) {
+                                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Fido(fido_info)) => {
+                                                                                esp_println::println!("simple-debug: nfc_poll app=fido");
+                                                                                let (v_maj, v_min) = if fido_info.is_fido2() { (2, 0) } else { (1, 0) };
+                                                                                detected_app = DetectedApp::Fido {
+                                                                                    ver_major: v_maj,
+                                                                                    ver_minor: v_min,
+                                                                                };
+                                                                            }
+                                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Piv(piv_info)) => {
+                                                                                esp_println::println!("simple-debug: nfc_poll app=piv");
+                                                                                let (u0, u1) = if let Some(uuid) = piv_info.card_uuid {
+                                                                                    (uuid[0], uuid[15])
+                                                                                } else {
+                                                                                    (0, 0)
+                                                                                };
+                                                                                detected_app = DetectedApp::Piv {
+                                                                                    uuid_first: u0,
+                                                                                    uuid_last: u1,
+                                                                                };
+                                                                            }
+                                                                            Ok(m5stack_papermono::nfc::SmartCardApp::OpenPgp(pgp_info)) => {
+                                                                                esp_println::println!(
+                                                                                    "simple-debug: nfc_poll app=openpgp v={}.{} mfr={:04x}",
+                                                                                    pgp_info.version_major(),
+                                                                                    pgp_info.version_minor(),
+                                                                                    pgp_info.manufacturer_id()
+                                                                                );
+                                                                                detected_app = DetectedApp::OpenPgp {
+                                                                                    ver_major: pgp_info.version_major(),
+                                                                                    ver_minor: pgp_info.version_minor(),
+                                                                                    manufacturer_id: pgp_info.manufacturer_id(),
+                                                                                };
+                                                                            }
+                                                            Ok(m5stack_papermono::nfc::SmartCardApp::YubiKey(ref profiles)) => {
+                                                                let has_fido = profiles.fido.is_some();
+                                                                let has_piv = profiles.piv.is_some();
+                                                                let has_openpgp = profiles.openpgp.is_some();
+                                                                esp_println::println!(
+                                                                    "simple-debug: nfc_poll app=yubikey fido={} piv={} openpgp={} sw_fido={:04x} sw_piv={:04x} sw_pgp={:04x}",
+                                                                    has_fido,
+                                                                    has_piv,
+                                                                    has_openpgp,
+                                                                    profiles.fido_sw,
+                                                                    profiles.piv_sw,
+                                                                    profiles.openpgp_sw
+                                                                );
+                                                                                detected_app = DetectedApp::YubiKey {
+                                                                                    has_fido,
+                                                                                    has_piv,
+                                                                                    has_openpgp,
+                                                                                };
+                                                                            }
+                                                                            Ok(m5stack_papermono::nfc::SmartCardApp::Generic(_)) => {
+                                                                                esp_println::println!("simple-debug: nfc_poll app=isodep");
+                                                                                detected_app = DetectedApp::IsoDep;
+                                                                            }
+                                                                            Err(_) => {
+                                                                                esp_println::println!("simple-debug: nfc_poll app=probe_err");
+                                                                                detected_app = DetectedApp::IsoDep;
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    Err(_) => {
+                                                                        esp_println::println!("simple-debug: nfc_poll step=rats_err");
+                                                                    }
+                                                                }
+                                                            }
+
                                                             // Safely park RF field and power gate.
                                                             let _ = st.disable_field();
                                                             let _ =
@@ -299,8 +663,8 @@ pub async fn poll_iso14443a(i2c: &mut crate::ioe::SysI2c) -> Option<Iso14443aCar
                                                                     nfc::IOE1_ENABLE,
                                                                     false,
                                                                 );
-                                                            store_detected(&card);
-                                                            return Some(card);
+                                                            store_detected(&card, detected_app);
+                                                            return Some((card, detected_app));
                                                         }
                                                         Ok(None) => {
                                                             esp_println::println!(

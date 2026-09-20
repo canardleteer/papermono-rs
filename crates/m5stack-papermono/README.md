@@ -13,7 +13,8 @@ model (`C153`):
 
 - **ST25R3916 NFC**: I2C `0x50` controller with `PYG4` power-gating, oscillator
   stabilization, ISO14443-A polling (WUPA/REQA), anticollision cascades (CL1/CL2),
-  SAK acquisition, and UID detection for physical contactless cards.
+  SAK acquisition, UID detection, ISO-DEP (ISO 14443-4) activation (RATS/ATS),
+  and smart card authentication discovery (FIDO CTAP, PIV, OpenPGP Card).
 - **Stamp LoRa-1262 (SX1262)**: Dedicated SPI interface (GPIO38/39/40/41 muxed
   off JTAG), power-gated via M5PM1 `G2` (`3V3_L2_LoRa`), reset via M5IOE1
   `PYG10`, RF antenna switch via M5IOE1 `PYG2`, status queries, packet

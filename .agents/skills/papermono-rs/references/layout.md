@@ -9,6 +9,7 @@
 | `crates/ssd1677-otp/` | Panel OTP sequences. No MCU LUT |
 | `crates/m5pm1/` | PMIC registers + PWM0 |
 | `crates/m5ioe1/` | Expander banks + IP2315 gate typestate |
+| `crates/st25r3916/` | ST25R3916 NFC transceiver driver (initiator, ISO-DEP, smart card probing, target profiles, PT_Memory, framing) |
 | `crates/m5stack-papermono-lite/` | `C153-Lite`. Shared pin map for both SKUs |
 | `crates/m5stack-papermono/` | `C153`. Re-exports Lite; adds NFC + LoRa |
 | `host/` | Default-members. Host libraries (not `xtask`) |

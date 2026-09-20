@@ -29,7 +29,13 @@ This crate provides a `#![no_std]` driver based on `embedded-hal` 1.0.
      Tag 7-byte UID ISO-DEP).
    - FeliCa passive target mode (NFC-F at 212 kbps and 424 kbps).
    - NFCIP-1 passive and active communication target modes (ISO/IEC 18092 P2P).
-3. **Protocol Framing**:
+3. **Protocol Framing & ISO-DEP / Smart Card**:
+   - ISO/IEC 14443-4 (ISO-DEP / T=CL) activation (RATS/ATS) and half-duplex
+     block transmission protocol (I-blocks, R-blocks, S-blocks, and WTX).
+   - ISO/IEC 7816-4 APDU parsing, transceiving with chaining, and status
+     responses.
+   - Smart card application discovery for FIDO CTAP (CTAP2
+     `authenticatorGetInfo`), PIV (NIST SP 800-73-4 CHUID Card UUID), and
+     OpenPGP Card (version and manufacturer ID).
    - NFC Type 2 Tag block layout, capability container (CC), and NDEF TLV.
-   - ISO/IEC 7816-4 APDU parsing and status responses for Type 4A tags.
    - Lightweight NDEF message and record construction.

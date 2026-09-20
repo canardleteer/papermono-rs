@@ -24,13 +24,13 @@ use crate::commands::{
     CMD_TRANSMIT_WITH_CRC, CMD_TRANSMIT_WUPA,
 };
 use crate::registers::{
-    AUX_DISPLAY_OSC_OK, IO_CONF2_AAT_EN, IO_CONF2_IO_DRV_LVL, IO_CONF2_SUP3V,
-    MODE_INITIATOR_ISO14443A, MODE_NFC_AR8_AUTO, OP_CONTROL_EN, OP_CONTROL_RX_EN, OP_CONTROL_TX_EN,
-    REG_ANTENNA_TUNING1, REG_ANTENNA_TUNING2, REG_AUX_DEFINITION, REG_AUX_DISPLAY, REG_BIT_RATE,
-    REG_EXT_FIELD_DETECTOR_ACT, REG_EXT_FIELD_DETECTOR_DEACT, REG_IO_CONF1, REG_IO_CONF2,
-    REG_ISO14443A_SETTINGS, REG_MAIN_IRQ, REG_MODE_DEFINITION, REG_NUM_TX_BYTES1,
-    REG_NUM_TX_BYTES2, REG_OP_CONTROL, REG_RECEIVER_CONF1, REG_RECEIVER_CONF2, REG_RECEIVER_CONF3,
-    REG_RECEIVER_CONF4, REG_TX_DRIVER,
+    AUX_DISPLAY_OSC_OK, IO_CONF2_AAT_EN, IO_CONF2_IO_DRV_LVL, IO_CONF2_SUP3V, MAIN_IRQ_RXE,
+    MAIN_IRQ_TXE, MODE_INITIATOR_ISO14443A, MODE_NFC_AR8_AUTO, OP_CONTROL_EN, OP_CONTROL_RX_EN,
+    OP_CONTROL_TX_EN, REG_ANTENNA_TUNING1, REG_ANTENNA_TUNING2, REG_AUX_DEFINITION,
+    REG_AUX_DISPLAY, REG_BIT_RATE, REG_EXT_FIELD_DETECTOR_ACT, REG_EXT_FIELD_DETECTOR_DEACT,
+    REG_IO_CONF1, REG_IO_CONF2, REG_ISO14443A_SETTINGS, REG_MAIN_IRQ, REG_MODE_DEFINITION,
+    REG_NUM_TX_BYTES1, REG_NUM_TX_BYTES2, REG_OP_CONTROL, REG_RECEIVER_CONF1, REG_RECEIVER_CONF2,
+    REG_RECEIVER_CONF3, REG_RECEIVER_CONF4, REG_TX_DRIVER,
 };
 use embedded_hal::i2c::I2c;
 
@@ -104,6 +104,13 @@ impl Iso14443aCard {
     pub const fn is_double_size(&self) -> bool {
         self.uid_len == 7
     }
+
+    /// Whether SAK indicates compliance with ISO/IEC 14443-4 (bit 5 set, mask `0x20`).
+    #[inline]
+    #[must_use]
+    pub const fn is_iso14443_4(&self) -> bool {
+        (self.sak & 0x20) != 0
+    }
 }
 
 impl<I2C: I2c> crate::St25r3916<I2C> {
@@ -137,10 +144,11 @@ impl<I2C: I2c> crate::St25r3916<I2C> {
         self.write_reg(REG_EXT_FIELD_DETECTOR_ACT, 0x13)?;
         self.write_reg(REG_EXT_FIELD_DETECTOR_DEACT, 0x02)?;
 
-        // 4. Ready mode
+        // 4. Ready mode: enable oscillator, regulator, and automatic external field detector.
         self.write_reg(REG_OP_CONTROL, OP_CONTROL_EN | 0x03)?;
 
-        // 5. Wait for crystal oscillator stability
+        // 5. Wait for crystal oscillator stability before configuring mode registers
+        // (Section 4.5.4 footnote: "Register can be written only in case crystal clock is present and stable (oscok = 1)").
         for _ in 0..100 {
             let aux = self.read_reg(REG_AUX_DISPLAY)?;
             if (aux & AUX_DISPLAY_OSC_OK) != 0 {
@@ -148,10 +156,10 @@ impl<I2C: I2c> crate::St25r3916<I2C> {
             }
         }
 
-        // 6. Adjust regulators
+        // 6. Adjust regulators to calibrate PSRR against actual rail voltage.
         self.direct_cmd(CMD_ADJUST_REGULATORS)?;
 
-        // 7. Mode definition: ISO14443A Initiator mode
+        // 7. Configure Initiator ISO14443-A mode with automatic response handling and 106 kbps rate.
         self.write_reg(
             REG_MODE_DEFINITION,
             MODE_INITIATOR_ISO14443A | MODE_NFC_AR8_AUTO,
@@ -160,14 +168,14 @@ impl<I2C: I2c> crate::St25r3916<I2C> {
         self.write_reg(REG_ISO14443A_SETTINGS, 0x00)?;
         self.write_reg(REG_AUX_DEFINITION, 0x00)?;
 
-        // 8. Receiver frontend configuration
+        // 8. Configure receiver frontend: 600k input impedance, dynamic squelch, AGC, stability-focused gain.
         self.write_reg(REG_RECEIVER_CONF1, RX_CONF1_Z600K)?;
         self.write_reg(REG_RECEIVER_CONF2, RX_CONF2_DEFAULT)?;
         self.write_reg(REG_RECEIVER_CONF3, RX_CONF3_STABILITY)?;
         self.write_reg(REG_RECEIVER_CONF4, RX_CONF4_STABILITY)?;
         self.direct_cmd(CMD_RESET_RX_GAIN)?;
 
-        // 9. Field activation
+        // 9. Energize 13.56 MHz RF field with initial collision avoidance, then enable TX and RX.
         self.direct_cmd(CMD_NFC_INITIAL_FIELD_ON)?;
         self.write_reg(
             REG_OP_CONTROL,
@@ -283,19 +291,44 @@ impl<I2C: I2c> crate::St25r3916<I2C> {
         self.direct_cmd(CMD_TRANSMIT_WITH_CRC)?;
 
         let mut count = 0;
-        let mut n = 0;
+        let mut rxe_seen = false;
+        // Step 1: Wait for transmission end (or reception end if already finished)
         while count < 80 {
-            n = self.fifo_bytes()?;
-            if n >= 1 {
+            let irq = self.read_reg(REG_MAIN_IRQ)?;
+            if (irq & MAIN_IRQ_RXE) != 0 {
+                rxe_seen = true;
+                break;
+            }
+            if (irq & MAIN_IRQ_TXE) != 0 {
                 break;
             }
             count += 1;
         }
+
+        // Step 2: If RXE was not seen yet, wait for reception end
+        if !rxe_seen {
+            count = 0;
+            while count < 80 {
+                let irq = self.read_reg(REG_MAIN_IRQ)?;
+                if (irq & MAIN_IRQ_RXE) != 0 {
+                    rxe_seen = true;
+                    break;
+                }
+                count += 1;
+            }
+        }
+
+        if !rxe_seen {
+            return Ok(None);
+        }
+
+        let n = self.fifo_bytes()?;
         if n < 1 {
             return Ok(None);
         }
         let mut sak = [0u8; 1];
         self.read_fifo(&mut sak)?;
+        self.direct_cmd(CMD_CLEAR_FIFO)?;
         Ok(Some(sak[0]))
     }
 
@@ -354,19 +387,44 @@ impl<I2C: I2c> crate::St25r3916<I2C> {
         self.direct_cmd(CMD_TRANSMIT_WITH_CRC)?;
 
         let mut count = 0;
-        let mut n = 0;
+        let mut rxe_seen = false;
+        // Step 1: Wait for transmission end (or reception end if already finished)
         while count < 80 {
-            n = self.fifo_bytes()?;
-            if n >= 1 {
+            let irq = self.read_reg(REG_MAIN_IRQ)?;
+            if (irq & MAIN_IRQ_RXE) != 0 {
+                rxe_seen = true;
+                break;
+            }
+            if (irq & MAIN_IRQ_TXE) != 0 {
                 break;
             }
             count += 1;
         }
+
+        // Step 2: If RXE was not seen yet, wait for reception end
+        if !rxe_seen {
+            count = 0;
+            while count < 80 {
+                let irq = self.read_reg(REG_MAIN_IRQ)?;
+                if (irq & MAIN_IRQ_RXE) != 0 {
+                    rxe_seen = true;
+                    break;
+                }
+                count += 1;
+            }
+        }
+
+        if !rxe_seen {
+            return Ok(None);
+        }
+
+        let n = self.fifo_bytes()?;
         if n < 1 {
             return Ok(None);
         }
         let mut sak = [0u8; 1];
         self.read_fifo(&mut sak)?;
+        self.direct_cmd(CMD_CLEAR_FIFO)?;
         Ok(Some(sak[0]))
     }
 
@@ -616,10 +674,16 @@ mod tests {
             Transaction::write(ADDRESS, std::vec![CMD_TRANSMIT_WITH_CRC]),
             Transaction::write_read(
                 ADDRESS,
+                std::vec![register_read_cmd(REG_MAIN_IRQ)],
+                std::vec![MAIN_IRQ_RXE],
+            ),
+            Transaction::write_read(
+                ADDRESS,
                 std::vec![register_read_cmd(REG_FIFO_STATUS1)],
                 std::vec![1],
             ),
             Transaction::write_read(ADDRESS, std::vec![MODE_FIFO_READ], std::vec![0x08]),
+            Transaction::write(ADDRESS, std::vec![CMD_CLEAR_FIFO]),
         ];
         let i2c = Mock::new(&txns);
         let mut st = crate::St25r3916::new(i2c, ADDRESS);
@@ -636,6 +700,24 @@ mod tests {
             .unwrap()
             .expect("sak");
         assert_eq!(sak, 0x08);
+
+        let card_classic = Iso14443aCard {
+            atqa,
+            sak,
+            uid_len: 4,
+            uid: [0x08, 0x2C, 0xA1, 0x3F, 0, 0, 0, 0, 0, 0],
+        };
+        assert!(card_classic.is_single_size());
+        assert!(!card_classic.is_double_size());
+        assert!(!card_classic.is_iso14443_4());
+
+        let card_isodep = Iso14443aCard {
+            atqa,
+            sak: 0x20,
+            uid_len: 4,
+            uid: [0x08, 0x2C, 0xA1, 0x3F, 0, 0, 0, 0, 0, 0],
+        };
+        assert!(card_isodep.is_iso14443_4());
 
         st.release().done();
     }

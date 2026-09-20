@@ -189,6 +189,16 @@ pub fn nfc_tag(sample: &papermono_log::NfcTagSample) {
     }
 }
 
+/// Emits detected smart card application summary on PaperMono (`C153`).
+#[cfg(all(feature = "touch", feature = "c153"))]
+#[allow(dead_code)]
+pub fn nfc_app(sample: &papermono_log::NfcAppSample) {
+    let mut buf = [0u8; papermono_log::NFC_APP_CAPACITY];
+    if let Ok(line) = papermono_log::format_nfc_app(sample, &mut buf) {
+        emit(line);
+    }
+}
+
 /// Emits Stamp LoRa-1262 (SX1262) status on PaperMono (`C153`).
 #[cfg(all(feature = "touch", feature = "c153"))]
 pub fn lora(sample: &papermono_log::LoraStatusSample) {

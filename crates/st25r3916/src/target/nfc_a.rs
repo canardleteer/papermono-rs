@@ -182,7 +182,10 @@ mod tests {
             Transaction::write(ADDR, std::vec![REG_NFCIP1_PASSIVE_TARGET, 0x20]),
             Transaction::write(
                 ADDR,
-                std::vec![REG_MODE_DEFINITION, MODE_TARGET_ISO14443A | 0x02],
+                std::vec![
+                    REG_MODE_DEFINITION,
+                    MODE_TARGET_ISO14443A | MODE_NFC_AR8_AUTO,
+                ],
             ),
             Transaction::write(ADDR, std::vec![REG_OP_CONTROL, 0xC0]),
             Transaction::write(ADDR, std::vec![crate::commands::CMD_GOTO_SENSE]),

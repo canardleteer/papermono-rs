@@ -710,7 +710,7 @@ async fn wait_nav(
 
                         // 2. Perform bounded ISO14443-A poll:
                         let maybe_tag = crate::nfc::poll_iso14443a(i2c).await;
-                        if let Some(_card) = maybe_tag {
+                        if let Some((_card, _app)) = maybe_tag {
                             crate::beep::click();
                             #[cfg(feature = "c153")]
                             {
@@ -722,6 +722,9 @@ async fn wait_nav(
                                     uid_last: _card.uid[_card.uid_len.saturating_sub(1)],
                                 };
                                 crate::cdc::nfc_tag(&sample);
+                                if let Some(app_sample) = _app.to_log_sample() {
+                                    crate::cdc::nfc_app(&app_sample);
+                                }
                             }
                         }
                         return Some(Nav::Refresh);

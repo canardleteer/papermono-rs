@@ -34,6 +34,7 @@ simple-debug: wifi_http req=1 path=/ src=192.168.4.2
 simple-debug: imu pose=Portrait0 x=0 y=-16384 z=0
 simple-debug: nfc ack=1 id=05 rev=1
 simple-debug: nfc_tag type=iso14443a atqa=0004 sak=08 len=4 uid=08..2c
+simple-debug: nfc_app app=fido ver=2.0
 simple-debug: lora ack=1 raw=24 mode=2 cmd=2
 simple-debug: lora_tx freq=915.000 pwr=14 sf=7 bw=125 time_ms=58 status=ok
 simple-debug: lora_rx freq=917.625 rssi=-84 snr=7 len=16 preview=ff..0a
@@ -50,7 +51,9 @@ SoftAP CDC may include the fixed demo SSID/password; do not add
 foreign MAC/BSSID/IRK fields. `imu` lines (when `--features
 orient`) report enclosure pose plus raw BMI270 XYZ for axis
 calibration. `nfc_tag` lines mask middle UID bytes on serial for
-user privacy. `lora_tx` lines report user-controlled test ping
+user privacy. `nfc_app` lines report discovered smart card
+applications (FIDO CTAP, PIV, OpenPGP Card, or ISO-DEP). `lora_tx`
+lines report user-controlled test ping
 bursts (+14 dBm bench-safe). `lora_rx` lines report packet sniffer
 captures with first and last preview bytes. `lora_scan` lines
 report US915 channel energy sweeps and packet detections.

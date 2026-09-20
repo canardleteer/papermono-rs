@@ -64,6 +64,8 @@ pub enum LineKind {
     Nfc,
     /// ST25R3916 NFC tag detection report (`nfc_tag`).
     NfcTag,
+    /// ST25R3916 NFC smart card application discovery report (`nfc_app`).
+    NfcApp,
     /// Stamp LoRa-1262 (SX1262) status (`lora`).
     Lora,
     /// Stamp LoRa-1262 (SX1262) packet transmission report (`lora_tx`).
@@ -182,6 +184,7 @@ pub fn classify(body: &str) -> LineKind {
         "imu" => LineKind::Imu,
         "nfc" => LineKind::Nfc,
         "nfc_tag" => LineKind::NfcTag,
+        "nfc_app" => LineKind::NfcApp,
         "lora" => LineKind::Lora,
         "lora_tx" => LineKind::LoraTx,
         "lora_rx" => LineKind::LoraRx,
@@ -381,6 +384,13 @@ mod tests {
                 .unwrap()
                 .kind,
             LineKind::NfcTag
+        );
+        assert_eq!(
+            records("simple-debug: nfc_app app=fido ver=2.0\n")
+                .next()
+                .unwrap()
+                .kind,
+            LineKind::NfcApp
         );
         assert_eq!(
             records("simple-debug: lora ack=1 raw=24 mode=2 cmd=2\n")
