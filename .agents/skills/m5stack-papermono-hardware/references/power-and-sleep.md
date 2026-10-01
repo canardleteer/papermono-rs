@@ -31,7 +31,7 @@ turns the unit back on. Not a current measurement.
 `C153` still
 [nyc-power-button](../resources/not-yet-confirmed.md#nyc-power-button)
 /
-[nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode).
+[measure.md](measure.md).
 
 ## Rail levels (not a series stack)
 
@@ -94,7 +94,7 @@ only; no current meter.
   here. IMU G4 and touch `ext0` not tried.
 
 [nyc-pm1-wake](../resources/not-yet-confirmed.md#nyc-pm1-wake)
-stays open. `C153` open.
+stays open. C153 remains unmeasured for this item.
 
 **Lite interactive button sleep and wake (measured 2026-09-03, `C153-Lite`).**
 Implemented in `embassy-debug-fw` (enabled by default under `sleep` feature).
@@ -182,7 +182,7 @@ percent meter.
 **Lite (2026-09-02, rail verification):** PWM0 `lamp=1024` with
 `PYG3` (`EPD_VDD`) off left the lamp **dark**. The same
 duty after `PYG3` high (no `EPD_RST`, no OTP) was **on**.
-AW9967 needs that L3B rail, not only G3 PWM. `C153` open.
+AW9967 needs that L3B rail, not only G3 PWM. C153 remains unmeasured for this item.
 [nyc-frontlight](../resources/not-yet-confirmed.md#nyc-frontlight).
 
 ## Do not

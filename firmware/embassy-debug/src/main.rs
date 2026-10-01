@@ -2,10 +2,10 @@
 //!
 //! # Architecture & Purpose
 //! This firmware serves as an advanced, asynchronous reference application for
-//! the M5Stack PaperMono-Lite (`C153-Lite`) and PaperMono (`C153`). Core functionality
-//! is shared across both models, operating as a clean Lite baseline by default.
-//! Compiling with `--features c153` activates the PaperMono (`C153`) board identity
-//! and discovery diagnostics for NFC and LoRa peripherals. Demonstrating principles from
+//! the M5Stack PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`). Core functionality
+//! is shared across both models. The default feature set targets C153 and includes
+//! NFC and LoRa discovery; compile with `--no-default-features --features lite`
+//! to build a pruned C153-Lite image. Demonstrating principles from
 //! *The Embassy Book*, *The Rust on ESP Book*, and *The Embedded Rust Book*:
 //!
 //! - **Asynchronous Cooperative Multitasking**: Built on the `embassy-executor`

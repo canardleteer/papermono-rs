@@ -3,12 +3,12 @@ name = "embassy-debug-fw"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Unified PaperMono and PaperMono-Lite Embassy debug image. Flash only via cargo xtask flash-app after a matching snapshot exists."
+description = "PaperMono Embassy debug image (C153 default, or C153-Lite with --no-default-features --features lite). Flash only via cargo xtask flash-app after a matching snapshot exists."
 license = "MIT"
 
 # Workspace member, not a default-member: host `cargo test` skips this
-# package. Build with `cargo xtask build-fw embassy-debug` (or
-# `cargo xtask build-fw embassy-debug --features c153`).
+# package. Build with `cargo xtask build-fw embassy-debug` (C153 default, or
+# `--no-default-features --features lite` for C153-Lite).
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]

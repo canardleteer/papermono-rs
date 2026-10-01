@@ -45,7 +45,7 @@ titles stay on `RefreshMode` as a catalog only.
 | 4-gray card | `OtpRefresh::GrayFull` (`0xD7`) |
 | Rebuild mono after gray, or a full clear | `OtpRefresh::MonoFull` (`0xF8` then `0x14`, both planes) |
 | Fast flip after a mono baseline | `OtpRefresh::Partial` (`0xFF`, RAM 1 only) |
-| After N partials (card change) | one `MonoFull` (embassy-debug `PARTIALS_BEFORE_FULL` = 18) |
+| After N partials (card change) | one `MonoFull` (embassy-debug `PARTIALS_BEFORE_FULL` = 18; this differs from vendor guidance near 10) |
 | Same-card status redraw | stay on `Partial` (`paint_mono_fast(..., soft = true)`); do not flash `MonoFull` mid-update |
 
 **Soft vs hard mono (embassy-debug, Lite 2026-09-04):** Legend
@@ -59,6 +59,11 @@ redraw. Do not treat soft as permission for uninterrupted
 continuous partials forever — navigation still clears the
 budget.
 
+The 18-partial threshold and same-card soft exemption are
+implementation behavior, not vendor guidance or validated
+panel-life limits. The soft path can continue partials after the
+nominal budget. See the local discrepancy report when available.
+
 Do **not** upload `0x32`. Do **not** send `Partial` after
 `GrayFull` until `MonoFull`. Do **not** send a second bare
 Mode 1. Do **not** stamp `epd_*` from an OTP path.
@@ -69,7 +74,7 @@ are **abandoned**.
 
 ## Refresh trials (Lite, 2026-09-01)
 
-Recorded as successes and failures. `C153` unmeasured.
+Recorded as successes and failures on Lite; C153 refresh behavior is unmeasured.
 Silicon table: [measure.md](measure.md).
 
 ### Successes

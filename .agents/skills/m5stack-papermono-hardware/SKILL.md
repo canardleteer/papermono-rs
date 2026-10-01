@@ -28,14 +28,12 @@ Host discovery and flash I/O belong to the consuming project’s
 tools, not this skill. Vendor Arduino / ESP-IDF / PlatformIO trees
 are wiring evidence, not a flash path here.
 
-Official docs, UserDemo, OTP-Demo, and FreeInk are not a
-measurement. Observed silicon:
-[measure.md](references/measure.md). Lite USB (run and
-download) is in
-[flashing.md](references/flashing.md#usb-measured). There are
-two SKUs: PaperMono (`C153`) and PaperMono-Lite
-(`C153-Lite`). Name which one you measured.
-Open nets live in
+Official docs and firmware are specifications and software
+intent, not measurements of our units. Live results for both
+PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) are in
+[measure.md](references/measure.md). Name the SKU and date for
+each live result. Do not copy results between variants. Remaining
+questions live in
 [not-yet-confirmed.md](resources/not-yet-confirmed.md).
 
 ## How to read this skill
@@ -48,28 +46,24 @@ Open nets live in
    symlink this page as `docs/SAFETY.md`.
 3. **Observed silicon** —
    [references/measure.md](references/measure.md). Chip, flash,
-   USB, factory image, and which peripherals ACK **on a
-   PaperMono or PaperMono-Lite in hand**. Lite USB (run and
-   download) is in
-   [flashing.md](references/flashing.md#usb-measured). Name
-   the SKU. A result on one variant does not confirm the
-   other. That beats SDK profiles when they disagree on those
-   fields.
+   USB, flash, factory-image, and peripheral results on both
+   SKUs. Name the SKU. A result on one variant does not confirm
+   the other. Read this ledger rather than assuming this summary
+   covers every measurement.
 4. **Enclosure** —
    [references/enclosure.md](references/enclosure.md). Where keys,
    USB-C, and the SD slot sit. Vendored product photos:
    [resources/enclosure/](resources/enclosure/SOURCE.md)
    (PNG for reading; WebP is upstream). Callouts: **BUTTON A
    (UP)**, **BUTTON B (DOWN)**, red power.
-5. **Pin map and rails** — remaining hardware pages (official
-   HTML **PinMap** tables until
-   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
-   and friends close). Living tables:
+5. **Pin map and rails** — subsystem pages distinguish official
+   PinMap claims from on-unit observations. Living sources and
+   checked revisions:
    [catalog.md](references/catalog.md).
 6. **Official docs and firmware catalog** —
-   [references/catalog.md](references/catalog.md). Dated
-   **view as markdown** snapshots of the two product pages
-   (2026-09-01):
+   [references/catalog.md](references/catalog.md). Dated exports
+   of the two product pages (current review: 2026-10-01; prior
+   snapshot retained):
    [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md).
    Living HTML can still change.
 7. **Vendor datasheets** —
@@ -225,16 +219,21 @@ flash size is 16 MB
    not invent a 105-byte `0x32` table (Table 7-1 is 105
    bytes) and do not map `RefreshMode` / `epd_*` onto OTP
    `0x22`. What to do: [display.md](references/display.md).
-   What not to do: [safety.md](references/safety.md). After
-   ~10 partials, one OTP mono full.
+   What not to do: [safety.md](references/safety.md). The
+   vendor recommends one full refresh after about 10 partial
+   fast refreshes and warns against uninterrupted partials.
+   Firmware's 18-partial limit and same-card exemption are
+   implementation choices, not verified panel guidance; see
+   [display.md](references/display.md).
 4. **Park IP2315 off the system I2C bus** except for the charge
    transaction. M5IOE1 `PYG11_PWM3` gates `0x75`. Sheet: I2C
    high is VBAT; pins 8/9 mux LED vs I2C; at VIN both must
    sample high or the chip stays in LED mode and can hang
    neighbors.
 5. **Download mode is the power button**, not DTR on a CH343.
-   Hold ~2 s until the red LED blinks, then release.
-   [nyc-download-mode](resources/not-yet-confirmed.md#nyc-download-mode).
+   On both measured SKUs, hold about 2 s until the small red LED
+   beside the power button blinks, then release. See
+   [flashing.md](references/flashing.md#usb-measured).
 6. **Ship a 16 MB-aware partition table.** Do not inherit 8 MB
    DevKit limits. Do not assume 32 MB geometry or arbitrary partition offsets.
 7. **Lite has no NFC and no LoRa.** Do not init ST25R3916 or
@@ -307,9 +306,9 @@ later IPFS CIDv1.
 
 ## Bring-up order (official intent)
 
-Two vendor sequences. Lite official M5IOE1 `begin` ACKed
-([measure.md](references/measure.md)); the rest is **not
-measured**. Name both when they disagree
+Two vendor sequences. Live results for both SKUs are in
+[measure.md](references/measure.md). Remaining electrical
+results are **not measured**. Name both sources when they disagree
 ([sources.md](references/sources.md)).
 
 Arduino / M5PM1 docs:

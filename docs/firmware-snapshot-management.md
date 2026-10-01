@@ -36,7 +36,7 @@ factory-reset image you can share.
   ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
   `partitions.csv` matches **Lite stock** at `0x8000`. PIO
   `default_16MB.csv` is still a different table. `C153` is
-  [nyc-partition-table](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-partition-table).
+  [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## Two snapshot kinds
 

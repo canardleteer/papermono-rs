@@ -16,16 +16,20 @@ authored.
 | --- | --- | --- |
 | Upstream page | https://docs.m5stack.com/en/core/PaperMono | https://docs.m5stack.com/en/core/PaperMono-Lite |
 | Export | M5Stack docs **view as markdown** | Same |
-| Snapshot file | `PaperMono.2026-09-01.md` | `PaperMono-Lite.2026-09-01.md` |
-| Vendored on | 2026-09-01 | 2026-09-01 |
-| SHA-256 | `f7e3920a219db4ed592665fb10232e6fc53bc902a776f03c4d14b045dcdd15b7` | `8103ae486b7969cb67019ad04479d51c03e317721ca015e002caaa4de51b147d` |
+| Snapshot file | `PaperMono.2026-10-01.md` (prior: `PaperMono.2026-09-01.md`) | `PaperMono-Lite.2026-10-01.md` (prior: `PaperMono-Lite.2026-09-01.md`) |
+| Vendored on | 2026-10-01 | 2026-10-01 |
+| SHA-256 | `96990812f2e4ac81a1909ff0f41fef5d9b0866036f90a8c18abfc9d69927876c` | `0aec6aac04f0f459cdd1707d7bdf2b7a48522d95142abb0d1ad12a0b694509e9` |
 | Copyright | M5Stack (product documentation). Vendored for offline agent use. | Same |
 
-**M5GFX LUT Refresh Speed** is on both snapshots. Both name
-laboratory results for **PaperMono** under M5GFX modes,
-reference only. The two pages do **not** use the same
-English sentence; numbers match. Lite reprints the PaperMono
-lab table. That is not a Lite timing.
+Both snapshots contain the **M5GFX LUT Refresh Speed** table and
+explicitly identify the values as PaperMono laboratory results.
+Treat them as reference timings for PaperMono (`C153`), not
+PaperMono-Lite timings or on-unit results. Both pages also retain
+the recommendation to use the panel manufacturer's OTP example
+because M5GFX waveforms are currently unstable, and advise a full
+refresh after about 10 partial fast refreshes. See
+[display.md](../../references/display.md) for how this relates to
+this repository's OTP refresh path and current implementation.
 
 Product PDFs (`papermono-product` /
 `papermono-lite-product`) are a different snapshot and can

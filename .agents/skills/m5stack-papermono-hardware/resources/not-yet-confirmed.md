@@ -4,13 +4,12 @@ Measurement backlog for this product. **Closed items leave this
 file**; the fact goes into the matching `references/` page. Do
 not grow a confirmed-history section here.
 
-**No PaperMono (`C153`) has been measured for this skill.**
-PaperMono-Lite (`C153-Lite`) has run- and download-mode USB
-IDs in [flashing.md](../references/flashing.md#usb-measured)
-and chip / 16 MB flash / partition-table rows in
-[measure.md](../references/measure.md). Official docs,
-UserDemo, OTP-Demo, and FreeInk do not close a row by
-themselves. Firmware evidence is intent until a dump is parsed.
+Both PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) have
+live measurements in [measure.md](../references/measure.md),
+including USB, flash size, and factory partition tables. C153 NFC
+and LoRa results are also recorded there. This file lists remaining
+questions; source documentation and firmware intent do not close
+electrical measurements.
 
 **Name the SKU.** Confirm on a physical unit of that variant.
 A result on PaperMono does not confirm PaperMono-Lite, and the
@@ -37,11 +36,10 @@ When a human accepts a firmware flash, pack every safe
 unattended probe into that image (root `AGENTS.md`,
 **Pack one flash**). Do not spend a boot on I2C alone
 if lamp, `FLAG`, leftover inputs, or (when asked)
-`wifi n=` / `ble n=` can ride along. Packed listen-only
-radio stays default-off until asked. Landing
-`embassy-debug` already defaults `--features radio` for
-interactive BLE / Wi-Fi cards (idle until touch). No
-foreign MAC / BSSID / IRK. No NVS write.
+`wifi n=` / `ble n=` can ride along. Packed listen-only scan
+counts stay ask-first. The default `embassy-debug` image
+includes interactive BLE / Wi-Fi cards; they are idle until
+touch. No foreign MAC / BSSID / IRK. No NVS write.
 
 Rule: a new named part in the SKILL product snapshot gets an
 NYC row in the same change.
@@ -49,8 +47,8 @@ NYC row in the same change.
 ## Chip surface coverage
 
 Every named IC has at least one functional NYC (not ACK-only).
-Shared chips: recipes can run on Lite. `C153` stays open until
-that unit exists. Do **not** init NFC/LoRa on Lite.
+Shared-chip recipes need separate evidence per SKU. Do **not**
+initialize NFC/LoRa on Lite.
 
 | Surface | SKU | NYC |
 | --- | --- | --- |
@@ -69,9 +67,9 @@ that unit exists. Do **not** init NFC/LoRa on Lite.
 | Buzzer GPIO42 | C153, C153-Lite | [nyc-buzzer](#nyc-buzzer) |
 | RGB LED | C153, C153-Lite | [nyc-rgb-led](#nyc-rgb-led) |
 | microSD | C153, C153-Lite | [nyc-sdmmc-width](#nyc-sdmmc-width), [nyc-tf-det](#nyc-tf-det) |
-| ST25R3916 | C153 | [nyc-nfc-ack](#nyc-nfc-ack). Lite: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
-| SX1262 die | C153 | [nyc-lora-ack](#nyc-lora-ack) |
-| Stamp LoRa-1262 module | C153 | [nyc-stamp-lora](#nyc-stamp-lora). Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
+| ST25R3916 | C153 | Confirmed live; Lite pads: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
+| SX1262 die | C153 | Confirmed live; open work is listed under radio reception and safety recipes |
+| Stamp LoRa-1262 module | C153 | Confirmed live; Lite pads: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
 | Full I2C roster incl. `0x50` | C153 | [nyc-i2c-ack](#nyc-i2c-ack) |
 
 ## Index
@@ -80,9 +78,7 @@ that unit exists. Do **not** init NFC/LoRa on Lite.
 | --- | --- | --- |
 | [nyc-flash-id](#nyc-flash-id) | JEDEC, flash size, PSRAM, eFuse, chip rev | [measure.md](../references/measure.md) |
 | [nyc-usb-vid](#nyc-usb-vid) | Download IDs; `C153`; `probe-rs`; extra CDC | [flashing.md](../references/flashing.md) |
-| [nyc-download-mode](#nyc-download-mode) | Hold-until-red-blink enters ROM download | [flashing.md](../references/flashing.md) |
 | [nyc-cpu-flash-runtime](#nyc-cpu-flash-runtime) | Runtime CPU MHz and DIO vs QIO | [measure.md](../references/measure.md) |
-| [nyc-partition-table](#nyc-partition-table) | Live table vs UserDemo CSV (`C153` still) | [flashing.md](../references/flashing.md) |
 | [nyc-nvs-phy](#nyc-nvs-phy) | Per-unit PHY cal vs M5 restore image | [safety.md](../references/safety.md) |
 | [nyc-wifi-ble](#nyc-wifi-ble) | On-unit Wi-Fi **and** BLE scan counts | [measure.md](../references/measure.md) |
 | [nyc-gpio0-strap](#nyc-gpio0-strap) | `BOOT_OUT` during reset vs download | [pin-map.md](../references/pin-map.md) |
@@ -106,9 +102,6 @@ that unit exists. Do **not** init NFC/LoRa on Lite.
 | [nyc-pdm-mic](#nyc-pdm-mic) | Rate / slot / hole energy GPIO45/46 | [sensors.md](../references/sensors.md) |
 | [nyc-sdmmc-width](#nyc-sdmmc-width) | 1-bit vs DAT0–DAT3 | [input-storage.md](../references/input-storage.md) |
 | [nyc-tf-det](#nyc-tf-det) | Insert = 0 | [input-storage.md](../references/input-storage.md) |
-| [nyc-stamp-lora](#nyc-stamp-lora) | Stamp LoRa-1262 module vs SX1262 die | [pin-map.md](../references/pin-map.md) |
-| [nyc-lora-ack](#nyc-lora-ack) | SX1262 SPI status on C153 | [pin-map.md](../references/pin-map.md) |
-| [nyc-nfc-ack](#nyc-nfc-ack) | ST25R3916 `0x50` on C153 | [pin-map.md](../references/pin-map.md) |
 | [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) | Lite GPIO6 / PYG4 NC vs routed | [pin-map.md](../references/pin-map.md) |
 | [nyc-lite-lora-pads](#nyc-lite-lora-pads) | Lite SPI1 / IRQ NC vs routed | [pin-map.md](../references/pin-map.md) |
 | [nyc-rgb-led](#nyc-rgb-led) | Red not PWM; G/B range | [sensors.md](../references/sensors.md) |
@@ -143,17 +136,6 @@ ACM + vendor JTAG; no second CDC; no CH343;
 identical (`303a:1001`, 2026-09-05). Do not commit iSerial. Write
 [flashing.md](../references/flashing.md).
 
-### nyc-download-mode
-
-**Lite and C153 written:** hold until first blink is
-about **2 s** (operator stopwatch; matches the official
-note). The blinking die is the small **red** next to the
-power button (`LED_EN_PP`), not the RGB window. USB IDs
-do not change. `detect-connected --probe` (`NoReset`) and
-`backup-factory-firmware` succeed across both SKUs.
-Write [flashing.md](../references/flashing.md),
-[power-and-sleep.md](../references/power-and-sleep.md).
-
 ### nyc-cpu-flash-runtime
 
 **Lite partial (`simple-debug-fw`, 2026-09-01):** CDC hello
@@ -163,16 +145,6 @@ CDC for CPU MHz and DIO vs QIO, and the same on **`C153`**.
 UserDemo `sdkconfig.defaults` asks for 240 MHz and octal
 SPIRAM; that is intent, not a log.
 [measure.md](../references/measure.md).
-
-### nyc-partition-table
-
-**Lite and C153 confirmed:** table at `0x8000` matches UserDemo
-`partitions.csv` (nvs `0x9000`/`0x6000`, phy `0xf000`/`0x1000`,
-factory `0x10000`/`0xF00000`). Verified on Lite 2026-09-01 and
-on C153 2026-09-05 (`id-e3e5915e`). Factory app descriptor names
-project `PaperMono-UserDemo`, IDF `v5.5.1`, version `c78f6c5-dirty`
-on both. Written in [measure.md](../references/measure.md) /
-[flashing.md](../references/flashing.md). Do not commit the dump.
 
 ### nyc-nvs-phy
 
@@ -185,35 +157,36 @@ the risk). [safety.md](../references/safety.md).
 
 On-unit 2.4 GHz Wi-Fi **and** BLE scan in one recipe. CDC
 counts only (`wifi n=` / `ble n=`). No BSSID, MAC, or IRK.
-Close per SKU; Lite first; `C153` stays open. Official HTML
+Close per SKU. C153 scan counts remain unmeasured. Official HTML
 “2.4 GHz Wi-Fi”, UserDemo’s Wi-Fi app, and silicon BLE in
 board-info do **not** close this. A Wi-Fi-only result leaves
-BLE open under this same id. Default images stay radio-off.
+BLE open under this same id. Interactive cards remain idle
+until selected; packed scan counts require an explicit ask.
 
 **Lite written (2026-09-02):** listen-only
 `wifi n=21` `ble n=418` in
 [measure.md](../references/measure.md). No connect.
-`C153` still open.
+C153 remains unmeasured for this item.
 [docs/CRATES.md](../../../../docs/CRATES.md).
 
 **Lite BLE pairing (2026-09-04):** `embassy-debug` live.
 Smartphone connects to `PaperMono`: `pair state=connected`.
 DisplayOnly passkey generated and displayed on card / CDC:
-`pair pin=413590`. Panel fast partial refreshes. Passkey entered on phone:
+passkey value omitted. Panel fast partial refreshes. Passkey entered on phone:
 pairing completes with `pair ok`, panel displays paired banner.
-Bonds held in RAM. `C153` still open.
+Bonds held in RAM. C153 remains unmeasured for this item.
 
 **Lite SoftAP / survey cards (2026-09-04):** `embassy-debug`
 live SoftAP confirmed on `C153-Lite`. Touch `[ START HOTSPOT ]`:
 CDC `wifi_ap state=active ssid=PaperMono-AP pass=mono2026
-ip=192.168.4.1`. Host `wlx9cefd5f6363b` saw WPA2 ch1, connected,
+ip=192.168.4.1`. A host Wi-Fi adapter saw WPA2 ch1, connected,
 DHCP `192.168.4.50`. `curl http://192.168.4.1/` JSON included
 battery and `wifi.requests`. CDC `client=connected` and
 `wifi_http req=`. Survey card + mutual exclusion written
 (channels 1–13, top 4 APs on glass, CDC counts only); SoftAP
 path host-verified. WPA3/SAE unavailable in precompiled
 `esp-radio` blob (not a future NYC close — use WPA2). No
-foreign MAC/BSSID/IRK. `C153` still open.
+foreign MAC/BSSID/IRK. C153 remains unmeasured for this item.
 [measure.md](../references/measure.md).
 
 ### nyc-gpio0-strap
@@ -240,7 +213,7 @@ resets (red off during reboot, solid red after; also cleanly
 resets when the MCU is in light sleep). Hold to first blink
 ~2 s (same red die). Double-press gap too short to time;
 USB unplugged, lamp and red go fully off; one short press
-turns the unit back on. `C153` still open.
+turns the unit back on. C153 remains unmeasured for this item.
 [power-and-sleep.md](../references/power-and-sleep.md).
 
 ### nyc-ip2315-bus
@@ -263,7 +236,8 @@ color change; front lamp on. No IP2315 current or done
 register (chip stayed off the bus). Live UI telemetry
 (2026-09-03) verified on Legend card: M5PM1 `vbat=4190`, `vin=5030`,
 `battery_percent` mapping 3300..4150 mV with 60 s auto-refresh and IP2315
-parked. Battery drain rate and IP2315 registers remain open. `C153` open.
+parked. Battery drain rate and IP2315 registers remain open.
+C153 remains unmeasured for this item.
 [power-and-sleep.md](../references/power-and-sleep.md),
 [measure.md](../references/measure.md).
 
@@ -281,7 +255,8 @@ lamp-on: human lamp off, then on again in **2–3 s**. CDC
 same boot: `wake src=08` / `0a`, `sleep abort`. Not a 10 s
 RTC GPIO wake. In `embassy-debug-fw`, sleep is implemented as
 interactive ESP32-S3 light sleep with low-power GPIO2/GPIO3 button
-wake (2026-09-03). IMU / touch `ext0` still open. `C153` open.
+wake (2026-09-03). IMU / touch `ext0` still open. C153 remains
+unmeasured for this item.
 [power-and-sleep.md](../references/power-and-sleep.md),
 [user-demo.md](../references/user-demo.md).
 
@@ -296,7 +271,7 @@ PWM1 left the lamp constant.
 **Lite (2026-09-02, rail verification):** PWM0 `lamp=1024` needs
 `PYG3` (`EPD_VDD`) or the lamp stays dark. No `EPD_RST`.
 [power-and-sleep.md](../references/power-and-sleep.md),
-[measure.md](../references/measure.md). `C153` open.
+[measure.md](../references/measure.md). C153 remains unmeasured for this item.
 
 ### nyc-epd-spi-clock
 
@@ -403,7 +378,7 @@ Do not invent a FIFO map. INT wake stays
 
 **Partial (2026-09-01, `C153-Lite`):** CDC `imu_id=24` in
 [measure.md](../references/measure.md). Optional later: a
-sample. `C153` open. [sensors.md](../references/sensors.md).
+sample. C153 remains unmeasured for this item. [sensors.md](../references/sensors.md).
 
 ### nyc-rx8130
 
@@ -414,7 +389,7 @@ clears the sub-second chain). INT wake stays
 
 **Partial (2026-09-02, `C153-Lite`):** CDC `rtc_flag=31`
 (`UF|TF|VBFF` from catalog `rx8130ce` Flag Register).
-Did not write `SEC`. `C153` open.
+Did not write `SEC`. C153 remains unmeasured for this item.
 
 ### nyc-pdm-mic
 
@@ -440,67 +415,6 @@ UserDemo 4-bit vs FreeInk 1-bit.
 
 Empty slot vs inserted: `PYG1` level. Official insert = 0.
 [input-storage.md](../references/input-storage.md).
-
-### nyc-stamp-lora
-
-Stamp LoRa-1262 is the **module** (SKU S014 / S014-IF /
-S014-I). SX1262 is the **Semtech die** inside it. Do not
-flatten product HTML “SX1262 (Stamp LoRa-1262)” into one
-part. Dedicated summary: [stamp-lora-1262.md](stamp-lora-1262.md).
-
-| | SX1262 die | Stamp LoRa-1262 |
-| --- | --- | --- |
-| Sheet | catalog `sx1262` (150–960 MHz ISM) | [Stamp page](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262); [stamp-lora-1262.md](stamp-lora-1262.md) |
-| PaperMono band | do not copy 150–960 MHz | **868–923 MHz**, built-in FPC |
-| Nets | SPI MOSI/MISO/CLK, NSS, BUSY, IRQ | plus `LoRa_EN` (PM1 G2), `SX_NRST` (IOE PYG10), `SX_ANT_SW` (IOE PYG2) |
-
-**Confirmed live on `C153`:** `LoRa_EN` (M5PM1 `G2`) push-pull active
-high; `SX_NRST` (M5IOE1 `PYG10`) push-pull active low; `SX_ANT_SW`
-(M5IOE1 `PYG2`) push-pull active high (must be driven HIGH to
-connect the built-in FPC antenna; driving LOW disconnects it); TCXO at
-3.0 V via DIO3 (`TCXO_CTRL_3_0V`); internal regulator mode `REGULATOR_LDO`;
-and DIO2 configured as internal RF switch. Over-the-air packet reception
-confirmed on US915 band with built-in FPC antenna.
-Lite: [nyc-lite-lora-pads](#nyc-lite-lora-pads) only.
-[pin-map.md](../references/pin-map.md),
-[stamp-lora-1262.md](stamp-lora-1262.md),
-[datasheets.md](datasheets.md).
-
-### nyc-lora-ack
-
-C153 only. **Confirmed live on `C153`** via `embassy-debug-fw` (`--features c153`).
-Discovery primitives, driver, and status decoding in `crates/m5stack-papermono`
-(`lora` module, `Sx1262`, `RadioStatus`, `CMD_GET_STATUS` `0xC0`). With M5PM1
-`G2` configured as push-pull output (`GPIO_DRV` `0x13`), `3V3_L2_LoRa` powers
-up, `SX_NRST` (`PYG10`) is released, `SX_BUSY` (`GPIO21`) goes low, and the
-SX1262 responds to `CMD_GET_STATUS` with `raw=0xAA` (`mode=2` `STBY_RC`,
-`cmd=5`). Interactive test cards in `embassy-debug-fw` provide user-controlled
-915 MHz test ping (`lora_tx`, clamped to +14 dBm / 25 mW with 60 mA OCP),
-up to 60 s sniffer window (`lora_rx` on 906.875 MHz / 917.625 MHz), and a
-104-channel US915 sweeper (`lora_scan`) with double-duty scanning and
-buzzer beep feedback. Confirmed live over-the-air demodulation of 50-byte
-Meshtastic LongFast broadcast frames on 906.875 MHz at -107 dBm RSSI and
--16 dB SNR with acoustic tone feedback. Zero continuous background TX;
-radio immediately returns to standby and powers down.
-Tracked on branch `feat/papermono-discovery`.
-[pin-map.md](../references/pin-map.md),
-[docs/CRATES.md](../../../../docs/CRATES.md).
-
-### nyc-nfc-ack
-
-C153 only. **Confirmed live on `C153`** via `embassy-debug-fw` (`--features c153`).
-Discovery primitives, identity parsing, and ISO14443-A poller in
-`crates/m5stack-papermono` (`nfc` module, `CMD_READ_IC_IDENTITY` `0x7F`,
-`IcIdentity`, `St25r3916`). With M5IOE1 `PYG4` asserted, ST25R3916 ACKs at I2C
-address `0x50`, responds to command `0x7F` with `id=0x05` (ST25R3916), `rev=2`
-(`nfc ack=1 id=05 rev=2`), and executes ISO14443-A polling, anticollision, and
-UID reading (`simple-debug: nfc_tag type=iso14443a`). RF is kept safely
-parked between polls. Also closes the NFC half of [nyc-i2c-ack](#nyc-i2c-ack).
-Lite: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) and `nfc=0` only.
-Tracked on branch `feat/papermono-discovery`.
-[pin-map.md](../references/pin-map.md),
-[user-demo.md](../references/user-demo.md),
-[docs/CRATES.md](../../../../docs/CRATES.md).
 
 ### nyc-lite-nfc-pads
 
@@ -533,7 +447,7 @@ Confirm red ignores PWM; sweep G/B. Download-mode blink is red.
 LED is driven by M5PM1 register `0x06` (`PWR_CFG`) bit 4
 (`LED_EN_PP`). Clearing bit 4 turns the red LED off; setting bit 4
 turns it back on. Used in `embassy-debug-fw` to turn off the red LED
-during low-power light sleep. `C153` open.
+during low-power light sleep. C153 remains unmeasured for this item.
 [sensors.md](../references/sensors.md).
 
 ### nyc-buzzer

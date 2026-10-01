@@ -134,8 +134,8 @@ SSD1677 write spec max 20 MHz; clock on a unit:
 SX1262 SPI spec max 16 MHz (C153). That is the **die**.
 The populated part is Stamp LoRa-1262 (module): 868–923 MHz,
 FPC antenna, `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`.
-[nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora).
-Die SPI status: [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack).
+[measure.md](measure.md).
+Die SPI status: [measure.md](measure.md).
 
 USB-C CC1/CC2 are **5.1 kΩ Rd** to GND on the schematic: 5 V
 sink, no PD controller in the extract.

@@ -51,6 +51,8 @@ exclude = [
     # Vendor "view as markdown" product-page snapshots.
     ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono.2026-09-01.md",
     ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono-Lite.2026-09-01.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono.2026-10-01.md",
+    ".agents/skills/m5stack-papermono-hardware/resources/official-html/PaperMono-Lite.2026-10-01.md",
 ]
 
 # MD004 would restyle every `-` list to `*` (first-pass noise).

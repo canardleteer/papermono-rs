@@ -214,8 +214,8 @@ UserDemo CSV (intent in source; **Lite stock matches**):
 | factory | app/factory | `0x10000` | `0xF00000` |
 
 Lite capture 2026-09-01 parsed that table at `0x8000`
-([measure.md](measure.md)). `C153` still
-[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+([measure.md](measure.md)). C153 is also confirmed
+([measure.md](measure.md)).
 
 Lite factory app descriptor: project `PaperMono-UserDemo`,
 IDF `v5.5.1`, version `c78f6c5-dirty`, date Aug 6 2026 —

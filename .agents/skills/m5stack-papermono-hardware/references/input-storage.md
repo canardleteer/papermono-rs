@@ -68,7 +68,7 @@ uses `SPI3_HOST` at 8 MHz, RadioLib begin at 868.0 MHz (EU
 demo vs product 868–923). Mux GPIO39–41 off JTAG before SPI.
 Reset/ant via expander, enable M5PM1 G2.
 Module vs die:
-[nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora).
+[measure.md](measure.md).
 Lite HTML **PinMap** omits RFID/LoRa; the Lite schematic still
 draws those blocks (gallery page 05). Do not init; leftover
 pads
@@ -76,5 +76,5 @@ pads
 /
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads).
 ACK recipes:
-[nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack),
-[nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack).
+[measure.md](measure.md),
+[measure.md](measure.md).

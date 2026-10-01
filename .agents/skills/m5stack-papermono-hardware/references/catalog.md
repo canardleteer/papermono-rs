@@ -4,10 +4,10 @@ This page is a map, not a pinout. Pins and rails stay in the
 other reference files. Do not copy pin numbers from other board
 pages like M5Paper (IT8951).
 
-When official pages disagree with each other or with FreeInk,
-name both sides ([sources.md](sources.md)); the skill user
-weighs them. Dated **view as markdown** exports of the two
-product pages (2026-09-01):
+When official pages disagree with each other or with community
+sources, name both sides ([sources.md](sources.md)); the skill
+user weighs them. Current product-page exports (2026-10-01) and
+the prior dated export are in:
 [official-html/SOURCE.md](../resources/official-html/SOURCE.md).
 The living HTML can still change.
 
@@ -17,7 +17,7 @@ The living HTML can still change.
 | --- | --- |
 | PaperMono (`C153`) | https://docs.m5stack.com/en/core/PaperMono |
 | PaperMono-Lite (`C153-Lite`) | https://docs.m5stack.com/en/core/PaperMono-Lite |
-| HTML **view as markdown** (2026-09-01) | [PaperMono.2026-09-01.md](../resources/official-html/PaperMono.2026-09-01.md), [PaperMono-Lite.2026-09-01.md](../resources/official-html/PaperMono-Lite.2026-09-01.md) ([SOURCE.md](../resources/official-html/SOURCE.md)) |
+| HTML **view as markdown** (2026-10-01) | [PaperMono.2026-10-01.md](../resources/official-html/PaperMono.2026-10-01.md), [PaperMono-Lite.2026-10-01.md](../resources/official-html/PaperMono-Lite.2026-10-01.md) ([SOURCE.md](../resources/official-html/SOURCE.md)) |
 | Product SKU aliases (UserDemo README) | https://docs.m5stack.com/en/products/sku/C153 and https://docs.m5stack.com/en/products/sku/C153-LITE |
 | Product PDF (C153) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono.pdf |
 | Product PDF (C153-Lite) | https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/static/pdf/static/en/core/PaperMono-Lite.pdf |
@@ -99,21 +99,28 @@ nets; use the PNGs when the extract drops wires. Cache:
 
 ## Firmware you can actually run
 
+Upstream repository refs below were checked on 2026-10-01. Pinned
+commits make the reviewed source reproducible; moving branches may
+advance.
+
 | Firmware | Kind | Notes |
 | --- | --- | --- |
-| [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo) | Official ESP-IDF eval | MIT. Arduino-on-IDF v5.5.1, firmware V1.2 at `c109910`. One ELF; runtime NFC probe chooses Pro vs Lite. HAL under `main/hal/`. `partitions.csv` is intent ([user-demo.md](user-demo.md)) |
-| [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official ESP-IDF OTP | MIT. Direct SSD1677 OTP (partial / mono full / 4-gray). Names `DEPG0397BBS770F3HP-XM`. Direct IDF dep is M5Unified; [M5GFX](https://github.com/m5stack/M5GFX) is a private transitive (`m5gfx` 0.2.27 in the lock). OTP waveforms live in `EDP_OTP_LUT_demo`, not `Panel_SSD1677` |
-| [M5GFX](https://github.com/m5stack/M5GFX) | Official Arduino / IDF component | `Panel_SSD1677_4Gray` is the UserDemo / M5Unified panel path (`board_M5PaperMono`). Four `epd_*` titles. Product page: LUTs currently unstable; prefer OTP-Demo for panel life |
-| [M5Unified](https://github.com/m5stack/M5Unified) | Official Arduino / IDF component | Product PlatformIO pins `#develop`. `board_M5PaperMono`: PMIC, SDMMC 4-bit, IP2315/IP2316 charge via IOE1 GPIO11, RTC INT. C++ HAL intent, not a Rust crate, not a flash path, does not close NYC. Panel LUTs stay M5GFX / OTP-Demo |
-| [M5PM1](https://github.com/m5stack/M5PM1) / [M5IOE1](https://github.com/m5stack/M5IOE1) | Official drivers | MIT. IOE: wake START+STOP, UID then REV, 100 kHz / 800 ms / 400 kHz. Board `0x4F` REV `'W'`; UM `0x6F`–`0x76` REV `'A'`. [user-demo.md](user-demo.md) |
+| [M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo) | Official ESP-IDF eval | MIT. Reviewed `c1099107` (firmware V1.2, 2026-08-10); one ELF with runtime SKU detection. HAL and the live stock-image comparison: [user-demo.md](user-demo.md), [measure.md](measure.md) |
+| [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official ESP-IDF OTP | MIT. Reviewed `c7c02554` (2026-08-20). Direct SSD1677 OTP partial / mono full / 4-gray example. Names panel `DEPG0397BBS770F3HP-XM`. Read its current manifest before citing any transitive M5GFX version; the panel OTP recipe is separate from `Panel_SSD1677` LUTs |
+| [M5PaperMono-PowerDemo](https://github.com/m5stack/M5PaperMono-PowerDemo) | Official ESP-IDF power tests | Reviewed `cf4f57c6` (2026-09-03). Separate firmware projects publish current measurements at two battery voltages, including PM1 shutdown, wake, display, radio, and frontlight cases. Test reports describe their test units and setup; they are not measurements of our units |
+| [M5GFX](https://github.com/m5stack/M5GFX) | Official Arduino / IDF component | Reviewed release `0.2.31` (`cd363dde`, 2026-09-29) and development commit `2be6da8f` (2026-10-01). Current tree contains PaperMono board metadata and evolving four-mode SSD1677 LUT code. Product documentation still calls the PaperMono LUTs unstable and recommends OTP; development code does not supersede that warning |
+| [M5Unified](https://github.com/m5stack/M5Unified) | Official Arduino / IDF component | Reviewed `44d0c52d` (2026-09-29). `board_M5PaperMono` sources describe PMIC, SDMMC, charger, and RTC behavior. C++ intent, not Rust API or measured silicon |
+| [M5PM1](https://github.com/m5stack/M5PM1) / [M5IOE1](https://github.com/m5stack/M5IOE1) | Official drivers | Reviewed `be9a5456` / `846eec7d` (2026-05-29). Compare chip-driver behavior against current catalog entries and board observations; board `0x4F` is distinct from the chip UM's `0x6F`–`0x76` samples |
+| [M5Stack UiFlow board configuration](https://github.com/m5stack/uiflow-micropython/tree/300e3ccde6314bcc30d03f05e33d05872e888e72/m5stack/boards/M5STACK_PaperMono) | Official | Reviewed `300e3ccd` (2026-09-18). Declares 8 MB OPI PSRAM and 16 MB flash; configuration is not a measurement of either unit |
 | UiFlow2 / M5Burner | Official | Flash `PaperMono` or `PaperMono-Lite` image for that SKU |
 | Easyloader “User Demo” | Official binary | Linked from the product page |
 | Factory reset firmware | Official binary | Linked from the product page. Does not close `nyc-nvs-phy` |
 | CrossPoint e-reader | Partner | Linked from the product page as “PaperMono CrossPoint E-Reader” |
 | FreeInk `PAPERMONO` | Third-party | [external.md](../resources/external.md) |
+| Public PaperMono repository search | Community index | 16 matches on 2026-10-01; relevant firmware examples are summarized in [external.md](../resources/external.md). Search results are discovery leads, not evidence of board facts |
 
-SKU: burn Lite firmware on Lite. UserDemo is one binary that
-**skips** NFC/LoRa apps when `Hal::hasNfcHardware()` is false;
+SKU: use the image intended for that SKU. UserDemo is one binary
+that **skips** NFC/LoRa apps when `Hal::hasNfcHardware()` is false;
 that is not a license to init those chips on Lite. Do not
 assume a `C153` **UiFlow2 / Easyloader** image is safe on
 Lite.

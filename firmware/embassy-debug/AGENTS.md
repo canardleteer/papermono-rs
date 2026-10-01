@@ -224,7 +224,7 @@ and same-card orientation remaps use
    `[ START HOTSPOT ]`. Glass shows SSID, segmented password, URL, client
    count, and HTTP request count. CDC prints `wifi_ap state=active …`.
 3. **Host-agent SoftAP check** (when the human asks for a live test and a
-   spare host Wi-Fi adapter is available, e.g. `wlx9cefd5f6363b`):
+   spare host Wi-Fi adapter is available, such as a USB Wi-Fi adapter):
    - Monitor CDC (`cargo xtask monitor`) for `wifi_ap` / `wifi_http`.
    - Scan: `nmcli dev wifi list ifname IFACE`.
    - Connect: `nmcli dev wifi connect PaperMono-AP password mono2026 ifname IFACE`.
@@ -235,7 +235,8 @@ and same-card orientation remaps use
 
 Lite SoftAP host-verified 2026-09-04:
 [measure.md](../../.agents/skills/m5stack-papermono-hardware/references/measure.md).
-`C153` still open.
+C153 radio survey and NFC/LoRa are confirmed. Other radio
+behavior is tracked per SKU in the measurement ledger.
 
 ## LoRa verification workflow (`c153`)
 

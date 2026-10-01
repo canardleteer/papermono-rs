@@ -81,15 +81,18 @@ Implemented is not proven. Read the
 [tool verification ledger](references/xtask.md#tool-verification-ledger)
 before assuming a command works on silicon.
 
-**Lite (`C153-Lite`) live so far:** `detect-connected` (run
-and download), `--probe` (`NoReset`), named backup /
-confirm / restore, `flash-app` (`factory` at `0x10000`;
+**Both SKUs have live factory evidence:** `detect-connected` (run
+and download) and C153 factory backup/partition results are recorded in the
+hardware measurement ledger. Host-tool live verification to date is mainly
+Lite: `detect-connected` (run and download), `--probe`
+(`NoReset`), named backup / confirm / restore, `flash-app` (`factory` at `0x10000`;
 short-press red after), and `monitor` (stock silent;
 custom images print `simple-debug:`). Silicon facts:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-`C153` USB / JEDEC / partition table have not been
-measured. Official HTML `epd_*` times are PaperMono lab
+C153 USB and partition-table results are recorded in the
+hardware ledger; JEDEC bytes and PSRAM remain unmeasured.
+Official HTML `epd_*` times are PaperMono lab
 reference only
 ([display.md](../m5stack-papermono-hardware/references/display.md)).
 

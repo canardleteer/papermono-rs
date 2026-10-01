@@ -1,7 +1,7 @@
 # embassy-debug-fw
 
-Embassy staged image for PaperMono (`C153-Lite` baseline, or `C153`
-with `--features c153`). USB-Serial/JTAG prints the same
+Embassy staged image for PaperMono (`C153` default, or `C153-Lite` with
+`--no-default-features --features lite`). USB-Serial/JTAG prints the same
 `simple-debug:` lines as the proof-of-life image, with `hello
 image=embassy-debug`. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
@@ -74,10 +74,10 @@ Hold the red power button about 2 s until it blinks
 
 ```shell
 . $HOME/export-esp.sh
-# PaperMono-Lite baseline:
+# PaperMono (`C153`) default:
 cargo xtask build-fw embassy-debug
-# Or PaperMono Full SKU (C153):
-cargo xtask build-fw embassy-debug --features c153
+# Or PaperMono-Lite (`C153-Lite`):
+cargo xtask build-fw embassy-debug --no-default-features --features lite
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
   --yes

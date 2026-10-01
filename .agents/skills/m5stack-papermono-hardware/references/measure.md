@@ -52,8 +52,8 @@ blinks, then release. Confirmed on Lite: after that hold,
 `detect-connected --probe` (`NoReset`) got board-info.
 **Lite (2026-09-02):** ~2 s to first blink; the small red
 next to the power button (`LED_EN_PP`), not the RGB
-window. `C153` still
-[nyc-download-mode](../resources/not-yet-confirmed.md#nyc-download-mode).
+window. Hold behavior is confirmed on both SKUs
+([flashing.md](flashing.md#usb-measured)).
 This is not an automatic DTR/RTS sequence through an external UART bridge.
 
 ```shell
@@ -83,20 +83,20 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | Chip | `C153` | ESP32-S3 revision v0.2; crystal 40 MHz; features Wi-Fi, BLE, embedded flash. MAC omitted (matches Lite) |
 | Flash size | `C153-Lite` | 16 MB (`0x1000000`) from flasher `board-info`. JEDEC bytes not printed |
 | Flash size | `C153` | 16 MB (`0x1000000` / 16777216 bytes) from flasher `board-info`. JEDEC bytes not printed |
-| Partition table | `C153-Lite` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv`. No `otadata`. PIO `default_16MB.csv` still different. `C153` open |
+| Partition table | `C153-Lite` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv`. No `otadata`. PIO `default_16MB.csv` still different. `C153` confirmed |
 | Partition table | `C153` | At `0x8000`: nvs `0x9000`/`0x6000`, phy_init `0xf000`/`0x1000`, factory `0x10000`/`0xF00000`. Matches UserDemo `partitions.csv` and Lite |
 | Secure boot / flash encryption | `C153-Lite` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
 | Secure boot / flash encryption | `C153` | Both disabled (`SPI_BOOT_CRYPT_CNT` 0) |
 | `simple-debug-fw` clocks | `C153-Lite` | CDC `hello`: `cpu_mhz=80` `xtal_mhz=40` (`esp-hal` `Config::default`). Not UserDemo. [nyc-cpu-flash-runtime](../resources/not-yet-confirmed.md#nyc-cpu-flash-runtime) |
 | `embassy-debug-fw` hello | `C153-Lite` | 2026-09-01 run mode after `flash-app`. `image=embassy-debug` `sku=C153-Lite` `cpu_mhz=80` `xtal_mhz=40` `reset=chip_power_on`. 1 Hz `hb` idle `btn_a=1 btn_b=1`. Same idle `gpio` as `simple-debug` (`boot=1 pmic_irq=0 tp=0 ioe=1 busy=0`). First CDC attach glued `i2c` onto `hb` |
 | I2C advertised roster | `C153-Lite` | 2026-09-02. Official `begin` at board `0x4F`. `ack=32,38,4f,68,6e nak=50,6f,75` `ioe_addr=4f` `imu_id=24` `rtc_flag=31` `tf=1` (empty slot; [nyc-tf-det](../resources/not-yet-confirmed.md#nyc-tf-det)). No `0x70`–`0x76` walk. `C153` still [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
-| RX8130CE `FLAG` | `C153-Lite` | 2026-09-02. Read-only `0x1D`: CDC `rtc_flag=31`. Did not write `SEC`. Do not invent bit names. `C153` open. [sensors.md](sensors.md) |
+| RX8130CE `FLAG` | `C153-Lite` | 2026-09-02. Read-only `0x1D`: CDC `rtc_flag=31`. Did not write `SEC`. Do not invent bit names. C153 remains unmeasured for this item. [sensors.md](sensors.md) |
 | Lamp + `EPD_VDD` | `C153-Lite` | 2026-09-02. PWM0 `lamp=1024` with `PYG3` off: human **lamp dark**. Same PWM0 after `PYG3` high (no `EPD_RST`, no OTP): human **lamp on**. Idle `gpio busy=1` (rail up, no refresh). [power-and-sleep.md](power-and-sleep.md) |
 | FT `/INT` (GPIO4) | `C153-Lite` | 2026-09-01 attended taps. Idle `touch int=1`. Each contact: `int=0` then `int=1`. Active-low data-ready, matches factory demo `ext0` GPIO4 low. During a slide the pad blips high (do not score “lift” on that). [touch.md](touch.md) |
 | FT XY (M5GFX `getTouchRaw`) | `C153-Lite` | 2026-09-01 embassy-debug walk. Register-2 decode: official-portrait `x=`/`y=` matched drawn targets (dots within 2–22 px). Area 5–475 / 5–795 on the wire. `n=1` only. [touch.md](touch.md) |
 | PDM mic (`PYG12` gated) | `C153-Lite` | 2026-09-01 PDM bring-up. 80 ms window then `PYG12` parked. CDC `mic rms=1422 peak=12917` on 10 s `hello` (same pair at `t=10`/`t=20`/`t=30`: reprint). Earlier same-day reprint was `rms=1356 peak=12917`. **Unprompted idle** — no spoken/noise request. Firmware intent 16 kHz right. USB only. Superseded for hole energy by the PCM-dump row |
 | PDM hole tone (PCM dump) | `C153-Lite` | 2026-09-01. Live `mic rms≈1370–1395` (`peak≈14029`, window-start spike). BUTTON A: `mic pcm hz=0 n=256` (board played nothing), two windows. Prefix `0` / spike / DC floor **−8**. Last ~48 samples: sine-like swing (mins ≈−3116 / −3571), period **~32–44** samples at 16 kHz (phone-band). Energy ~1500–1580 while the phone played A at the hole. Right slot. USB only. [nyc-pdm-mic](../resources/not-yet-confirmed.md#nyc-pdm-mic) |
-| Frontlight (AW9967) | `C153-Lite` | 2026-09-01. Human: right-edge slide **drives brightness** after embassy-debug wrote M5PM1 G3 / **PWM0** (5 kHz, 12-bit). No meter, no %. Same day, PWM1 duty writes left the lamp **constant** (gutter still fired). One PWM into one AW9967; no warm/cool pair. `C153` open. [power-and-sleep.md](power-and-sleep.md) |
+| Frontlight (AW9967) | `C153-Lite` | 2026-09-01. Human: right-edge slide **drives brightness** after embassy-debug wrote M5PM1 G3 / **PWM0** (5 kHz, 12-bit). No meter, no %. Same day, PWM1 duty writes left the lamp **constant** (gutter still fired). One PWM into one AW9967; no warm/cool pair. C153 remains unmeasured for this item. [power-and-sleep.md](power-and-sleep.md) |
 | Lamp gutter vs targets | `C153-Lite` | 2026-09-01. Official portrait `ACTIVE_MAX_X` 475, gutter 80 px → `x >= 395`. Targets first top-right is `(400, 80)` (also `(400, 720)`). Human: that tap no longer scored. Walk now scores slop before `LampSlide::feed`. Image on unit (150336 bytes); scored-hit not observed |
 | OTP-Demo 4-gray (`otp_gray`) | `C153-Lite` | 2026-09-01. `panel mode=otp_gray w=800 h=480 busy_rose=1`. Human: four quadrants. OTP-Demo `GrayFull`. Not a LUT. Datasheet Mode 1 / `epd_text` stamp did not move glass. [nyc-otp-busy](../resources/not-yet-confirmed.md#nyc-otp-busy) / [nyc-lut-path](../resources/not-yet-confirmed.md#nyc-lut-path) |
 | OTP canvas (`otp_orient`) | `C153-Lite` | 2026-09-01. USB-C down, buttons left. Corner bars: **1 bottom-left, 2 top-left, 3 bottom-right, 4 top-right**. OTP RAM X = physical Y (799 toward USB-C); RAM Y = physical X. [display.md](display.md). `C153` still [nyc-canvas-orient](../resources/not-yet-confirmed.md#nyc-canvas-orient) |
@@ -110,13 +110,13 @@ Per-unit MAC, USB serial, and factory serial omitted.
 | RTC 10 s sleep/wake | `C153-Lite` | 2026-09-02 trial **stopped**. `--features sleep` (default off). USB-in `SYS_CMD` bounced. Unplug: lamp off, back in 2–3 s. CDC same boot `wake src=08`/`0a` `sleep abort` (not EXT). [power-and-sleep.md](power-and-sleep.md). `C153` still [nyc-pm1-wake](../resources/not-yet-confirmed.md#nyc-pm1-wake) |
 | Button light sleep & wake | `C153-Lite` | 2026-09-03 embassy-debug live. BUTTON A ~2 s hold: sleep notice painted, lamp 0, M5PM1 red LED (`PWR_CFG` `0x06` bit 4) off. LowPower light sleep arms GPIO2/3. USB CDC halts (host read fault). BUTTON A/B ~1 s hold qualifies wake: red LED on, lamp restored, prior card repainted. Brief taps (<1 s) stay asleep. Power button short press resets cleanly. [power-and-sleep.md](power-and-sleep.md) |
 | Live battery gauge & telemetry | `C153-Lite` | 2026-09-03 embassy-debug live. M5PM1 ADC `vbat=4190 mV`, `vin=5030 mV`, linear state-of-charge `battery_percent` maps 3300..4150 mV to 0..100% (rendered 100% full bar and readout next to gauge). Power state indicates USB connected (`VIN >= 4400 mV` / `PWR_SRC_VIN`). Legend card auto-refreshes every 60 s with IP2315 parked. [power-and-sleep.md](power-and-sleep.md) |
-| BLE passkey pairing | `C153-Lite` | 2026-09-04 embassy-debug live. Connectable undirected advertising as `PaperMono`. Smartphone connects (`pair state=connected`). DisplayOnly passkey generated and displayed on e-paper card and over CDC (`pair pin=413590`). Panel partial-refreshes. Passkey entered on phone: pairing completes with `pair ok`, panel displays paired banner. Bonds held in RAM. `C153` unmeasured. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-wifi-ble) |
-| WPA2 SoftAP + JSON HTTP | `C153-Lite` | 2026-09-04 embassy-debug live. Touch `[ START HOTSPOT ]` on `wifi_ap` card: CDC `wifi_ap state=active ssid=PaperMono-AP pass=mono2026 ip=192.168.4.1`. Host adapter `wlx9cefd5f6363b` scanned WPA2 ch1, connected, DHCP `192.168.4.50`. `curl http://192.168.4.1/` returned JSON (`sku`, battery, `wifi.clients`, `wifi.requests`). CDC `wifi_ap client=connected count=1` and `wifi_http req=1` / `req=2`. Survey ↔ SoftAP mutual exclusion in firmware. No foreign MAC/BSSID/IRK. WPA3/SAE not used (`esp-radio` blob). `C153` unmeasured. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-wifi-ble) |
+| BLE passkey pairing | `C153-Lite` | 2026-09-04 embassy-debug live. Connectable undirected advertising as `PaperMono`. Smartphone connects (`pair state=connected`). DisplayOnly passkey generated and displayed on e-paper card and over CDC (a generated passkey). Panel partial-refreshes. Passkey entered on phone: pairing completes with `pair ok`, panel displays paired banner. Bonds held in RAM. `C153` unmeasured. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-wifi-ble) |
+| WPA2 SoftAP + JSON HTTP | `C153-Lite` | 2026-09-04 embassy-debug live. Touch `[ START HOTSPOT ]` on `wifi_ap` card: CDC `wifi_ap state=active ssid=PaperMono-AP pass=mono2026 ip=192.168.4.1`. A host Wi-Fi adapter scanned WPA2 ch1, connected, DHCP `192.168.4.50`. `curl http://192.168.4.1/` returned JSON (`sku`, battery, `wifi.clients`, `wifi.requests`). CDC `wifi_ap client=connected count=1` and `wifi_http req=1` / `req=2`. Survey ↔ SoftAP mutual exclusion in firmware. No foreign MAC/BSSID/IRK. WPA3/SAE not used (`esp-radio` blob). `C153` unmeasured. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-wifi-ble) |
 | Soft mono status redraw | `C153-Lite` | 2026-09-04 embassy-debug. Same-card Legend / Bluetooth / Wi-Fi and same-card orientation remaps use `paint_mono_fast(..., soft = true)` and stay on OTP `Partial` past `PARTIALS_BEFORE_FULL` (18) so PIN / client / survey / hold flips do not flash `MonoFull`. Card navigation still takes `MonoFull` when the budget is due. [display.md](display.md) |
 | BMI270 orient axis map | `C153-Lite` | 2026-09-04 embassy-debug `--features orient`. Glass toward operator: USB-C down = −X → `Portrait0`; +X `Portrait180`; +Y `Landscape0` (USB right); −Y `Landscape180` (USB left). X↔Y vs sticky LSM6; landscape Y signs flipped after first glass check. Bosch 8 KiB config + `INTERNAL_STATUS` `0x21` required (max-FIFO blob → XYZ zero). [sensors.md](sensors.md) |
 | Card nav release arming | `C153-Lite` | 2026-09-04 embassy-debug. Button B on press-down + hold through Shapes paint required a second press. Fix: arm after A/B high; Prev/Next on release; buttons before IMU; 3-sample orient hysteresis. [embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md) |
 | Nav queuing & touch in 4 orientations | `C153-Lite` | 2026-09-05 embassy-debug. Concurrent button polling queues navigation clicks during EPD paint. FT6336 power-cycle on bring-up prevents warm-reboot NAK at `0x38`. Touch regions and gutters scoped in page coordinates across all four rotations (`Portrait0`, `Portrait180`, `Landscape0`, `Landscape180`). [touch.md](touch.md) |
-| ST25R3916 NFC ISO14443-A | `C153` | 2026-09-05 embassy-debug live. Powered via M5IOE1 `PYG4`, responds at I2C `0x50` with IC identity `0x05`, rev `2`. Executes short-frame WUPA/REQA, anticollision cascade CL1/CL2, SAK read, and UID detection for physical ISO14443-A contactless cards. Built-in NFC antenna coil is located at the rear behind the bottom-left corner when viewing the e-paper panel face-up in portrait with USB-C at bottom (or bottom-right when looking directly at the rear case). UID masked on CDC (`nfc_tag`). RF field safely parked between polls. [not-yet-confirmed.md](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
+| ST25R3916 NFC ISO14443-A | `C153` | 2026-09-05 embassy-debug live. Powered via M5IOE1 `PYG4`, responds at I2C `0x50` with IC identity `0x05`, rev `2`. Executes short-frame WUPA/REQA, anticollision cascade CL1/CL2, SAK read, and UID detection for physical ISO14443-A contactless cards. Built-in NFC antenna coil is located at the rear behind the bottom-left corner when viewing the e-paper panel face-up in portrait with USB-C at bottom (or bottom-right when looking directly at the rear case). UID masked on CDC (`nfc_tag`). RF field safely parked between polls. [measure.md](measure.md) |
 | Stamp LoRa-1262 transceiver | `C153` | 2026-09-05 embassy-debug live. Powered via M5PM1 `G2` (`3V3_L2_LoRa`), reset on M5IOE1 `PYG10`, antenna switch on M5IOE1 `PYG2` (driven HIGH to connect built-in FPC antenna; LOW disconnects). Dedicated SPI (GPIO38/39/40/41 muxed off JTAG), BUSY on GPIO21. Responds to `CMD_GET_STATUS` (`raw=0xAA`, `STBY_RC`). Bench-safe test TX ping (+14 dBm / 25 mW, 60 mA OCP). Over-the-air packet reception of live 50-byte Meshtastic LongFast broadcast frames on 906.875 MHz (SF11 / BW 250 kHz / CR 4/5 / Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, with acoustic tone feedback. Continuous 104-channel US915 sweeper with double-duty scanning. Zero background TX. [stamp-lora-1262.md](../resources/stamp-lora-1262.md) |
 
 ## Factory image (Lite stock, measured table)
@@ -139,13 +139,13 @@ does not rewrite the snapshot. Do not commit dumps, NVS, PHY,
 image SHA, or the confirm-records JSON.
 
 A `C153` full-chip original capture (`backup-factory-firmware
---as-original`, 2026-09-05, unit `id-e3e5915e`) parsed the table at
+--as-original`, 2026-09-05, unit identifier omitted) parsed the table at
 `0x8000`. Offsets match UserDemo `partitions.csv` and Lite. The factory
 app descriptor at `0x10000` names project **PaperMono-UserDemo**, IDF
 **v5.5.1**, version `c78f6c5-dirty`, compile date **Aug 6 2026
 16:12:13**, matching Lite stock. The same day, `confirm-factory-firmware`
 re-read the live `C153` flash; all partition regions and the full dump
-SHA-256 matched the original snapshot (`id-e3e5915e`). Do not commit
+SHA-256 matched the original snapshot. Do not commit
 dumps, NVS, PHY, image SHA, or unit MAC.
 
 OTP path:
@@ -164,12 +164,12 @@ for live safe diagnostics:
 | --- | --- | --- | --- |
 | USB run & download VID:PID | `C153` | **Confirmed live**: `303a:1001` Espressif USB JTAG/serial debug unit; ~2 s hold to download | [nyc-usb-vid](../resources/not-yet-confirmed.md#nyc-usb-vid) |
 | Flash size & JEDEC bytes | `C153` | **Flash size confirmed live**: 16 MB (`0x1000000`); JEDEC bytes open | [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |
-| Factory partition table | `C153` | **Confirmed live**: at `0x8000` (nvs `0x9000`, phy `0xf000`, factory `0x10000`) | [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table) |
+| Factory partition table | `C153` | **Confirmed live**: at `0x8000` (nvs `0x9000`, phy `0xf000`, factory `0x10000`) | [measure.md](measure.md) |
 | Factory app descriptor | `C153` | **Confirmed live**: PaperMono-UserDemo, IDF v5.5.1, `c78f6c5-dirty` | [user-demo.md](user-demo.md) |
 | System I2C roster | `C153` | **Confirmed live**: `0x32, 0x38, 0x4F, 0x50, 0x68, 0x6E` ACK (`0x50` ST25R3916 ACKs when M5IOE1 `PYG4` asserted) | [nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack) |
-| ST25R3916 IC identity | `C153` | **Confirmed live**: ST25R3916 responds at `0x50` to command `0x7F` with IC type `0x05`, revision 2 (`id=05 rev=2`) | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
-| ST25R3916 ISO14443-A poll & UID | `C153` | **Confirmed live**: ISO14443-A short frames (REQA/WUPA), anticollision (CL1), SAK (`0x00`), and 4-byte UID read (`nfc_tag`) via `embassy-debug-fw` | [nyc-nfc-ack](../resources/not-yet-confirmed.md#nyc-nfc-ack) |
-| SX1262 LoRa SPI status | `C153` | **Confirmed live**: SX1262 responds over SPI3 with status `0xAA` (mode 2 `STBY_RC`, cmd 5) when M5PM1 `G2` push-pull enabled and `PYG10` reset released | [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack) |
+| ST25R3916 IC identity | `C153` | **Confirmed live**: ST25R3916 responds at `0x50` to command `0x7F` with IC type `0x05`, revision 2 (`id=05 rev=2`) | [measure.md](measure.md) |
+| ST25R3916 ISO14443-A poll & UID | `C153` | **Confirmed live**: ISO14443-A short frames (REQA/WUPA), anticollision (CL1), SAK (`0x00`), and 4-byte UID read (`nfc_tag`) via `embassy-debug-fw` | [measure.md](measure.md) |
+| SX1262 LoRa SPI status | `C153` | **Confirmed live**: SX1262 responds over SPI3 with status `0xAA` (mode 2 `STBY_RC`, cmd 5) when M5PM1 `G2` push-pull enabled and `PYG10` reset released | [measure.md](measure.md) |
 | Leftover pins transition | `C153` | GPIO5 (LoRa IRQ), GPIO6 (NFC IRQ), GPIO21 (BUSY) transition from floating leftovers to active | [pin-map.md](pin-map.md) |
 
 ## What this page is not

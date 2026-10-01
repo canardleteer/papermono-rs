@@ -2,10 +2,10 @@
 //!
 //! # Purpose & Architecture
 //! This firmware serves as an introductory, bare-metal proof-of-life reference
-//! implementation for the M5Stack PaperMono-Lite (`C153-Lite`) and PaperMono (`C153`).
-//! Core functionality is shared across both models, operating as a clean Lite baseline
-//! by default. Compiling with `--features c153` activates the PaperMono (`C153`)
-//! board identity and verifies Full-model pin configurations. It demonstrates
+//! implementation for the M5Stack PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`).
+//! The default feature set targets C153. Build a pruned Lite image with
+//! `--no-default-features --features lite`. Shared proof-of-life behavior
+//! verifies the selected board profile. It demonstrates
 //! fundamental embedded Rust concepts described in *The Embedded Rust Book* and
 //! *The Rust on ESP Book*:
 //!

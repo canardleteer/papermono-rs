@@ -60,8 +60,9 @@ Target: `xtensa-esp32s3-none-elf`.
 
 ```shell
 . $HOME/export-esp.sh
-cargo xtask build-fw simple-debug
-cargo xtask build-fw embassy-debug
+cargo xtask build-fw simple-debug  # C153 default
+cargo xtask build-fw embassy-debug # C153 default
+# C153-Lite: add --no-default-features --features lite
 ```
 
 `save-image` refuses an `esp-hal` ELF without
@@ -95,7 +96,12 @@ offsets or 32 MB geometry.
 
 ## Board profile runtime detection and pruning
 
-Firmware builds are unified by default:
+The manifests default to C153. `embassy-debug` includes `c153`,
+`touch`, `panel`, `sleep`, `radio`, and `orient`; `simple-debug`
+defaults to `c153`. Both packages support
+`--no-default-features --features lite` for C153-Lite. Runtime
+board detection in Embassy lets one C153-capable image skip radio
+cards on Lite:
 
 - Cold boot probes the ST25R3916 NFC IC identity at I2C address `0x50`
   (following the `M5PaperMono-UserDemo` `Hal::detectBoardVariant` discriminator).
@@ -109,12 +115,13 @@ Firmware builds are unified by default:
 
 ## Wi-Fi / BLE in embassy-debug
 
-Landing image defaults `--features radio`. Cards: BLE
+The default C153 Embassy image enables `radio`. Cards: BLE
 passkey (`PaperMono`), Wi-Fi channel survey, WPA2 SoftAP
 (`PaperMono-AP` / `mono2026`, `192.168.4.1`, DHCP + JSON
 HTTP). Survey ↔ SoftAP mutually exclusive. Soft status
-redraws use OTP Partial past the usual budget; card change
-still honors `PARTIALS_BEFORE_FULL`. Agent workflows:
+redraws use OTP Partial past the nominal 18-partial budget. This
+differs from the product-page advice near 10 partials and remains
+a documented implementation discrepancy. Agent workflows:
 [firmware/embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md).
 Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
 (**Radio**). Silicon: hardware

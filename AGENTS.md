@@ -330,8 +330,8 @@ results under M5GFX modes, reference only
 PaperMono (`C153`) discovery is tracked on branch
 `feat/papermono-discovery`. The board crate (`m5stack-papermono`) provides
 safe discovery primitives and register constants for ST25R3916 NFC and Stamp
-LoRa-1262 (SX1262). Physical `C153` factory backup (`id-e3e5915e`) confirmed
-16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware. Both
-`simple-debug-fw` and `embassy-debug-fw` include C153 support by default,
-with runtime detection bypassing radio initialization on C153-Lite.
-`--no-default-features --features lite` prunes C153 dependencies.
+LoRa-1262 (SX1262). Physical `C153` factory backup confirmed
+16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware.
+Both firmware packages default to `C153`. Build `C153-Lite` with
+`--no-default-features --features lite`; the default Embassy image includes
+NFC and LoRa discovery.

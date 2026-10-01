@@ -112,18 +112,18 @@ If multiple Espressif devices are connected, specify the target port with
 
 `simple-debug` provides proof-of-life verification using blocking `esp-hal`
 routines. It streams a heartbeat and button events over the CDC interface
-while keeping the display inactive. The core firmware serves as a clean Lite
-baseline by default; passing `--features c153` activates Full-model identity
-and compile-time pin verification.
+while keeping the display inactive. The firmware defaults to `C153`; build
+`C153-Lite` with `--no-default-features --features lite`. Both profiles verify
+pins at compile time.
 
 ```shell
 . $HOME/export-esp.sh
 
-# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
+# Build the default PaperMono (C153) image:
 cargo xtask build-fw simple-debug
 
-# Or build with PaperMono (C153) features:
-cargo xtask build-fw simple-debug --features c153
+# Or build PaperMono-Lite (C153-Lite):
+cargo xtask build-fw simple-debug --no-default-features --features lite
 
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
@@ -148,18 +148,18 @@ presenting a Ferris splash on boot and allowing navigation across test cards
 with hardware buttons. Frontlight brightness and buzzer volume adjust via edge
 swipes, and touch buttons provide immediate visual highlight feedback.
 
-The core firmware operates as a Lite baseline by default. Adding `--features c153`
-activates PaperMono (`C153`) board identity and discovery diagnostics
-for the ST25R3916 NFC controller and Stamp LoRa-1262 (SX1262) transceiver.
+The firmware defaults to PaperMono (`C153`), including ST25R3916 NFC and Stamp
+LoRa-1262 (SX1262) support. Build PaperMono-Lite (`C153-Lite`) with
+`--no-default-features --features lite` to compile those drivers out.
 
 ```shell
 . $HOME/export-esp.sh
 
-# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
+# Build the default PaperMono (C153) image:
 cargo xtask build-fw embassy-debug
 
-# Or build with PaperMono (C153) features:
-cargo xtask build-fw embassy-debug --features c153
+# Or build PaperMono-Lite (C153-Lite):
+cargo xtask build-fw embassy-debug --no-default-features --features lite
 
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
@@ -230,7 +230,7 @@ wireless cards.
 Discovery preparation for PaperMono (`C153`) is active on the
 `feat/papermono-discovery` branch. Safe host-tested driver primitives for
 ST25R3916 NFC and Stamp LoRa-1262 (SX1262) are implemented. The factory backup
-of the physical `C153` hardware (`id-e3e5915e`) confirmed identical 16 MB
+of the physical `C153` hardware confirmed identical 16 MB
 flash size, stock partition table geometry, and factory demo version
 (`c78f6c5-dirty`) matching the PaperMono-Lite baseline.
 

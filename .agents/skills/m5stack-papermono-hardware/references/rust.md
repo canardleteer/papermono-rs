@@ -50,7 +50,7 @@ and SoftAP are mutually exclusive in the consuming firmware.
 WPA3/SAE is not available in the precompiled `esp-radio`
 ESP32-S3 blob. No NVS writes for radio bring-up. Close
 [nyc-wifi-ble](../resources/not-yet-confirmed.md#nyc-wifi-ble)
-per SKU; `C153` still open.
+per SKU; C153 NFC and LoRa are confirmed live, while other peripherals remain item-specific.
 
 Board crates live under `crates/` (host-testable, no `esp-hal`).
 `simple-debug-fw` is a workspace member, not a default-member.
