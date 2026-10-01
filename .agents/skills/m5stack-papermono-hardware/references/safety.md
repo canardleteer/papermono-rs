@@ -144,3 +144,20 @@ no Cargo `runner`. Do not treat bare `espflash`, `esptool`,
 When firmware lands, encode M5PM1/M5IOE1 rail enables, IP2315
 isolate, and EPD OTP-first as compile-time constraints so the
 sequences above are type errors rather than field failures.
+
+## SX1262 TX readiness
+
+PaperMono (`C153`) lifecycle hooks keep antenna control high through the
+active session. Startup and shutdown confirm output mode, push-pull
+drive, latch and sampled level. Initial verification interval is one,
+so each TX gets fresh enabled-state confirmation. Denial, mismatch or
+readback failure blocks TX, invalidates readiness, restores interval one
+and triggers cleanup. Shutdown attempts reset, antenna-low and rail-off
+even if an earlier step fails, then confirms the disabled control state.
+Recovery requires successful shutdown followed by startup.
+
+Raw `SetTx` uses the same guard. Default hooks deny TX; permanent-antenna
+permission requires an explicit caller policy. Continuous-carrier and
+infinite-preamble commands are unsupported. Digital readback does not
+validate the RF path. The new policy awaits physical C153 validation;
+C153-Lite radio outputs remain undriven.

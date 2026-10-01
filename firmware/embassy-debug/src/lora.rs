@@ -1,34 +1,30 @@
 //! Stamp LoRa-1262 (SX1262) transceiver driver and interactive test service.
 //!
-//! # Architecture & Hardware Net Routing
-//! The M5Stack PaperMono (`C153`) includes an SX1262 LoRa transceiver connected via:
-//! - **SPI Bus**: ESP32-S3 `SPI3` on `GPIO38` (MOSI), `GPIO39` (SCK), `GPIO40` (MISO), `GPIO41` (NSS).
-//!   Configured at 8 MHz (`lora::SPI_USERDEMO_HZ`).
-//! - **BUSY Pin**: `GPIO21`. Active high while executing internal commands.
-//! - **IRQ / DIO1**: `GPIO5`. High upon packet completion, timeout, or error.
-//! - **Power Rail**: Switched `3V3_L2_LoRa` rail gated by M5PM1 GPIO `G2` (`lora::PMIC_ENABLE`).
-//! - **Reset Line**: M5IOE1 expander pin `PYG10` (`lora::IOE1_RESET`, active low).
-//! - **Antenna Switch**: M5IOE1 expander pin `PYG2` (`lora::IOE1_ANTENNA_SWITCH`).
-//! - **PaperMono-Lite (`C153-Lite`)**: LoRa hardware is unpopulated. All pins are unmounted or
-//!   leftover test pads.
+//! PaperMono's official PinMap and
+//! [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp)
+//! identify SPI3 on GPIO38/39/40/41, BUSY on GPIO21 and DIO1 on GPIO5.
+//! M5PM1 G2 gates `3V3_L2_LoRa`; M5IOE1 PYG10 asserts reset and PYG2
+//! controls the antenna path. C153-Lite has no populated radio; runtime
+//! detection bypasses initialization and keeps these GPIOs undriven.
 //!
-//! # RF Safety Protocol
-//! To guarantee bench safety and prevent damage to un-terminated RF stages:
-//! 1. **Zero Continuous Background TX**: The transceiver is never keyed autonomously in the background.
-//! 2. **Explicit User-Initiated Bursts**: Transmission only occurs when the human explicitly taps `[ TX PING ]`.
-//! 3. **Bench-Safe Output Power**: Transmit output is clamped to +14 dBm (`PA_DUTY_CYCLE_14DBM`, `PA_HP_MAX_14DBM`),
-//!    with the over-current protection clamped to 60 mA (`OCP_60_MA`).
-//! 4. **Immediate Standby & Rail Park**: Following a single packet burst, the radio is immediately returned to
-//!    low-power RC standby (`CMD_SET_STANDBY`), the reset line is asserted low, and the PMIC rail is powered down.
+//! Each on-demand probe, ping, receive window or sweep uses one explicit
+//! startup/shutdown pair. PYG2 stays high during packet and channel operations.
+//! Readback confirms digital controls at startup/shutdown and before every TX.
+//! Failures warn on CDC and require confirmed cleanup before another startup.
 //!
-//! # Unlicensed US Frequency Presets
-//! - **Bench Ping**: 915.000 MHz (`FREQ_BENCH_PING_HZ`) in the US 902–928 MHz ISM band.
-//! - **Primary Sniffer**: 917.625 MHz (`FREQ_RX_SNIFFER_PRI_HZ`).
-//! - **Secondary Sniffer**: 906.875 MHz (`FREQ_RX_SNIFFER_SEC_HZ`).
+//! TX occurs only after a tap on `[ TX PING ]`. The existing profile sends
+//! `SetTxParams` +14 with the retained PA settings and 60 mA OCP code. This
+//! command value does not establish radiated power: catalog `sx1262` Rev 2.2
+//! §13.1.14.1 “PA Optimal Settings” describes matching-network-dependent rows.
+//! RF power and antenna performance remain hardware measurements.
 //!
-//! # Privacy Protection
-//! In accordance with privacy rules, serial CDC telemetry logs emit only packet metadata (frequency,
-//! RSSI, SNR, length) and first/last preview bytes. Internal network or channel names are excluded.
+//! Presets remain 915.000 MHz for ping and 917.625/906.875 MHz for reception.
+//! CDC logs packet metrics and bounded preview bytes. Embassy timers yield
+//! during settling and IRQ polling; dedicated SPI transactions are blocking.
+//! Ownership and borrowing follow the
+//! [Embedded Rust Book](https://docs.rust-embedded.org/book/peripherals/borrowing.html),
+//! [Rust on ESP Book](https://docs.espressif.com/projects/rust/book/application-development/),
+//! and [Embassy Book](https://embassy.dev/book/).
 
 use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, AtomicI16, AtomicI8, AtomicU32, AtomicU8, Ordering};
@@ -51,9 +47,12 @@ use m5stack_papermono::lora::{
     TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS,
 };
 #[cfg(feature = "c153")]
-pub use m5stack_papermono::lora::{ChipMode, CommandStatus};
+use m5stack_papermono::lora::{
+    AntennaCheck, AntennaFailure, CheckPhase, RadioContext, RadioHooks, SessionError,
+    StartupFailure, SxError,
+};
 #[cfg(feature = "c153")]
-use m5stack_papermono_lite::addresses;
+pub use m5stack_papermono::lora::{ChipMode, CommandStatus};
 
 #[cfg(feature = "c153")]
 use crate::ioe;
@@ -101,7 +100,7 @@ pub enum LoraCardState {
     Transmitted {
         /// Carrier frequency in kHz (e.g. 915000).
         freq_khz: u32,
-        /// Output power in dBm (+14 dBm bench safe).
+        /// Configured power command in dBm; RF output requires measurement.
         pwr_dbm: i8,
         /// Airtime / execution duration in milliseconds.
         time_ms: u32,
@@ -335,44 +334,199 @@ pub fn set_listening_state(freq_khz: u32) {
     LORA_STATE_CODE.store(5, Ordering::Release);
 }
 
-/// Powers up the `3V3_L2_LoRa` power rail and brings the Stamp LoRa-1262 out of reset.
-///
-/// # Hardware Sequencing & Net Routing
-/// - **Hold in Reset**: M5IOE1 `PYG10` (`lora::IOE1_RESET`) is driven LOW as push-pull.
-/// - **Connect Antenna**: M5IOE1 `PYG2` (`lora::IOE1_ANTENNA_SWITCH`, schematic net `PYB_LoRa_ANT_SW`)
-///   is driven HIGH as push-pull to connect the built-in FPC antenna to the module RF path
-///   (per PaperMono Schematic V0.6.2 Page 5 and official `M5PaperMono-UserDemo` `hal_lora.cpp`).
-/// - **Energize Power Rail**: M5PM1 GPIO `G2` (`lora::PMIC_ENABLE`) is driven HIGH as push-pull
-///   output to energize the `3V3_L2_LoRa` switched power rail.
-/// - **Rail Settle**: 15 ms stabilization delay.
-/// - **Release Reset**: M5IOE1 `PYG10` is driven HIGH.
-/// - **Boot Settle**: 20 ms delay for the 32 MHz TCXO and internal SX1262 logic to reach Standby RC.
+/// Records a control or transport failure for both radio cards.
+/// Atomic state crosses UI/heartbeat tasks; the system I2C bus stays with its caller.
+static LORA_CONTROL_FAILED: AtomicBool = AtomicBool::new(false);
+
+/// Retains unfinished cleanup across diagnostic wrappers and cancelled futures.
+/// The SPI3 mutex serializes changes; a later operation confirms shutdown first.
 #[cfg(feature = "c153")]
-async fn power_up(i2c: &mut ioe::SysI2c) {
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
-    // Connect RF antenna switch line on C153 (matches M5PaperMono-UserDemo hal_lora.cpp):
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_ANTENNA_SWITCH, true);
-    {
-        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
-        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, true);
-    }
-    Timer::after(Duration::from_millis(15)).await;
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, true);
-    Timer::after(Duration::from_millis(20)).await;
+static LORA_NEEDS_CLEANUP: AtomicBool = AtomicBool::new(false);
+
+/// Reports whether the last radio session failed control, verification or cleanup.
+/// A later successful startup clears the banner before operations resume.
+pub fn control_failed() -> bool {
+    LORA_CONTROL_FAILED.load(Ordering::Acquire)
 }
 
-/// Parks the Stamp LoRa-1262 transceiver safely.
-///
-/// Drives M5IOE1 `PYG10` (reset) LOW, disconnects the antenna switch (M5IOE1 `PYG2` LOW),
-/// and de-energizes the `3V3_L2_LoRa` power rail via M5PM1 `G2`.
+/// Borrowed SPI3 transport and PaperMono hooks. System I2C is not stored here.
 #[cfg(feature = "c153")]
-async fn power_down(i2c: &mut ioe::SysI2c) {
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_RESET, false);
-    let _ = ioe::set_push_pull_output(i2c, lora::IOE1_ANTENNA_SWITCH, false);
-    {
-        let mut pm1 = m5stack_papermono_lite::m5pm1::M5pm1::new(&mut *i2c, addresses::M5PM1);
-        let _ = pm1.set_gpio_output(lora::PMIC_ENABLE, false);
+type Radio<'a> = Sx1262<
+    &'a mut Spi<'static, esp_hal::Blocking>,
+    &'a mut Output<'static>,
+    &'a mut Input<'static>,
+    RadioHooks,
+>;
+
+/// Constructs a radio wrapper without GPIO/SPI transactions. The caller's existing
+/// Embassy mutex guard excludes other users of SPI3 for this diagnostic session.
+#[cfg(feature = "c153")]
+fn session(hw: &mut LoraHardware) -> Radio<'_> {
+    Sx1262::with_hooks(
+        &mut hw.spi,
+        &mut hw.nss,
+        &mut hw.busy,
+        RadioHooks::new(report_antenna),
+    )
+}
+
+/// Lends system I2C for one control operation and uses Embassy's upstream DelayNs
+/// implementation. Once the future completes, touch and PMIC may borrow I2C again.
+#[cfg(feature = "c153")]
+fn context(i2c: &mut ioe::SysI2c) -> RadioContext<'_, ioe::SysI2c, embassy_time::Delay> {
+    RadioContext {
+        i2c,
+        delay: embassy_time::Delay,
+        ioe_address: ioe::active_address(),
     }
+}
+
+/// Converts board readback evidence to bounded serial telemetry. A mismatch or bus
+/// error marks the card failed; sampled high confirms only the digital control net.
+#[cfg(feature = "c153")]
+fn report_antenna(check: AntennaCheck) {
+    let phase = match check.request.phase {
+        CheckPhase::Startup => papermono_log::LoraPhase::Startup,
+        CheckPhase::BeforeTx => papermono_log::LoraPhase::BeforeTx,
+        CheckPhase::Shutdown => papermono_log::LoraPhase::Shutdown,
+    };
+    let failure = match check.failure {
+        AntennaFailure::None => papermono_log::LoraFailure::None,
+        AntennaFailure::Bus => papermono_log::LoraFailure::Bus,
+        AntennaFailure::Mismatch => papermono_log::LoraFailure::Mismatch,
+    };
+    if failure != papermono_log::LoraFailure::None {
+        LORA_CONTROL_FAILED.store(true, Ordering::Release);
+    }
+    crate::cdc::lora_control(&papermono_log::LoraControlSample {
+        phase,
+        interval: check.request.interval,
+        attempts: check.request.attempt,
+        checks: check.request.check,
+        expected_high: check.expected_high,
+        output: check.evidence.output,
+        push_pull: check.evidence.push_pull,
+        latch: check.evidence.latch,
+        level: check.evidence.level,
+        failure,
+    });
+}
+
+/// Emits a typed warning for a control or chip operation whose register evidence
+/// is unavailable. The caller always follows this path with explicit cleanup.
+#[cfg(feature = "c153")]
+fn report_failure(
+    sx: &Radio<'_>,
+    phase: papermono_log::LoraPhase,
+    failure: papermono_log::LoraFailure,
+) {
+    LORA_CONTROL_FAILED.store(true, Ordering::Release);
+    let stats = sx.session_stats();
+    crate::cdc::lora_control(&papermono_log::LoraControlSample {
+        phase,
+        interval: sx.verification_interval().get(),
+        attempts: stats.tx_attempts,
+        checks: stats.verifications,
+        expected_high: phase != papermono_log::LoraPhase::Shutdown,
+        output: None,
+        push_pull: None,
+        latch: None,
+        level: None,
+        failure,
+    });
+}
+
+/// Classifies lifecycle errors without discarding the original readback reason.
+/// Board bus errors are distinguished from chip SPI/BUSY failures on serial.
+#[cfg(feature = "c153")]
+fn session_failure<S, H>(error: &SessionError<S, H>) -> papermono_log::LoraFailure {
+    use papermono_log::LoraFailure;
+    match error {
+        SessionError::TxDenied | SessionError::NotActive | SessionError::RecoveryRequired => {
+            LoraFailure::Denied
+        }
+        SessionError::ReadinessMismatch => LoraFailure::Mismatch,
+        SessionError::Verification(_) => LoraFailure::Bus,
+        SessionError::Chip(_) => LoraFailure::Chip,
+        SessionError::Startup { cause, .. } => match cause {
+            StartupFailure::Control(_) => LoraFailure::Control,
+            StartupFailure::Chip(_) => LoraFailure::Chip,
+            StartupFailure::Verification(_) => LoraFailure::Bus,
+            StartupFailure::Mismatch => LoraFailure::Mismatch,
+        },
+        SessionError::Shutdown(failure) => {
+            if failure.control.is_some() {
+                LoraFailure::Control
+            } else if failure.verification.is_some() {
+                LoraFailure::Bus
+            } else {
+                LoraFailure::Mismatch
+            }
+        }
+    }
+}
+
+/// Starts a short diagnostic session at the default verification interval of one.
+/// Startup rolls back on failure; the summary preserves its cleanup result. Never
+/// cancel this future: power sequencing uses awaited Embassy timers between writes.
+#[cfg(feature = "c153")]
+async fn start_radio(sx: &mut Radio<'_>, i2c: &mut ioe::SysI2c) -> bool {
+    // A failed or interrupted earlier diagnostic may have left the rail enabled.
+    // Require confirmed low controls before attempting a new high-state startup.
+    if LORA_NEEDS_CLEANUP.load(Ordering::Acquire) && !stop_radio(sx, i2c).await {
+        return false;
+    }
+    LORA_NEEDS_CLEANUP.store(true, Ordering::Release);
+    match sx.startup(&mut context(i2c)).await {
+        Ok(()) => {
+            LORA_CONTROL_FAILED.store(false, Ordering::Release);
+            true
+        }
+        Err(error) => {
+            report_failure(
+                sx,
+                papermono_log::LoraPhase::Startup,
+                session_failure(&error),
+            );
+            let cleanup_ok = matches!(error, SessionError::Startup { cleanup: None, .. });
+            LORA_NEEDS_CLEANUP.store(!cleanup_ok, Ordering::Release);
+            report_summary(sx, cleanup_ok);
+            false
+        }
+    }
+}
+
+/// Emits verification totals, including startup, pre-TX and shutdown checks.
+/// Transport/setup failures remain visible in card state even if cleanup succeeds.
+#[cfg(feature = "c153")]
+fn report_summary(sx: &Radio<'_>, cleanup_ok: bool) {
+    let stats = sx.session_stats();
+    crate::cdc::lora_session(&papermono_log::LoraSessionSample {
+        interval: sx.verification_interval().get(),
+        attempts: stats.tx_attempts,
+        checks: stats.verifications,
+        failures: stats.failures,
+        cleanup_ok,
+    });
+}
+
+/// Explicitly asserts reset, disconnects antenna and disables the rail, attempting
+/// all cleanup steps. Disabled-state confirmation runs even after a control error.
+/// No packet, channel or standby transition invokes these lifecycle controls.
+#[cfg(feature = "c153")]
+async fn stop_radio(sx: &mut Radio<'_>, i2c: &mut ioe::SysI2c) -> bool {
+    let result = sx.shutdown(&mut context(i2c)).await;
+    let ok = result.is_ok();
+    LORA_NEEDS_CLEANUP.store(!ok, Ordering::Release);
+    if let Err(error) = result {
+        report_failure(
+            sx,
+            papermono_log::LoraPhase::Shutdown,
+            session_failure(&error),
+        );
+    }
+    report_summary(sx, ok);
+    ok
 }
 
 /// Executes an initial non-destructive probe and immediately parks the transceiver.
@@ -384,9 +538,10 @@ pub async fn probe_and_park(i2c: &mut ioe::SysI2c) -> bool {
         return false;
     };
 
-    power_up(i2c).await;
-
-    let mut sx = Sx1262::new(&mut hw.spi, &mut hw.nss, &mut hw.busy);
+    let mut sx = session(hw);
+    if !start_radio(&mut sx, i2c).await {
+        return false;
+    }
     let status_res = sx.get_status();
 
     let success = match status_res {
@@ -403,8 +558,8 @@ pub async fn probe_and_park(i2c: &mut ioe::SysI2c) -> bool {
         }
     };
 
-    power_down(i2c).await;
-    success
+    let cleanup_ok = stop_radio(&mut sx, i2c).await;
+    success && cleanup_ok
 }
 
 /// Fallback probe on Lite SKU.
@@ -414,75 +569,94 @@ pub async fn probe_and_park(_i2c: &mut crate::ioe::SysI2c) -> bool {
     false
 }
 
-/// Transmits a user-controlled test ping packet at 915.000 MHz (+14 dBm bench safe).
+/// Transmits a user-controlled test ping at 915.000 MHz with the retained PA profile.
 ///
 /// # RF Safety & Sequencing
 /// 1. Powers up `3V3_L2_LoRa` rail via M5PM1 `G2`, connects FPC antenna via M5IOE1 `PYG2`,
 ///    and releases reset via M5IOE1 `PYG10`.
 /// 2. Configures the transceiver in Standby RC (Semtech SX1262 Section 13.1.2 "SetStandby"),
-///    LDO regulator mode (Section 13.1.8 "SetRegulatorMode", matching `hal_lora.cpp`),
-///    3.0 V TCXO supply (Section 13.3.2 "SetDio3AsTcxoCtrl"), and automatic RF switch
-///    via DIO2 (Section 13.3.1 "SetDio2AsRfSwitchCtrl").
+///    LDO regulator mode (Section 13.1.11 "SetRegulatorMode", matching `hal_lora.cpp`),
+///    3.0 V TCXO supply (Section 13.3.6 "SetDIO3AsTCXOCtrl"), and automatic RF switch
+///    via DIO2 (Section 13.3.5 "SetDIO2AsRfSwitchCtrl").
 /// 3. Configures carrier frequency to 915.000 MHz (Section 13.4.1 "SetRfFrequency") and
-///    clamps output power to +14 dBm with 60 mA hardware over-current protection
-///    (Section 13.1.11 "SetPaConfig", Section 13.4.4 "SetTxParams", Section 13.4.15 "SetOcp").
+///    retains the +14 power command and 60 mA OCP register setting
+///    (Section 13.1.14 "SetPaConfig", Section 13.4.4 "SetTxParams", Section 12.1 “Registers” (OCP)).
 /// 4. Loads payload into the transceiver FIFO (Section 13.2.3 "WriteBuffer") and
 ///    triggers transmission (Section 13.1.4 "SetTx").
-/// 5. Polls for `IRQ_TX_DONE` (Section 13.5.1 "GetIrqStatus"), then immediately returns
-///    to Standby RC and parks the hardware rails via [`power_down`].
+/// 5. Polls for `IRQ_TX_DONE` (Section 13.3.3 "GetIrqStatus"), then immediately returns
+///    to Standby RC and parks the hardware rails via explicit shutdown.
 #[cfg(feature = "c153")]
 pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraTxSample> {
     let mut lock = LORA_HW.lock().await;
     let hw = lock.as_mut()?;
 
-    power_up(i2c).await;
+    let mut sx = session(hw);
+    if !start_radio(&mut sx, i2c).await {
+        return None;
+    }
 
-    let mut sx = Sx1262::new(&mut hw.spi, &mut hw.nss, &mut hw.busy);
+    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+        // 1. Enter Standby RC:
+        sx.set_standby(STDBY_CONFIG_RC)?;
+        sx.set_regulator_mode(REGULATOR_LDO)?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
+        sx.set_dio2_as_rf_switch_ctrl(true)?;
 
-    // 1. Enter Standby RC:
-    let _ = sx.set_standby(STDBY_CONFIG_RC);
-    let _ = sx.set_regulator_mode(REGULATOR_LDO);
-    let _ = sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS);
-    let _ = sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ);
-    let _ = sx.set_dio2_as_rf_switch_ctrl(true);
+        // 2. Configure LoRa modem on 915.000 MHz:
+        sx.set_packet_type(PACKET_TYPE_LORA)?;
+        sx.set_rf_frequency(FREQ_BENCH_PING_HZ)?;
 
-    // 2. Configure LoRa modem on 915.000 MHz:
-    let _ = sx.set_packet_type(PACKET_TYPE_LORA);
-    let _ = sx.set_rf_frequency(FREQ_BENCH_PING_HZ);
+        // 3. Retained PA profile, +14 power command and 60 mA OCP code:
+        sx.set_pa_config(
+            PA_DUTY_CYCLE_14DBM,
+            PA_HP_MAX_14DBM,
+            PA_DEVICE_SEL_SX1262,
+            PA_LUT_DEFAULT,
+        )?;
+        sx.set_tx_params(14, RAMP_40_US)?;
+        sx.set_ocp(OCP_60_MA)?;
 
-    // 3. Clamped bench-safe PA output (+14 dBm, 60 mA OCP clamp):
-    let _ = sx.set_pa_config(
-        PA_DUTY_CYCLE_14DBM,
-        PA_HP_MAX_14DBM,
-        PA_DEVICE_SEL_SX1262,
-        PA_LUT_DEFAULT,
-    );
-    let _ = sx.set_tx_params(14, RAMP_40_US);
-    let _ = sx.set_ocp(OCP_60_MA);
+        // 4. Modulation & Packet format:
+        sx.set_lora_modulation_params(LORA_SF7, LORA_BW_125_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
+        let payload = b"PAPEBENCH-PING#001";
+        sx.set_lora_packet_params(
+            8,
+            LORA_HEADER_VARIABLE,
+            payload.len() as u8,
+            LORA_CRC_ON,
+            LORA_IQ_STANDARD,
+        )?;
+        sx.set_lora_sync_word(SYNC_WORD_PRIVATE)?;
 
-    // 4. Modulation & Packet format:
-    let _ = sx.set_lora_modulation_params(LORA_SF7, LORA_BW_125_KHZ, LORA_CR_4_5, LORA_LDRO_OFF);
-    let payload = b"PAPEBENCH-PING#001";
-    let _ = sx.set_lora_packet_params(
-        8,
-        LORA_HEADER_VARIABLE,
-        payload.len() as u8,
-        LORA_CRC_ON,
-        LORA_IQ_STANDARD,
-    );
-    let _ = sx.set_lora_sync_word(SYNC_WORD_PRIVATE);
+        // 5. Load FIFO buffer:
+        sx.set_buffer_base_address(0x00, 0x00)?;
+        sx.write_buffer(0x00, payload)?;
 
-    // 5. Load FIFO buffer:
-    let _ = sx.set_buffer_base_address(0x00, 0x00);
-    let _ = sx.write_buffer(0x00, payload);
+        // 6. Arm TX IRQ:
+        sx.clear_irq_status(IRQ_ALL)?;
+        sx.set_dio_irq_params(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE, 0, 0)?;
 
-    // 6. Arm TX IRQ:
-    let _ = sx.clear_irq_status(IRQ_ALL);
-    let _ = sx.set_dio_irq_params(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE, 0, 0);
+        Ok(())
+    })();
+    if setup.is_err() {
+        report_failure(
+            &sx,
+            papermono_log::LoraPhase::BeforeTx,
+            papermono_log::LoraFailure::Chip,
+        );
+        stop_radio(&mut sx, i2c).await;
+        return None;
+    }
 
     // 7. Initiate single burst transmission:
     let start = Instant::now();
-    let _ = sx.set_tx(0); // 0 = timeout disabled, wait for TxDone
+    if let Err(error) = sx.set_tx(&mut context(i2c), 0).await {
+        let reason = session_failure(&error);
+        report_failure(&sx, papermono_log::LoraPhase::BeforeTx, reason);
+        stop_radio(&mut sx, i2c).await;
+        return None;
+    } // Zero disables the chip timer; this diagnostic polls for TxDone.
 
     let mut confirmed = false;
     for _ in 0..60 {
@@ -499,7 +673,7 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
 
     // 8. Immediately return to standby and park the hardware rails:
     let _ = sx.set_standby(STDBY_CONFIG_RC);
-    power_down(i2c).await;
+    let cleanup_ok = stop_radio(&mut sx, i2c).await;
 
     let sample = papermono_log::LoraTxSample {
         freq_khz: FREQ_BENCH_PING_HZ / 1_000,
@@ -507,7 +681,7 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
         sf: 7,
         bw_khz: 125,
         time_ms: elapsed_ms,
-        ok: confirmed,
+        ok: confirmed && cleanup_ok,
     };
 
     LORA_FREQ_KHZ.store(sample.freq_khz, Ordering::Release);
@@ -533,10 +707,10 @@ pub async fn transmit_ping(_i2c: &mut crate::ioe::SysI2c) -> Option<papermono_lo
 /// 2. Configures receiver parameters: Semtech SX1262 Section 13.1.5 "SetRx" (`0xFFFFFF`
 ///    for continuous reception), Section 13.4.5 "SetModulationParams" (SF11, BW 250 kHz,
 ///    CR 4/5), Section 13.4.6 "SetPacketParams" (variable header, 255-byte max buffer, CRC on),
-///    and Section 13.4.8 "SetLoRaSyncWord" (`0x24B4`).
-/// 3. Arms `IRQ_RX_DONE` on DIO1 (Section 13.3.3 "SetDioIrqParams").
+///    and Section 12.1 “Registers” (LoRa Sync Word) (`0x24B4`).
+/// 3. Arms `IRQ_RX_DONE` on DIO1 (Section 13.3.1 "SetDioIrqParams").
 /// 4. Polls for packet arrival. Upon reception, reads packet length and buffer start pointer
-///    (Section 13.5.3 "GetRxBufferStatus"), queries packet RSSI and SNR (Section 13.5.4
+///    (Section 13.5.2 "GetRxBufferStatus"), queries packet RSSI and SNR (Section 13.5.3
 ///    "GetPacketStatus"), reads payload bytes (Section 13.2.4 "ReadBuffer"), and immediately
 ///    returns to standby and powers down.
 #[cfg(feature = "c153")]
@@ -559,29 +733,48 @@ pub async fn listen_rx(
 
     set_listening_state(target_freq / 1_000);
 
-    power_up(i2c).await;
+    let mut sx = session(hw);
+    if !start_radio(&mut sx, i2c).await {
+        return Err(-120);
+    }
 
-    let mut sx = Sx1262::new(&mut hw.spi, &mut hw.nss, &mut hw.busy);
+    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+        // 1. Enter Standby RC:
+        sx.set_standby(STDBY_CONFIG_RC)?;
+        sx.set_regulator_mode(REGULATOR_LDO)?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
+        sx.set_dio2_as_rf_switch_ctrl(true)?;
 
-    // 1. Enter Standby RC:
-    let _ = sx.set_standby(STDBY_CONFIG_RC);
-    let _ = sx.set_regulator_mode(REGULATOR_LDO);
-    let _ = sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS);
-    let _ = sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ);
-    let _ = sx.set_dio2_as_rf_switch_ctrl(true);
+        // 2. Configure receiver parameters: SF11, BW 250 kHz (Meshtastic LongFast standard)
+        sx.set_packet_type(PACKET_TYPE_LORA)?;
+        sx.set_rf_frequency(target_freq)?;
+        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
+        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)?;
+        sx.set_lora_sync_word(SYNC_WORD_ALT)?;
 
-    // 2. Configure receiver parameters: SF11, BW 250 kHz (Meshtastic LongFast standard)
-    let _ = sx.set_packet_type(PACKET_TYPE_LORA);
-    let _ = sx.set_rf_frequency(target_freq);
-    let _ = sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF);
-    let _ = sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD);
-    let _ = sx.set_lora_sync_word(SYNC_WORD_ALT);
+        // 3. Clear IRQs and start continuous reception (0xFFFFFF = Rx Continuous):
+        sx.clear_irq_status(IRQ_ALL)?;
+        sx.set_dio_irq_params(
+            IRQ_RX_DONE | IRQ_TIMEOUT | IRQ_CRC_ERR | lora::IRQ_HEADER_ERR,
+            IRQ_RX_DONE,
+            0,
+            0,
+        )?;
+        sx.set_buffer_base_address(0x00, 0x00)?;
+        sx.set_rx(0xFFFFFF)?;
 
-    // 3. Clear IRQs and start continuous reception (0xFFFFFF = Rx Continuous):
-    let _ = sx.clear_irq_status(IRQ_ALL);
-    let _ = sx.set_dio_irq_params(IRQ_RX_DONE | IRQ_TIMEOUT | IRQ_CRC_ERR, IRQ_RX_DONE, 0, 0);
-    let _ = sx.set_buffer_base_address(0x00, 0x00);
-    let _ = sx.set_rx(0xFFFFFF);
+        Ok(())
+    })();
+    if setup.is_err() {
+        report_failure(
+            &sx,
+            papermono_log::LoraPhase::Startup,
+            papermono_log::LoraFailure::Chip,
+        );
+        stop_radio(&mut sx, i2c).await;
+        return Err(-120);
+    }
 
     // 4. Debounce initial tap: wait until finger is lifted off glass (up to 400 ms)
     for _ in 0..20 {
@@ -597,7 +790,10 @@ pub async fn listen_rx(
         Timer::after(Duration::from_millis(50)).await;
 
         if let Ok(irq) = sx.get_irq_status() {
-            if irq & IRQ_RX_DONE != 0 {
+            if irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) != 0 {
+                let _ = sx.clear_irq_status(IRQ_ALL);
+            }
+            if irq & IRQ_RX_DONE != 0 && irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) == 0 {
                 rx_done = true;
                 break;
             }
@@ -621,7 +817,7 @@ pub async fn listen_rx(
         let _ = sx.read_buffer(start_ptr, &mut preview_buf);
 
         let _ = sx.set_standby(STDBY_CONFIG_RC);
-        power_down(i2c).await;
+        let cleanup_ok = stop_radio(&mut sx, i2c).await;
 
         let sample = papermono_log::LoraRxSample {
             freq_khz: target_freq / 1_000,
@@ -642,19 +838,27 @@ pub async fn listen_rx(
         LORA_PREVIEW[3].store(preview_buf[3], Ordering::Release);
         LORA_STATE_CODE.store(3, Ordering::Release);
 
-        Ok(Some(sample))
+        if cleanup_ok {
+            Ok(Some(sample))
+        } else {
+            Err(-120)
+        }
     } else {
         // Measure ambient noise floor:
         let ambient = sx.get_rssi_inst().unwrap_or(-115);
 
         let _ = sx.set_standby(STDBY_CONFIG_RC);
-        power_down(i2c).await;
+        let cleanup_ok = stop_radio(&mut sx, i2c).await;
 
         LORA_FREQ_KHZ.store(target_freq / 1_000, Ordering::Release);
         LORA_RSSI.store(ambient, Ordering::Release);
         LORA_STATE_CODE.store(4, Ordering::Release);
 
-        Ok(None)
+        if cleanup_ok {
+            Ok(None)
+        } else {
+            Err(-120)
+        }
     }
 }
 
@@ -674,7 +878,7 @@ pub async fn listen_rx(
 /// # Hardware Operation & Double-Duty Scanning
 /// - Applies "double duty" scanning to the expected channel neighborhood (slots 61..=63),
 ///   visiting them twice per sweep and doubling their dwell time (25 ms vs 10 ms).
-/// - Queries instantaneous RSSI (Semtech SX1262 Section 13.5.5 "GetRssiInst").
+/// - Queries instantaneous RSSI (Semtech SX1262 Section 13.5.4 "GetRssiInst").
 /// - Emits acoustic feedback via GPIO42 passive buzzer: 25 ms chirp on elevated RSSI
 ///   (above -105 dBm) and 80 ms tone on packet detection.
 /// - Parks transceiver and powers down rails upon completion or cancellation.
@@ -701,19 +905,36 @@ pub async fn run_scan_sweep(
         }
     };
 
-    power_up(i2c).await;
-    let mut sx = Sx1262::new(&mut hw.spi, &mut hw.nss, &mut hw.busy);
+    let mut sx = session(hw);
+    if !start_radio(&mut sx, i2c).await {
+        SCAN_DATA.lock(|cell| cell.borrow_mut().scanning = false);
+        return false;
+    }
 
-    // Initial transceiver configuration:
-    let _ = sx.set_standby(STDBY_CONFIG_RC);
-    let _ = sx.set_regulator_mode(REGULATOR_LDO);
-    let _ = sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS);
-    let _ = sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ);
-    let _ = sx.set_dio2_as_rf_switch_ctrl(true);
-    let _ = sx.set_packet_type(PACKET_TYPE_LORA);
-    let _ = sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF);
-    let _ = sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD);
-    let _ = sx.set_lora_sync_word(SYNC_WORD_MESHTASTIC);
+    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+        // Initial transceiver configuration:
+        sx.set_standby(STDBY_CONFIG_RC)?;
+        sx.set_regulator_mode(REGULATOR_LDO)?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
+        sx.set_dio2_as_rf_switch_ctrl(true)?;
+        sx.set_packet_type(PACKET_TYPE_LORA)?;
+        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
+        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)?;
+        sx.set_lora_sync_word(SYNC_WORD_MESHTASTIC)?;
+
+        Ok(())
+    })();
+    if setup.is_err() {
+        report_failure(
+            &sx,
+            papermono_log::LoraPhase::Startup,
+            papermono_log::LoraFailure::Chip,
+        );
+        stop_radio(&mut sx, i2c).await;
+        SCAN_DATA.lock(|cell| cell.borrow_mut().scanning = false);
+        return false;
+    }
 
     // Double-duty sweep sequence: visit slots 0..=51, then revisit expected slots (61..=63),
     // then continue 52..=103 (which naturally covers 61..=63 again).
@@ -744,13 +965,29 @@ pub async fn run_scan_sweep(
         }
 
         let freq_hz = m5stack_papermono::lora::us915_channel_freq_hz(slot);
-        let _ = sx.set_rf_frequency(freq_hz);
-
-        // Enter continuous RX:
-        let _ = sx.clear_irq_status(IRQ_ALL);
-        let _ = sx.set_dio_irq_params(IRQ_RX_DONE | IRQ_TIMEOUT, IRQ_RX_DONE, 0, 0);
-        let _ = sx.set_buffer_base_address(0x00, 0x00);
-        let _ = sx.set_rx(0xFFFFFF);
+        let channel = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+            // Standby changes only the chip mode; PYG2 stays high for this sweep.
+            sx.set_standby(STDBY_CONFIG_RC)?;
+            sx.set_rf_frequency(freq_hz)?;
+            sx.clear_irq_status(IRQ_ALL)?;
+            sx.set_dio_irq_params(
+                IRQ_RX_DONE | IRQ_TIMEOUT | IRQ_CRC_ERR | lora::IRQ_HEADER_ERR,
+                IRQ_RX_DONE,
+                0,
+                0,
+            )?;
+            sx.set_buffer_base_address(0x00, 0x00)?;
+            sx.set_rx(0xFFFFFF)
+        })();
+        if channel.is_err() {
+            report_failure(
+                &sx,
+                papermono_log::LoraPhase::Startup,
+                papermono_log::LoraFailure::Chip,
+            );
+            stopped = true;
+            break;
+        }
 
         // Double dwell time for expected channel neighborhood (slots 61..=63 and slot 19):
         let is_expected = (61..=63).contains(&slot) || slot == 19;
@@ -764,7 +1001,10 @@ pub async fn run_scan_sweep(
         let mut sample_opt = None;
 
         if let Ok(irq) = sx.get_irq_status() {
-            if irq & IRQ_RX_DONE != 0 {
+            if irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) != 0 {
+                let _ = sx.clear_irq_status(IRQ_ALL);
+            }
+            if irq & IRQ_RX_DONE != 0 && irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) == 0 {
                 hit = true;
                 packet_received = true;
                 let (len, start_ptr) = sx.get_rx_buffer_status().unwrap_or((0, 0));
@@ -829,8 +1069,9 @@ pub async fn run_scan_sweep(
     }
 
     let _ = sx.set_standby(STDBY_CONFIG_RC);
-    power_down(i2c).await;
+    let cleanup_ok = stop_radio(&mut sx, i2c).await;
 
+    stopped |= !cleanup_ok;
     SCAN_DATA.lock(|cell| {
         let mut data = cell.borrow_mut();
         data.scanning = !stopped;

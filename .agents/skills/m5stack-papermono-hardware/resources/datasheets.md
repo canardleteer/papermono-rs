@@ -76,7 +76,7 @@ product pages ([catalog.md](../references/catalog.md)).
 | `rx8130ce` | RX8130CE RTC | [Epson EN](https://download.epsondevice.com/td/pdf/app/RX8130CE_en.pdf) ([M5Stack register PDF](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1132/RX8130CE_cn-Register-Datasheet.pdf)) | Epson app manual | `pdf/rx8130ce.pdf`, `md/rx8130ce.md` | I2C ≤400 kHz; 7-bit from schematic/`0x32`, not a garbled extract |
 | `ip2315` | IP2315 charger | [ChipSourceTek copy](https://www.chipsourcetek.com/DataSheet/IP2315.pdf) | Chinese extract | `pdf/ip2315.pdf`, `md/ip2315.md` | 8-bit `0xEA`/`0xEB` → 7-bit `0x75`; LED vs I2C detect |
 | `st25r3916` | ST25R3916 NFC | [M5Stack copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1205/ST25R3916_EN.pdf) ([ST](https://www.st.com/resource/en/datasheet/st25r3916.pdf)) | **DS12484 Rev 8** | `pdf/st25r3916.pdf`, `md/st25r3916.md` | `C153`; I2C address `50h`; `I2C_EN` selects SPI vs I2C |
-| `sx1262` | SX1261/2 LoRa **die** | [M5Stack DS_SX1261-2 V2.2](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1177/DS_SX1261_2_V2-2.pdf) | **V2.2** (Dec 2024 footer) | `pdf/sx1262.pdf`, `md/sx1262.md` | `C153`; SPI ≤16 MHz; BUSY line. Die 150–960 MHz. Do not flatten onto Stamp LoRa-1262 |
+| `sx1262` | SX1261/2 LoRa **die** | [M5Stack DS_SX1261-2 V2.2](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1177/DS_SX1261_2_V2-2.pdf) ([second official copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1198/DS_SX1261_2_V2-2.pdf)) | **V2.2** (Dec 2024 footer) | `pdf/sx1262.pdf`, `md/sx1262.md` | `C153`; SPI ≤16 MHz; BUSY line. Die 150–960 MHz. Do not flatten onto Stamp LoRa-1262 |
 | `stamp-lora-1262` | Stamp LoRa-1262 **module** | [Product HTML](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262) ([summary](stamp-lora-1262.md)) | Living HTML | none (no PDF in this cache) | SKU S014 / S014-IF / S014-I. Contains SX1262. Module 868–923 MHz. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
 | `esp32-s3-datasheet` | ESP32-S3 | [Datasheet PDF](https://documentation.espressif.com/esp32-s3_datasheet_en.pdf) ([M5Stack copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/472/esp32-s3_datasheet_en.pdf)) | **Version 2.2** | `pdf/esp32-s3-datasheet.pdf`, `md/esp32-s3-datasheet.md` | Straps GPIO0/3/45/46; JTAG 39–42; USB 19/20 |
 | `esp32-s3-trm` | ESP32-S3 | [TRM PDF](https://documentation.espressif.com/esp32-s3_technical_reference_manual_en.pdf) | — | `pdf/esp32-s3-trm.pdf`, `md/esp32-s3-trm.md` | GPIO hold, USB-Serial/JTAG, `ext1` |
@@ -343,3 +343,14 @@ Do not add a row for bytes extracted from vendor firmware.
 FreeInk host LUTs stay third-party until
 [nyc-lut-path](not-yet-confirmed.md#nyc-lut-path) and a license
 row exist.
+
+## SX1262 revision and module leads
+
+The cached `sx1262` Rev 2.2 remains the command authority. A second
+M5Stack-hosted copy has the same Dec 2024 footer and PA table. Semtech's
+resource listing date does not establish another revision. Revision
+history records a SetTxParams correction in Rev 1.2 and a PA description
+change in Rev 2.2. Keep document revisions attached to upstream claims.
+Module antenna routing differs between S014, S014-I and S014-IF;
+C153's fitted revision remains a physical identification task.
+Sources and comparisons: [sources.md](../references/sources.md#sx1262-document-and-module-variants).

@@ -93,6 +93,20 @@ feedback on button navigation and touchscreen hits. Active channel
 survey runs continuously until touching `[ STOP SURVEY ]`
 (transitions through `[ STOPPING... ]` to complete).
 
+## LoRa lifecycle evidence
+
+C153 diagnostics use one explicit startup/shutdown pair per ping,
+receive window or sweep. Board hooks confirm `PYG2` mode, drive, latch
+and sample at startup and shutdown; every TX also confirms at interval
+one. Antenna control stays high until shutdown. Verification errors
+block TX and trigger cleanup, retaining warning evidence on both cards.
+Failed or interrupted cleanup is remembered across diagnostic wrappers;
+a later operation confirms shutdown before attempting another startup.
+Serial `lora_control` has phase, cadence and expected/observed fields;
+`lora_session` reports attempts, checks, failures and cleanup status.
+Do not raise the interval to twenty or forty without deliberate
+configuration and C153 evidence. RF validation needs hardware measurements.
+
 ## Carousel Order Guidance
 
 `Splash` is the landing card (index 0). The forward walk

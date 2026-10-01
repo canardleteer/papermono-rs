@@ -51,6 +51,20 @@ Packing (one flash, many safe probes) is a root rule:
 [AGENTS.md](../AGENTS.md#pack-one-flash). Do not treat this
 file as the only copy.
 
+## LoRa sessions
+
+The C153 path uses `sx1262-phy` via BSP re-exports and `RadioHooks`.
+Lend system I2C only during startup, shutdown and scheduled TX checks.
+Keep the existing on-demand ping, receive-window and sweep lifetimes.
+One active wrapper also supports sustained operation without antenna
+control changes between packets, standby or channel changes.
+
+Initial verification interval is one. Failures emit typed `lora_control`
+warnings, invalidate readiness and run cleanup; `lora_session` totals
+include lifecycle checks. Both radio cards surface errors. Reject
+CRC/header-failed RX packets. Preserve PA/OCP, channels, payload and
+runtime C153 detection; compile-time Lite prunes both SX1262 crates.
+
 ## Firmware examples as tutorial code
 
 Firmware under `firmware/` (`simple-debug-fw` and `embassy-debug-fw`)

@@ -1,0 +1,23 @@
+[package]
+name = "sx1262-phy"
+version = "0.1.0"
+description = "SX1262 blocking chip driver with async caller lifecycle and TX readiness hooks"
+readme = "README.md"
+publish = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["sx1262", "lora", "embedded-hal", "no-std", "radio"]
+categories.workspace = true
+include = ["src/**", "tests/**", "README.md", "Cargo.toml", "LICENSE"]
+
+[dependencies]
+embedded-hal.workspace = true
+embedded-hal-async = "1.0.0"
+lora-phy = { version = "=3.0.1", default-features = false }
+lora-modulation = { version = "0.1.5", default-features = false }
+
+[lints]
+workspace = true

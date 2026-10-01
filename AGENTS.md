@@ -123,6 +123,23 @@ available, agents may run the host SoftAP check in
 (scan / connect / curl / CDC `wifi_http`). Survey and SoftAP are
 mutually exclusive. WPA2 only (no WPA3 in the `esp-radio` blob).
 
+## LoRa lifecycle and verification
+
+`sx1262-phy` wraps published `lora-phy` chip operations; preserve Semtech
+catalog `sx1262` section citations when adapting them. Board nets,
+presets and `RadioHooks` stay in `m5stack-papermono::lora`. System I2C
+is borrowed for startup, shutdown and scheduled verification only.
+
+Start and stop modules explicitly. Keep PaperMono `PYG2` high across
+RX, TX, standby and channel changes until shutdown. Confirm output mode,
+push-pull drive, latch and sampled level on startup and shutdown.
+Initial TX verification interval is one; twenty or forty requires an
+explicit configuration change backed by C153 hardware evidence.
+Failures block TX, invalidate readiness, restore interval one, emit a
+serial warning and trigger cleanup. Digital evidence does not validate
+the RF path. C153-Lite radio outputs remain undriven. The new policy is
+host-tested; do not extend historical hardware confirmations to it.
+
 ## Keep skills updated
 
 Project-local skills must stay aligned with the tree. When you
@@ -254,6 +271,7 @@ xtask catalog a human sees, update the matching row in the
 | [crates/m5pm1/README.md](crates/m5pm1/README.md) | crates.io | PMIC registers + PWM0 |
 | [crates/m5ioe1/README.md](crates/m5ioe1/README.md) | crates.io | expander + IP2315 gate |
 | [crates/st25r3916/README.md](crates/st25r3916/README.md) | crates.io | ST25R3916 NFC driver |
+| [crates/sx1262-phy/README.md](crates/sx1262-phy/README.md) | crates.io | upstream SX1262 wrapper, lifecycle hooks and TX guard |
 | [crates/m5stack-papermono-lite/README.md](crates/m5stack-papermono-lite/README.md) | crates.io | Lite / shared pin-map role |
 | [crates/m5stack-papermono/README.md](crates/m5stack-papermono/README.md) | crates.io | C153 radio add-on role |
 | [host/papermono-host/README.md](host/papermono-host/README.md) | humans | host library, udev, flash contract |
@@ -310,5 +328,6 @@ PaperMono (`C153`) discovery is tracked on branch
 safe discovery primitives and register constants for ST25R3916 NFC and Stamp
 LoRa-1262 (SX1262). Physical `C153` factory backup (`id-e3e5915e`) confirmed
 16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware. Both
-`simple-debug-fw` and `embassy-debug-fw` support both models: Lite baseline by
-default, and Full SKU with `--features c153` for packed NFC and LoRa discovery.
+`simple-debug-fw` and `embassy-debug-fw` include C153 support by default,
+with runtime detection bypassing radio initialization on C153-Lite.
+`--no-default-features --features lite` prunes C153 dependencies.

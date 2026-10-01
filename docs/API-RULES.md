@@ -43,15 +43,26 @@ See [SAFETY.md](SAFETY.md).
 - `ssd1677-otp`: `OtpRefresh::Partial` requires a mono baseline.
   `GrayFull` invalidates it. After gray, `MonoFull` before any
   `Partial`.
-- M5PM1 `SYS_CMD` shutdown is an explicit method, not a raw poke.
+- M5PM1 `SYS_CMD` shutdown has an explicit method.
 
 Keep the board crates thin: pins, SKU nets, transforms, sequencing.
 They are not a second HAL over `esp-hal`.
 
+## SX1262 lifecycle boundary
+
+`sx1262-phy` wraps the published `lora-phy` chip operations and exposes
+board-neutral caller hooks. Keep pins, power rails, antenna controls and
+operating presets in the BSP. Hooks borrow context for one operation;
+keep synchronization outside the chip crate. Startup/shutdown are
+explicit. Packet, standby and frequency operations never control module
+lifetime. Guard every TX path, including raw `SetTx`; deny by default.
+Return buses, pins and hooks on release, with shutdown documented as
+an explicit preceding operation.
+
 ## Testing rules
 
 - Register-level tests are `embedded-hal-mock` transaction scripts
-  derived from datasheet tables, not from observed traffic.
+  derived from datasheet tables.
 - Sequencing tests assert **order and polarity**.
 - Geometry and packing are pure functions with exact byte counts.
 - Prefer a failing test that encodes a datasheet claim over a

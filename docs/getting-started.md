@@ -122,7 +122,7 @@ and compile-time pin verification.
 # Build for PaperMono-Lite (or Full hardware with Lite baseline features):
 cargo xtask build-fw simple-debug
 
-# Or build with PaperMono Full SKU (C153) features:
+# Or build with PaperMono (C153) features:
 cargo xtask build-fw simple-debug --features c153
 
 cargo xtask flash-app \
@@ -149,7 +149,7 @@ with hardware buttons. Frontlight brightness and buzzer volume adjust via edge
 swipes, and touch buttons provide immediate visual highlight feedback.
 
 The core firmware operates as a Lite baseline by default. Adding `--features c153`
-activates PaperMono Full SKU (`C153`) board identity and discovery diagnostics
+activates PaperMono (`C153`) board identity and discovery diagnostics
 for the ST25R3916 NFC controller and Stamp LoRa-1262 (SX1262) transceiver.
 
 ```shell
@@ -158,7 +158,7 @@ for the ST25R3916 NFC controller and Stamp LoRa-1262 (SX1262) transceiver.
 # Build for PaperMono-Lite (or Full hardware with Lite baseline features):
 cargo xtask build-fw embassy-debug
 
-# Or build with PaperMono Full SKU (C153) features:
+# Or build with PaperMono (C153) features:
 cargo xtask build-fw embassy-debug --features c153
 
 cargo xtask flash-app \
@@ -270,7 +270,24 @@ detailed flag specifications located in the project documentation.
 
 ## Hardware documentation
 
-Comprehensive hardware details reside in the hardware documentation collection,
+Hardware details reside in the hardware documentation collection,
 detailing power topologies, display timings, digitizer mappings, SKU
 variations, and verified component measurements. Datasheet citations and
 peripheral registers are referenced in [DATASHEETS.md](DATASHEETS.md).
+
+## Read LoRa session results on PaperMono
+
+1. **Open the LoRa card.** After starting the Embassy image, short-press
+   BUTTON B to reach `lora`. Tap `[ TX PING ]` for one configured packet
+   or `[ LISTEN RX ]` for the receive window. PaperMono-Lite skips these
+   cards because its radio hardware is absent.
+2. **Read the result.** A successful ping reports `lora_tx status=ok` and
+   `lora_session n=1 attempts=1 checks=3 failures=0 cleanup=ok` on serial.
+   `lora_control` shows high antenna control during startup and pre-TX,
+   then low during shutdown. Mode and drive both read `1`.
+3. **Respond to a failed confirmation.** If the card shows
+   `RADIO ERROR - CHECK SERIAL`, read the warning's phase and reason.
+   A mismatch or bus error blocks transmission and starts cleanup.
+   A later tap starts a new session; it must confirm readiness before
+   transmission can resume. Control readback does not establish RF-path
+   performance.

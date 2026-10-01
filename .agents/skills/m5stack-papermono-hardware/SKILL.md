@@ -404,3 +404,26 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
   `esp-hal` as the only legal Rust stack.
 - Write a “Confirmed live” row without a board in hand, or
   copy a `C153` result onto `C153-Lite` (or the reverse).
+
+## SX1262 lifecycle confirmation
+
+The generic `sx1262-phy` wrapper delegates modem operations to published
+`lora-phy`; pins and presets remain in the PaperMono BSP. PaperMono
+`RadioHooks` lends system I2C for reset, rail and antenna control and
+readback. Keep `PYG2` high across packet operations, standby and channel
+changes until shutdown. Startup/shutdown confirm output mode, push-pull
+drive, latch and sampled level. Initial pre-TX verification cadence is
+one; twenty or forty requires deliberate configuration and C153 evidence.
+Failures invalidate readiness, warn on serial and trigger cleanup.
+
+This software policy has host tests. Its new readback and cadence claims
+remain unconfirmed on physical C153; historical RX/TX measurements do
+not validate them. Digital confirmation cannot validate antenna impedance
+or the RF path. DIO2 RF switching is a separate function. See the
+[session control reference](resources/stamp-lora-1262.md#session-control-and-confirmation).
+
+Use the cached SX1262 Rev 2.2 as command authority. Record alternate
+revisions and module variants under [source leads](references/sources.md#sx1262-document-and-module-variants).
+The retained +14 power command and legacy PA names do not establish
+measured +14 dBm RF output. Current Stamp connector variants and legacy
+module controls must not replace PaperMono's own wiring references.

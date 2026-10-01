@@ -2598,7 +2598,9 @@ fn draw_lora_scan(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
             buf: &mut banner_buf,
             pos: 0,
         };
-        if scan_data.scanning {
+        if crate::lora::control_failed() {
+            let _ = write!(w, "[ RADIO ERROR - CHECK SERIAL ]");
+        } else if scan_data.scanning {
             let _ = write!(
                 w,
                 "[ SCANNING 104 CHANNELS (PASS {}) ]",
@@ -2906,19 +2908,23 @@ fn draw_lora(bw: &mut [u8], red: &mut [u8], rotation: PageRotation) {
     .draw(&mut ink);
 
     let banner_text_y = i32::from(banner_y) + 24;
-    let banner_str = match state {
-        LoraCardState::Unpopulated => "[ HARDWARE UNPOPULATED ]",
-        LoraCardState::Idle { .. } => "[ STANDBY (RC) - READY ]",
-        LoraCardState::Transmitted { ok, .. } => {
-            if ok {
-                "[ TEST PING TRANSMITTED ]"
-            } else {
-                "[ TX TIMEOUT / ERROR ]"
+    let banner_str = if crate::lora::control_failed() {
+        "[ RADIO ERROR - CHECK SERIAL ]"
+    } else {
+        match state {
+            LoraCardState::Unpopulated => "[ HARDWARE UNPOPULATED ]",
+            LoraCardState::Idle { .. } => "[ STANDBY (RC) - READY ]",
+            LoraCardState::Transmitted { ok, .. } => {
+                if ok {
+                    "[ TEST PING TRANSMITTED ]"
+                } else {
+                    "[ TX TIMEOUT / ERROR ]"
+                }
             }
+            LoraCardState::Received { .. } => "[ PACKET DETECTED ]",
+            LoraCardState::ListenQuiet { .. } => "[ NO PACKET HEARD ]",
+            LoraCardState::Listening { .. } => "[ LISTENING (SF11 / 60s) ]",
         }
-        LoraCardState::Received { .. } => "[ PACKET DETECTED ]",
-        LoraCardState::ListenQuiet { .. } => "[ NO PACKET HEARD ]",
-        LoraCardState::Listening { .. } => "[ LISTENING (SF11 / 60s) ]",
     };
 
     let _ = Text::with_alignment(

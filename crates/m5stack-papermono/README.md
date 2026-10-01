@@ -1,6 +1,6 @@
 # m5stack-papermono
 
-Board support for the full M5Stack PaperMono (`C153`) device.
+Board support for the M5Stack PaperMono (`C153`) device.
 
 Documentation:
 [PaperMono SCH V0.6.2 Schematic](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf)
@@ -22,3 +22,27 @@ model (`C153`):
   frame demodulation.
 
 The crate is `#![no_std]` and fully testable on the host compiler.
+
+## LoRa sessions
+
+`lora` re-exports the generic `sx1262-phy` API, backed by the published
+`lora-phy` SX126x driver. PaperMono pins, presets and `RadioHooks` remain
+in this BSP. `RadioContext` lends system I2C and an asynchronous delay
+for each startup, TX confirmation or shutdown operation; the wrapper
+holds no system-bus borrow between calls.
+
+Use `Sx1262::with_hooks(spi, nss, busy, RadioHooks::default())`, then
+explicit `startup`, chip configuration, packet operations and `shutdown`.
+Keep that same wrapper active for sustained operation. Antenna control
+stays high across RX, TX, standby and channel changes until shutdown.
+`release` returns SPI, NSS, BUSY and hooks without powering down.
+
+Startup and shutdown confirm output mode, push-pull drive, latch and
+sampled level. Fresh confirmation precedes each TX at the initial
+interval of one. A denial, mismatch or readback error blocks TX and
+requires shutdown/startup recovery. Digital readback confirms the
+control signal; it cannot measure the RF path. DIO2 switching is a
+separate SX1262 function. The sequence follows the official
+[M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp).
+The new lifecycle readback policy has host tests and awaits physical
+validation on `C153`.

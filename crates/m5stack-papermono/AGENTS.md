@@ -49,6 +49,20 @@ PaperMono-Lite (`C153-Lite`) baseline:
    - **Safety contract**: Keep transmitter in standby/idle; do not emit
      continuous RF carrier. Check `BUSY` before every transaction.
 
+## LoRa caller hooks
+
+`lora` re-exports `sx1262-phy`. Keep PaperMono nets and presets here;
+the generic crate delegates modem operations to published `lora-phy`.
+`RadioHooks` takes a short `RadioContext` with borrowed I2C, discovered
+expander address and upstream async DelayNs. Startup asserts reset,
+enables antenna and rail, settles, then releases reset. Shutdown
+asserts reset, lowers antenna and disables the rail; attempt remaining
+steps on errors. Confirm mode, push-pull drive, latch and sampled level
+at both boundaries and before TX at interval one. Keep antenna high
+throughout packet/standby/channel operations. Digital readback confirms
+the control net. RF-path validation and new
+physical confirmation remain open for C153.
+
 ## Agent Documentation Standards
 
 Maintain this file according to the [AGENTS.md standard](https://agents.md/),

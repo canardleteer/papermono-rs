@@ -12,6 +12,8 @@ The board contract and a safety-first host CLI (`cargo xtask`)
 are here. Board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
 `m5stack-papermono` (`C153`, NFC + LoRa).
+The generic [`sx1262-phy`](crates/sx1262-phy) wraps the published
+`lora-phy` driver with explicit lifecycle and TX-readiness hooks.
 `simple-debug-fw` and `embassy-debug-fw` are workspace members,
 not default-members.
 
@@ -47,8 +49,7 @@ before treating a command as verified on target hardware.
 
 ### PaperMono + PaperMono-Lite Setup
 
-The firmware ecosystem provides a unified, safe-by-default architecture
-that auto-detects board hardware at startup and operates both PaperMono
+The default firmware detects board hardware at startup and operates PaperMono
 (`C153`) and PaperMono-Lite (`C153-Lite`):
 
 1. **Unified Default Binary**: The default firmware image includes full
@@ -70,9 +71,12 @@ that auto-detects board hardware at startup and operates both PaperMono
    - The ST25R3916 NFC field is energized only during deliberate
      user-initiated polling and is powered down immediately when idle.
    - The SX1262 LoRa module operates with internal LDO regulation, hardware
-     over-current protection (OCP 60 mA), +14 dBm bench-safe TX power, and
+     over-current protection (OCP 60 mA), the retained +14 power command, and
      an active antenna switch (`PYG2`) engaged only when the transceiver is
-     powered.
+     powered. Startup, shutdown and every packet TX confirm antenna
+     output mode, push-pull drive, latch and sampled level. Failed checks
+     block TX and show a radio error on the cards. These digital checks
+     do not measure RF-path performance.
 3. **Compile-Time Pruning**: For users desiring minimal binary footprint or
    strictly verified Lite-only builds, passing
    `--no-default-features --features lite` completely compiles out all

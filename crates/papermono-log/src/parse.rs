@@ -70,6 +70,10 @@ pub enum LineKind {
     Lora,
     /// Stamp LoRa-1262 (SX1262) packet transmission report (`lora_tx`).
     LoraTx,
+    /// LoRa antenna-control evidence and warnings.
+    LoraControl,
+    /// LoRa session verification totals and cleanup result.
+    LoraSession,
     /// Stamp LoRa-1262 (SX1262) packet reception report (`lora_rx`).
     LoraRx,
     /// Stamp LoRa-1262 (SX1262) US915 channel scan report (`lora_scan`).
@@ -186,6 +190,8 @@ pub fn classify(body: &str) -> LineKind {
         "nfc_tag" => LineKind::NfcTag,
         "nfc_app" => LineKind::NfcApp,
         "lora" => LineKind::Lora,
+        "lora_control" => LineKind::LoraControl,
+        "lora_session" => LineKind::LoraSession,
         "lora_tx" => LineKind::LoraTx,
         "lora_rx" => LineKind::LoraRx,
         "lora_scan" => LineKind::LoraScan,

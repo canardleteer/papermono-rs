@@ -23,3 +23,7 @@ the papermono-rs skill
 [xtask.md](../../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
 
 License: MIT
+
+LoRa session logs include `lora_control` digital antenna evidence and
+`lora_session` verification totals. The host classifies both record kinds;
+unknown readback remains `unknown`, and failed checks carry `warning=1`.

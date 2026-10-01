@@ -29,7 +29,7 @@ IP2315 crates.
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
 | ST25R3916 | in-tree [`st25r3916`](../crates/st25r3916). [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here** | MCU-agnostic `embedded-hal` driver crate in `crates/st25r3916`. I2C `0x50`, `I2C_EN=VDD`. ISO14443-A initiator (WUPA/REQA, anticollision CL1/CL2, SAK read), ISO/IEC 14443-4 (ISO-DEP / T=CL) activation and APDU half-duplex block protocol with chaining/WTX, smart card application discovery (FIDO CTAP, PIV, OpenPGP), target/card emulation profiles (NFC-A, NFC-F, NFCIP-1), PT_Memory layout, and Type 2/4A / NDEF protocol framing. Re-exported with board nets in `m5stack-papermono::nfc`. Confirmed live on C153. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
-| SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **written-here driver in BSP** | Complete `Sx1262` driver with opcodes, `RadioStatus` parser, modulation/packet configuration, buffer I/O, RSSI/SNR telemetry in `m5stack-papermono::lora`. Confirmed live on C153. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
+| SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) 3.0.1 and [`lora-modulation`](https://crates.io/crates/lora-modulation) | **pass-with-wrapper** | Generic [`sx1262-phy`](../crates/sx1262-phy) delegates modem operations and errata workarounds to upstream, adding blocking transport, diagnostic commands and explicit lifecycle/TX guards. New session policy awaits physical C153 validation. [Upstream comparison](#sx1262-upstream-comparison) |
 | Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). Confirmed live on C153. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
 
 ## Rejected
@@ -46,11 +46,12 @@ IP2315 crates.
 | Crate | Why |
 | --- | --- |
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map and `BoardModel` runtime profile. `C153-Lite` firmware depends on this only |
-| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board crate with verified ST25R3916 NFC and Stamp LoRa-1262 transceiver drivers. Included in unified builds, pruned via `--no-default-features --features lite` |
+| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board nets, ST25R3916 support and SX1262 lifecycle hooks. Re-exports the generic driver; pruned via `--no-default-features --features lite` |
 | [`st25r3916`](../crates/st25r3916) | ST25R3916 NFC transceiver driver: initiator (reader), ISO-DEP / APDU block protocol, smart card app discovery (FIDO/PIV/OpenPGP), target (card emulation) profiles, PT_Memory, Type 2/4A framing, and NDEF |
 | [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
 | [`m5pm1`](../crates/m5pm1) | Register map, ADC, battery %, PWM0, red LED. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |
+| [`sx1262-phy`](../crates/sx1262-phy) | Generic wrapper around upstream SX126x operations, with caller lifecycle hooks, guarded TX and local diagnostic commands |
 | [`papermono-log`](../crates/papermono-log) | CDC line format for **both** `simple-debug-fw` and `embassy-debug-fw` |
 
 ## Radio
@@ -97,3 +98,42 @@ workspace lockfile. `esp-bootloader-esp-idf` is only for
 
 `embedded-hal` 1.0 and dev-only `embedded-hal-mock` (`eh1`) for
 `ssd1677-otp`, `m5pm1`, and `m5ioe1`.
+
+## SX1262 upstream comparison
+
+The published `lora-phy` 3.0.1 driver uses asynchronous `SpiDevice` and
+`InterfaceVariant`; the wrapper adapts our dedicated blocking SPI bus.
+The adapter futures complete in one poll, enforce BUSY before and after
+SPI, flush before deselecting NSS and preserve detailed bus failures.
+A borrowed upstream instance executes each chip operation without
+owning reset or antenna controls. Its RF-switch callbacks are no-ops;
+PaperMono lifecycle hooks own `PYG2` throughout a session. The upstream
+instance is private so its TX and continuous-carrier APIs cannot bypass
+our guard. Timed raw TX uses the same guard and a local command.
+
+The wrapper delegates the Semtech catalog `sx1262` Rev 2.2 §15.1
+“Modulation Quality with 500 kHz LoRa Bandwidth” and §15.4 “Optimizing
+the Inverted IQ Operation” workarounds to upstream. PA and OCP remain
+explicit to retain the existing PaperMono diagnostic settings. Upstream
+LDRO calculation and SF5/SF6 preamble handling are retained. Diagnostic
+readback, IRQ masks, arbitrary FIFO offsets and calibration/error queries
+remain local where the published API does not expose the same controls.
+
+Reviewed upstream issues and pull requests inform regression coverage:
+
+- [PR 428](https://github.com/lora-rs/lora-rs/pull/428): published transport
+  checks BUSY after commands; our adapter also checks before commands.
+- [Issue 350](https://github.com/lora-rs/lora-rs/issues/350): cancellation
+  hazards motivate explicit cleanup after interrupted lifecycle futures.
+- [PR 487](https://github.com/lora-rs/lora-rs/pull/487): firmware rejects
+  CRC/header-failed frames before reporting received packets. That newer
+  fix is not assumed to exist in the published dependency.
+- [PR 456](https://github.com/lora-rs/lora-rs/pull/456): Semtech SWL2001
+  comparison exposed a difference between the SX1262 datasheet and
+  ST's STM32WL power table in the 14 dBm row. This change preserves the
+  existing PA/OCP configuration and leaves
+  RF power characterization open.
+
+The new session verification defaults to one. Raising it to twenty or
+forty requires deliberate configuration and C153 hardware evidence.
+Physical RF validation and registry publication are separate tasks.

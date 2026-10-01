@@ -158,3 +158,14 @@ those nets as extra GPIO until
 /
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)
 close.
+
+## LoRa session ownership
+
+C153 `PYG2` antenna control is held high for the complete SX1262 session,
+including RX, TX, standby and channel changes. Board `RadioHooks` owns
+reset, rail and antenna sequencing; generic `sx1262-phy` wraps published
+`lora-phy` modem operations. `RadioContext` borrows system I2C for each
+control/readback call. Confirmation fields and source encodings:
+[Stamp LoRa-1262 session controls](../resources/stamp-lora-1262.md#session-control-and-confirmation).
+New physical confirmation remains open under
+[nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).

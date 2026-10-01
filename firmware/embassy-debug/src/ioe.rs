@@ -169,3 +169,10 @@ pub fn set_input(i2c: &mut SysI2c, pyg: u8) -> Result<(), esp_hal::i2c::master::
 pub fn read_input(i2c: &mut SysI2c, pyg: u8) -> Result<bool, esp_hal::i2c::master::Error> {
     m5stack_papermono_lite::m5ioe1::read_input(i2c, IOE_ADDR.load(Ordering::Relaxed), pyg)
 }
+
+/// Returns the discovered M5IOE1 address for a short borrowed radio context.
+/// No I2C access occurs; the discovery fallback remains shared with other devices.
+#[cfg(feature = "c153")]
+pub fn active_address() -> u8 {
+    IOE_ADDR.load(Ordering::Relaxed)
+}

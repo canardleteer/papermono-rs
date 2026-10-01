@@ -559,3 +559,31 @@ the left) matches the photos. Upper black key = GPIO2
 (BUTTON A), lower = GPIO3 (BUTTON B). Idle high, press low.
 Still need the same row on **`C153`**. Write leftovers in
 [enclosure.md](../references/enclosure.md).
+
+### nyc-lora-session-confirmation
+
+Open for `C153`: capture startup/high and shutdown/low antenna mode,
+drive, latch and input-sample evidence from the new lifecycle wrapper.
+Check `lora_session` totals: one ping at initial cadence one has three
+checks, a receive window or channel sweep has two. A sustained session
+must retain antenna control high across packet, standby and channel
+changes and preserve counters on repeated active startup. Exercise
+mismatch/readback failure and successful recovery with controlled hardware
+faults. Do not infer this policy from historical RX/TX observations.
+
+Host tests cover cadence one/twenty/forty and cleanup failure behavior.
+Physical evidence is required before deliberately changing firmware from
+one to twenty or forty. Digital control confirmation is distinct from
+RF-path validation, which remains a separate hardware task. No new
+physical session or RF validation occurred during this implementation.
+
+For `C153`, identify the fitted Stamp module revision and characterize
+RF output for the retained PA/OCP profile. Compare against catalog
+`sx1262` Rev 2.2 §13.1.14.1 “PA Optimal Settings” using the board's actual
+matching network. Module connectors and a successful digital readback
+cannot close these measurements. See [source leads](../references/sources.md#sx1262-document-and-module-variants).
+
+Confirm the retained 15 ms rail delay across C153 supply conditions;
+the official factory HAL uses 100 ms before reset release. Recheck
+cleanup recovery across diagnostic wrappers, including an interrupted
+operation followed by a new card action.

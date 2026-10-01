@@ -90,3 +90,55 @@ not measured. Name `C153` vs `C153-Lite`.
 Everything in
 [not-yet-confirmed.md](../resources/not-yet-confirmed.md).
 Firmware will not close those rows.
+
+## SX1262 PA profile comparison
+
+Catalog `sx1262` Rev 2.2 §13.1.14.1 “PA Optimal Settings”, Table 13-21,
+remains authoritative for the discrete SX1262. The reference rows require
+the corresponding matching network; configuration alone does not prove
+power at the antenna.
+
+| Profile | PA duty cycle | hpMax | SetTxParams | OCP |
+| --- | --- | --- | --- | --- |
+| Rev 2.2 optimal +14 dBm row | 2 | 2 | +22 | Select for the circuit |
+| Rev 2.2 optimal +17 dBm row | 2 | 3 | +22 | Select for the circuit |
+| Retained diagnostic, legacy +14 name | 2 | 3 | +14 | 60 mA |
+
+The lead in [lora-rs PR 456](https://github.com/lora-rs/lora-rs/pull/456)
+is a difference between the discrete SX1262 datasheet and ST's STM32WL
+power table. The integrated ST part has its own PA table in current
+upstream. The Semtech [SWL2001 reference BSP](https://github.com/Lora-net/SWL2001/blob/master/lbm_examples/radio_hal/ral_sx126x_bsp.c)
+uses the maximum-size SX1262 PA configuration and a board power offset;
+it does not supply that alternative optimal +14 row. Preserve the
+existing diagnostic settings during this lifecycle change. A separate
+C153 measurement must characterize RF output before changing its profile.
+
+## SX1262 document and module variants
+
+The [Semtech SX1262 resource listing](https://www.semtech.com/products/wireless-rf/lora-connect/sx1262)
+dates its datasheet entry 2025-04-07. That listing date alone does not
+establish a new revision; direct access was unavailable during review.
+The [second M5Stack copy](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1198/DS_SX1261_2_V2-2.pdf)
+identifies the same Rev 2.2, Dec 2024 and Table 13-21 values as our cache.
+Keep the cached revision as the command reference. Its revision history
+records the Rev 1.2 SetTxParams correction and the Rev 2.2 PA description
+change; older driver citations need that revision context.
+
+Official [Stamp LoRa-1262 documentation](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262)
+distinguishes S014 RF-pad routing from S014-I/S014-IF IPEX-4 routing.
+The [Cap LoRa-1262 comparison](https://docs.m5stack.com/en/cap/Cap_LoRa-1262)
+also distinguishes a smaller current Stamp module with expander control
+from a legacy module without that control. These variants explain why
+antenna policy belongs to the caller. They do not identify the fitted
+C153 module revision; PaperMono's own schematic and factory HAL remain
+its wiring references.
+
+## PaperMono LoRa startup timing
+
+The official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp)
+raises the rail before setting antenna-high/reset-low, waits 100 ms,
+releases reset and waits 20 ms. The lifecycle wrapper asserts reset
+before raising antenna/rail and retains this repository's existing
+15 ms rail and 20 ms boot waits. BUSY readiness and digital readback
+provide software checks; they do not prove electrical settling under
+all supply conditions. The shorter retained delay requires C153 evidence.

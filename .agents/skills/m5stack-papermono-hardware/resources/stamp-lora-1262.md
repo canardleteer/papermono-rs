@@ -39,7 +39,8 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
    functionality (`MTCK`, `MTDO`, `MTDI`) on the ESP32-S3. Firmware must
    configure them as general-purpose GPIOs / SPI signals before issuing
    transactions.
-2. **BUSY Line Timing**: Per Semtech SX1262 Section 13.5.1, the MCU must verify
+2. **BUSY Line Timing**: Per catalog `sx1262` §8.3.1 “BUSY Control Line”,
+   the MCU must verify
    that `SX_BUSY` is low before asserting `SX_NSS` for an SPI transaction.
    `GPIO21` does not have an internal pull resistor on the ESP32-S3.
 3. **Power-Gated Domain**: The module is powered from `3V3_L2_LoRa`. To safely
@@ -53,7 +54,7 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
    this line controls an RF switch that gates the built-in FPC antenna to
    the module's RF front-end: `PYG2` MUST be driven HIGH to connect the
    antenna (driving it LOW disconnects the antenna, severely attenuating
-   signals). In addition, SX1262 `DIO2` must be configured as the internal
+   signals). SX1262 `DIO2` must also be configured as the internal
    RF switch control (`set_dio2_as_rf_switch_ctrl(true)`), TCXO powered at
    3.0 V via DIO3 (`set_dio3_as_tcxo_ctrl`), and internal regulator set to
    `REGULATOR_LDO`.
@@ -67,3 +68,62 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
      Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, confirming the
      complete RF receive chain through the built-in FPC antenna.
    - Continuous 104-channel US915 sweeper with double-duty scanning.
+
+## Session control and confirmation
+
+Software policy for PaperMono (`C153`): assert `SX_NRST`, drive
+`SX_ANT_SW` high, enable `LoRa_EN`, wait the existing 15 ms rail delay,
+release reset and wait the existing 20 ms boot delay plus BUSY readiness.
+Confirm antenna output mode, push-pull drive, high latch and sampled high
+before marking the session ready. Shutdown invalidates readiness first,
+asserts reset, lowers antenna control, disables the rail, then confirms
+low latch and sampled low. Remaining cleanup steps run after failures.
+Control nets and polarities follow the official
+[M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp).
+Its startup raises the rail before asserting reset and waits 100 ms before
+release, then 20 ms. This wrapper asserts reset first and retains our
+existing 15/20 ms delays. Its ordering, readback and cadence policy await
+C153 measurement; the factory delay does not validate our shorter delay.
+
+Keep `SX_ANT_SW` high across RX, TX, standby and frequency changes.
+Short diagnostics stop after their operation; sustained sessions retain
+the same wrapper and counters across operations. System I2C is borrowed
+only during control/verification. Firmware uses initial cadence one,
+with fresh checks before every TX. Startup/shutdown checks always run.
+Twenty/forty requires a deliberate configuration change and evidence.
+Denial, mismatch or unavailable readback blocks TX, restores cadence one,
+warns on serial and requires shutdown/startup recovery.
+
+DIO2 controls the SX1262 RF switch according to catalog `sx1262` Rev 2.2
+§13.3.5 “SetDIO2AsRfSwitchCtrl”; `PYG2` is the board's separate antenna
+control. Readback confirms the digital control signal. RF connectivity
+and impedance require separate measurements. Physical RF validation and
+registry publication remain separate.
+
+| Evidence / encoding | Meaning | Official source |
+| --- | --- | --- |
+| `GPIO_M_L`, bit 1 = 1 | PYG2 configured as output | `m5ioe1` UM V1.4 Table 3 “Register Map”, “GPIO control (IO1–IO14)” |
+| `GPIO_DRV_L`, bit 1 = 0 | PYG2 push-pull drive | Same M5IOE1 sections |
+| `GPIO_O_L`, bit 1 | PYG2 output latch | Same M5IOE1 sections |
+| `GPIO_I_L`, bit 1 | PYG2 sampled level | Same M5IOE1 sections |
+| `TxModulation`, 0x0889 bit 2 | Clear for 500 kHz LoRa BW, set otherwise; delegated to upstream | `sx1262` §15.1.2 “Workaround” |
+| IQ polarity, 0x0736 bit 2 | Clear for inverted IQ, set for standard IQ; delegated to upstream | `sx1262` §15.4.2 “Workaround” |
+
+Serial `lora_control` records phase, cadence, attempts/checks, expected
+level, mode/drive/latch/sample and failure reason. `lora_session` records
+verification totals and cleanup status. Neither is a live measurement
+until captured on a physical board named by SKU.
+
+## Module variants and PA settings
+
+The official [Stamp product comparison](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262)
+identifies S014 with its RF pad connected; S014-I and S014-IF route the
+antenna to IPEX-4 and leave that pad unconnected. Only S014-IF includes
+the 12-pin FPC connector. These connectors describe module variants;
+they do not establish which module revision is fitted to a physical C153.
+Use PaperMono's wiring for its PYG2 control.
+
+The historical “+14 dBm” diagnostic uses command +14, PA duty cycle 2
+and hpMax 3. This is retained, but differs from the cached datasheet's
+optimal +14 reference row. Actual output power requires measurement.
+See [PA source comparison and document revisions](../references/sources.md#sx1262-pa-profile-comparison).

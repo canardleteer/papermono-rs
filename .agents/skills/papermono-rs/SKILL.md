@@ -143,3 +143,21 @@ firmware is
 skill
 [user-demo.md](../m5stack-papermono-hardware/references/user-demo.md).
 Do not `idf.py flash` it from this repo.
+
+## SX1262 sessions
+
+The generic `sx1262-phy` wraps published `lora-phy` operations and uses
+`lora-modulation` types. BSP re-exports preserve imports; PaperMono
+pins/presets and `RadioHooks` stay in `m5stack-papermono::lora`.
+Borrow system I2C only for control and verification operations. Keep
+synchronization in firmware. Startup and shutdown always confirm antenna
+mode, drive, latch and sampled level; initial pre-TX cadence is one.
+Twenty or forty needs deliberate configuration and C153 evidence.
+Failures warn on serial, block TX and run cleanup. Session summaries
+report verification counts. Both short and sustained sessions keep
+antenna control high between packet, standby and channel operations.
+C153-Lite outputs stay undriven and pruned builds exclude `sx1262-phy`
+and `lora-phy`. Host verification cannot confirm the RF path.
+
+Firmware remembers failed or interrupted cleanup across short diagnostic
+wrappers. A later operation must confirm shutdown before starting again.

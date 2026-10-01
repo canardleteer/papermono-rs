@@ -10,9 +10,16 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
 | `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |
+| `sx1262-phy/` | — | SX1262 upstream wrapper, diagnostic commands, lifecycle and TX guard |
 | `st25r3916/` | — | ST25R3916 NFC transceiver driver (initiator, ISO-DEP, smart card probing, target profiles, PT_Memory, framing) |
 | `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) + `BoardModel` enum and profile |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |
+
+`sx1262-phy/` is the generic SX1262 wrapper around published `lora-phy`
+and `lora-modulation`. Board-neutral hooks receive borrowed context.
+Default hooks deny TX; raw `SetTx` requires the same session guard.
+BSP pins, power sequencing and antenna confirmation remain in
+`m5stack-papermono::lora`.
 
 ## SKU split
 

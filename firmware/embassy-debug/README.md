@@ -112,7 +112,7 @@ embassy-debug`.
 
 Short-press BUTTON B. The glass walks forward: splash → lora_scan
 (tap `[ START SCAN ]` to sweep 104 US915 channels for energy and packets) →
-lora (tap `[ TX PING ]` for bench-safe 915 MHz burst or `[ LISTEN RX ]` for
+lora (tap `[ TX PING ]` for one 915 MHz burst or `[ LISTEN RX ]` for
 up to 60 s sniffer window) → nfc (tap `[ POLL TAG ]` for ISO14443-A UID
 reading and smart card authentication testing) → wifi hotspot (tap
 `[ START HOTSPOT ]` for SSID `PaperMono-AP`, password `mono2026`, URL
@@ -123,7 +123,21 @@ battery gauge) → shapes (procedural 3-degree Koch snowflake with
 benchmark) → tones → targets, then wrap. Survey and hotspot cannot run
 together: starting one stops the other. BUTTON A walks the other way.
 CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
-`wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, and `lora_scan`.
+`wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, `lora_scan`,
+`lora_control`, and `lora_session`.
+
+On PaperMono (`C153`), each ping, listen window or scan sweep starts and
+ends a radio session. Antenna control stays high throughout that
+operation. Serial `lora_control` records show output mode, push-pull
+drive, latch and sampled level, followed by a `lora_session` summary.
+A successful ping has startup, pre-TX and shutdown confirmations
+(`n=1`, three checks). RX and scan sessions have two lifecycle checks.
+If confirmation or cleanup fails, both radio cards display
+`RADIO ERROR - CHECK SERIAL`; the serial warning identifies the failed
+phase and available evidence. TX is blocked until a new session
+confirms shutdown and then restores readiness. A digital confirmation
+does not measure
+the antenna or RF path.
 
 ### Step 5: Slide the lamp
 

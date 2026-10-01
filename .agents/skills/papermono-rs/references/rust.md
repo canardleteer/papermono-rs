@@ -125,3 +125,20 @@ policy). Lite axis map: USB-C down = −X (see sensors.md).
 Same-card remaps soft-Partial; nav arms on button release
 with 3-sample IMU hysteresis
 ([embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md)).
+
+## SX1262 wrapper and diagnostics
+
+`sx1262-phy` is a publishable, host-testable `no_std` wrapper around
+published `lora-phy` SX126x operations, with local diagnostic commands.
+`lora-modulation` supplies typed parameters. Caller hooks may await;
+SPI operations stay blocking. `RadioHooks` and borrowed `RadioContext`
+belong in the C153 BSP. `release` returns SPI, NSS, BUSY and hooks;
+shutdown is explicit. Repeated active startup preserves state/counters.
+
+The TX guard checks readiness and permission on every attempt, then
+fresh hardware on attempts 1, N+1, 2N+1. It protects raw `SetTx` too.
+Unknown commands and continuous-carrier operations are unsupported.
+Initial N is one; failure restores one. Twenty/forty needs deliberate
+configuration and hardware evidence. Serial `lora_control` warnings and
+`lora_session` totals are host-parsed by `papermono-log` and the host
+library. Crate verdict: [CRATES.md](../../../../docs/CRATES.md).
