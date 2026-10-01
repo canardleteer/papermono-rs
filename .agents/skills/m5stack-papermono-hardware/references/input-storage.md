@@ -8,8 +8,8 @@ PinMap: GPIO2 = `USER_KEY1` = BUTTON A (UP), GPIO3 =
 `USER_KEY2` = BUTTON B (DOWN). GPIO3 is a strapping pin.
 Power is the red M5PM1 button, not a GPIO. Photos:
 [enclosure.md](enclosure.md). **Lite:** idle high, press
-low, in the default USB-C-down hold. `C153` still:
-[nyc-enclosure-edges](../resources/not-yet-confirmed.md#nyc-enclosure-edges).
+low, in the default USB-C-down hold. C153 button polarity and
+case-edge mapping remain unmeasured: [nyc-enclosure-edges](../resources/not-yet-confirmed.md#nyc-enclosure-edges).
 
 ## Buzzer
 

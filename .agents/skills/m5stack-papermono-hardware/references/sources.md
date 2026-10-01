@@ -36,14 +36,15 @@ External: [external.md](../resources/external.md). Vendor C++:
 
 | Source | Layer | Use |
 | --- | --- | --- |
-| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured), [display.md](display.md)) | Observed | Lite USB `303a:1001` (run and download); ESP32-S3 v0.2; 16 MB flash; stock table matches UserDemo CSV. Lite I2C 2026-09-02: `ack=32,38,4f,68,6e nak=50,6f,75`, `rtc_flag=31`, `imu_id=24`; C153 NFC and LoRa are confirmed. JEDEC bytes, PSRAM, and C153 probe-rs enumeration remain open. Official HTML `epd_*` times are not a row here |
+| Live silicon ([measure.md](measure.md), [flashing.md](flashing.md#usb-measured), [display.md](display.md)) | Observed | Both SKUs USB `303a:1001` (run and download), ESP32-S3 v0.2, 16 MB flash, and factory tables matching UserDemo CSV. Lite I2C 2026-09-02: `ack=32,38,4f,68,6e nak=50,6f,75`, `rtc_flag=31`, `imu_id=24`; C153 roster includes `0x50` when enabled. C153 NFC and LoRa functions are confirmed. JEDEC bytes, PSRAM, and C153 `probe-rs` enumeration remain open. Official HTML `epd_*` times are not a row here |
 | [PaperMono docs](https://docs.m5stack.com/en/core/PaperMono) | Official | Living **PinMap**, specs, e-paper notes, SKU compare, heading **M5GFX LUT Refresh Speed**. Re-read when nets look stale. Snapshot 2026-10-01: [PaperMono.2026-10-01.md](../resources/official-html/PaperMono.2026-10-01.md) |
 | [PaperMono-Lite docs](https://docs.m5stack.com/en/core/PaperMono-Lite) | Official | Living **PinMap** (no RFID/LoRa headings). Same **M5GFX LUT Refresh Speed** table. Same page: M5GFX LUTs unstable; prefer OTP-Demo. Snapshot 2026-10-01: [PaperMono-Lite.2026-10-01.md](../resources/official-html/PaperMono-Lite.2026-10-01.md) |
 | Official **M5GFX LUT Refresh Speed** (`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`) | Official | PaperMono laboratory results under M5GFX modes; reference only; times vary with content. Lite page reprints the same table. Snapshot 2026-10-01: [official-html/SOURCE.md](../resources/official-html/SOURCE.md). [display.md](display.md) |
 | Schematic PDFs + gallery PNGs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md), [catalog.md](catalog.md)) | Official | Dated OSS snapshot from those HTML pages. Walk PDF/PNGs. Nets. HTML may ship a newer set |
-| [M5PM1 & M5IOE1 Arduino](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Official (intent) | L0–L3B, expander pin names, wake examples |
+| [M5Stack PaperMono Arduino examples](https://docs.m5stack.com/en/arduino/papermono/program) | Official (intent; checked 2026-10-01) | Board Manager >=3.3.9; examples for display, buttons, touch, IMU, mic, microSD, NFC, LoRa, buzzer, power management, and wakeup. Individual pages and qualified observations: [catalog.md](catalog.md) |
+| [M5PM1 & M5IOE1 Arduino](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Official (intent) | L0–L3B are independently switched from L0; current power/wake examples. Does not make their sequences physical measurements |
 | [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official (intent) | OTP path; panel PN `DEPG0397BBS770F3HP-XM`. Direct dep M5Unified; M5GFX is transitive. Panel SPI is `EDP_OTP_LUT_demo` |
-| [M5GFX](https://github.com/m5stack/M5GFX) (`Panel_SSD1677_4Gray`) | Official (intent) | UserDemo / M5Unified panel. Four `epd_*` LUT modes. Autodetect `board_M5PaperMono`. Product page: LUTs unstable |
+| [M5GFX](https://github.com/m5stack/M5GFX) (`Panel_SSD1677_4Gray`) | Official (intent) | Reviewed 0.2.31 release and current development tree. UserDemo / M5Unified panel; four `epd_*` modes. Product page still warns LUTs unstable and recommends OTP |
 | [M5Unified](https://github.com/m5stack/M5Unified) (`develop`) | Official (intent) | C++ board HAL. PlatformIO `#develop`. `board_M5PaperMono` PMIC / SDMMC / charge / RTC INT. Not a Rust crate. Does not close NYC. Radio tracking is [nyc-wifi-ble](../resources/not-yet-confirmed.md#nyc-wifi-ble) |
 | [M5Unified LED](https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/led/LED_PaperMono_Class.hpp) | Official (intent) | `LED_PaperMono_Class`: red on PM1 `0x13`/`0x06`, green on IOE1 PYG8 PWM ch2, blue on PYG9 PWM ch3 (5 kHz, 8-bit) |
 | [M5Unified Power](https://github.com/m5stack/M5Unified/blob/8530f5377d782e4a25a6c482de2e71c3f75ca8eb/src/utility/Power_Class.cpp#L72-L96) | Official (intent) | IP2315 gate on IOE1 PYG11: 2 ms wait then 64-loop ready check before charge read |
@@ -62,9 +63,9 @@ product facts.
 ## Conflicts
 
 State both columns when a page or issue touches a row. The skill
-user weighs them. Lite USB IDs and flash **size** are
-measured on both SKUs; official HTML `epd_*` times are PaperMono
-lab reference, not a Lite timing. Each statement below is scoped by
+user weighs them. Both SKUs have measured USB IDs, flash size, and
+factory tables. Official HTML `epd_*` times are PaperMono lab
+reference, not separate Lite timings. Each statement below is scoped by
 linked measurements. Name
 `C153` vs `C153-Lite`.
 
@@ -75,7 +76,7 @@ linked measurements. Name
 | Canvas | 480×800. UserDemo `setRotation(0)`. Lite USB-C down: OTP RAM X = physical Y, RAM Y = physical X ([display.md](display.md), [measure.md](measure.md)) | FreeInk 800×480. OTP-Demo addresses 800×480 RAM. C153 orientation unmeasured |
 | Frontlight | Official HTML: M5PM1 G3 PWM `BL_FB` (brightness). Schematic V0.6.2: one AW9967DNR on `EINK_BL`. UserDemo `display.setBrightness`. Lite: PWM0 slide **drives** the lamp ([measure.md](measure.md)) | FreeInk README AW9967 (schematic-true). FreeInk Paper Mono: G3 → **PWM0**, no `gpioWarm`. CrossPoint warmth UI is for dual-channel boards (X4 Pro / Murphy M4), not this SKU. PWM1 writes left Lite constant |
 | M5IOE1 address | Schematic / pin map / UserDemo `IO_EXPANDER_ADDR = 0x4F`. Library: `0x4F` REV `'W'`; fallback candidate `0x6F` | Chip UM V 1.4: `0x6F`–`0x76` from IO7, REV `'A'`. Library default is `0x6F`. Auto-detect `0xFF` also walks `0x70`–`0x76` (includes `0x75`); UserDemo does not use it |
-| microSD | DAT0–DAT3 in the pin table. UserDemo `slot_config.width = 4` | FreeInk “native 1-bit SDMMC” |
+| microSD | DAT0–DAT3 in the pin table. UserDemo `slot_config.width = 4`; current Arduino example configures CLK, CMD, and DAT0–DAT3 with `SD_MMC.setPins` | FreeInk “native 1-bit SDMMC” |
 | Size / weight | HTML: 62.0 × 101.0 × 8.0 mm; 74.7 g / Lite 72.4 g | Older product PDF: 61 mm / “work in progress” |
 | USB debug | Both SKUs run **and** download: `303a:1001` Espressif USB JTAG/serial debug unit ([flashing.md](flashing.md#usb-measured)). Vendor Arduino: CDC flags | Generic DevKit or CH343 assumptions do not apply |
 | Flash | Official 16 MB. Both SKUs **measured** 16 MB (`0x1000000`) and UserDemo-matching table at `0x8000`. PIO `default_16MB.csv` is a different table | 32 MB assumptions do not apply. JEDEC bytes and PSRAM remain [nyc-flash-id](../resources/not-yet-confirmed.md#nyc-flash-id) |

@@ -4,8 +4,8 @@ Vendor documents are the official source for registers, opcodes,
 and timings of parts **named on this model**. Observed hardware
 still outranks a datasheet default. Wiring authority is the
 board contract in [SKILL.md](../SKILL.md). Precedence:
-[sources.md](../references/sources.md). Lite USB, chip, 16 MB
-flash, and the stock partition table are measured
+[sources.md](../references/sources.md). Both SKUs have measured USB,
+chip revision, 16 MB flash, and stock partition tables
 ([measure.md](../references/measure.md),
 [flashing.md](../references/flashing.md#usb-measured)).
 Official HTML `epd_*` times are PaperMono lab reference
@@ -20,7 +20,7 @@ this skill `resources/` directory.
 timings, strapping, or a datasheet-versus-docs conflict. Search
 extracted markdown rather than loading a whole TRM. The cache
 does not replace the pin map or enclosure. Official product
-pages as **view as markdown** (2026-09-01) are
+pages as **view as markdown** (2026-10-01) are
 [official-html/SOURCE.md](official-html/SOURCE.md), not this
 cache.
 

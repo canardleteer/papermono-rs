@@ -107,10 +107,11 @@ it does not silently pick a winner against the user.
    on-unit partition facts
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
-   not confirm the other. Lite USB, chip rev, 16 MB flash
-   size, and the stock partition table are observed.
+   not confirm the other. Both SKUs have measured USB IDs, chip
+   revision, 16 MB flash size, and stock partition tables.
    Official HTML `epd_*` times are PaperMono lab reference,
-   not a silicon row. JEDEC/PSRAM/ACK lists stay open.
+   not a silicon row. JEDEC bytes and PSRAM remain open. Other
+   peripheral measurements are scoped by SKU in the backlog.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -274,7 +275,7 @@ TRM. The cache does **not** replace the pin map or enclosure.
 
 It does not help for board wiring you already have from official
 pin tables, or for third-party project structure. Official
-product-page HTML as **view as markdown** (2026-09-01) lives
+product-page HTML as **view as markdown** (2026-10-01) lives
 in
 [resources/official-html/](resources/official-html/SOURCE.md).
 That is not a datasheet cache. Do not invent a second
@@ -353,7 +354,7 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 | Official UserDemo eval HAL | [references/user-demo.md](references/user-demo.md) |
 | M5GFX `Panel_SSD1677_4Gray` / OTP-Demo panel SPI | [references/display.md](references/display.md), [references/cpp-platformio.md](references/cpp-platformio.md) |
 | Official URLs, firmware list | [references/catalog.md](references/catalog.md) |
-| Official HTML **view as markdown** (2026-09-01) | [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md) |
+| Official HTML **view as markdown** (2026-10-01) | [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md) |
 | Vendor datasheets (catalog; local cache) | [resources/datasheets.md](resources/datasheets.md) |
 | Conflicts and citations | [references/sources.md](references/sources.md) |
 | Measurement backlog | [resources/not-yet-confirmed.md](resources/not-yet-confirmed.md) |
@@ -363,8 +364,8 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 
 - **PSRAM:** 8 MB octal in the product table. Close
   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id).
-- **Flash:** 16 MB. Lite measured 16 MB and a UserDemo-matching
-  table at `0x8000`. PlatformIO still uses `qio_opi` and
+- **Flash:** 16 MB. Both SKUs measured 16 MB and UserDemo-matching
+  tables at `0x8000`. PlatformIO still uses `qio_opi` and
   `default_16MB.csv` (different table). `simple-debug-fw` CDC:
   80 MHz CPU, 40 MHz XTAL. UserDemo runtime DIO vs QIO / 240
   MHz still

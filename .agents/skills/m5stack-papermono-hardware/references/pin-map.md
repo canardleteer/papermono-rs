@@ -7,9 +7,8 @@ Primary table source: the **PinMap** heading on
 [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite)
 ([catalog.md](catalog.md)). Those HTML pages can change; re-read
 them when a net disagrees with this file. Dated **view as
-markdown** snapshot (2026-09-01):
+markdown** snapshot (2026-10-01):
 [official-html/SOURCE.md](../resources/official-html/SOURCE.md).
-[nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
 SKU column: `C153, C153-Lite` or `C153`.
 
 Do not copy GPIO numbers from other products onto this board.
@@ -76,8 +75,8 @@ often 100 kHz. Do not assume 400 kHz until measured.
 Lite (2026-09-02) advertised scan after official `begin`
 and FT EN/RST: `ack=32,38,4f,68,6e` (RTC / FT / board IOE /
 IMU / PM1) and `nak=50,6f,75` (leftover NFC / UM IOE /
-parked IP2315). `C153` still
-[nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
+parked IP2315). C153 (2026-09-05) with M5IOE1 `PYG4`
+asserted: `ack=32,38,4f,50,68,6e`; `0x50` is ST25R3916.
 
 M5PM1 and M5IOE1 GPIO outputs default **open-drain** (including
 PWM). Pull-up or push-pull, or the pin does not drive high.

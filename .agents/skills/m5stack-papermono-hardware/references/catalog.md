@@ -97,6 +97,30 @@ Lite HTML PinMap omits those modules. Prefer the PDF for
 nets; use the PNGs when the extract drops wires. Cache:
 `png/` next to the PDFs ([datasheets.md](../resources/datasheets.md)).
 
+## Official Arduino examples
+
+M5Stack added a set of PaperMono-specific Arduino tutorials. The pages were
+checked 2026-10-01. They specify Board Manager 3.3.9 or newer; most examples
+require M5Unified 0.2.20 or newer and M5GFX 0.2.27 or newer. These version
+requirements are tutorial minimums, not a claim about the newest releases.
+Examples and wiring sequences are official software intent; use measured rows
+for our units.
+
+| Topic | Current M5Stack page | Notes relevant to this skill |
+| --- | --- | --- |
+| Display | [PaperMono Display](https://docs.m5stack.com/en/arduino/papermono/display) | Exercises four grayscale modes; product page still warns M5GFX waveforms are unstable |
+| Buttons | [PaperMono Button](https://docs.m5stack.com/en/arduino/papermono/button) | Uses BtnA / BtnB through M5Unified |
+| Touch | [PaperMono Touchscreen](https://docs.m5stack.com/en/arduino/papermono/touch) | Current example requests two points and documents active range X 5–475, Y 5–795; two-point operation on our Lite unit remains unmeasured |
+| IMU | [PaperMono IMU](https://docs.m5stack.com/en/arduino/papermono/imu) | M5Unified sample reads accelerometer and gyro |
+| Microphone | [PaperMono Microphone](https://docs.m5stack.com/en/arduino/papermono/mic) | GPIO45/46, PYG12, 16 kHz right channel; matches the pin map and current firmware intent |
+| microSD | [PaperMono microSD](https://docs.m5stack.com/en/arduino/papermono/microsd) | Enables PYG14 and configures CLK, CMD, DAT0–DAT3 with `SD_MMC.setPins` |
+| NFC | [PaperMono NFC](https://docs.m5stack.com/en/arduino/papermono/nfc) | M5IOE1 PYG4 enables the NFC module; C153-only |
+| LoRa | [PaperMono LoRa](https://docs.m5stack.com/en/arduino/papermono/lora) | PM1 GPIO2 power; IOE1 GPIO10 reset and GPIO2 antenna switch; dedicated SPI SCK39/MISO40/MOSI38/NSS41 |
+| Buzzer | [PaperMono Buzzer](https://docs.m5stack.com/en/arduino/papermono/buzzer) | M5Unified speaker API |
+| Power management | [M5PM1 and M5IOE1](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Clarifies L1–L3B are independently powered from L0, with wake and timer examples |
+| Wakeup | [PaperMono Wakeup](https://docs.m5stack.com/en/arduino/papermono/wakeup) | Separate light-sleep and deep-sleep examples; not a measurement of our sleep paths |
+| Build and flash | [Compiling and Flashing Arduino Examples](https://docs.m5stack.com/en/arduino/papermono/program) | Current board-selection and download-mode instructions |
+
 ## Firmware you can actually run
 
 Upstream repository refs below were checked on 2026-10-01. Pinned

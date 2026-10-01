@@ -59,7 +59,7 @@ initialize NFC/LoRa on Lite.
 | FT6336G | C153, C153-Lite | [nyc-ft6336-area](#nyc-ft6336-area), [nyc-ft6336-points](#nyc-ft6336-points) |
 | M5PM1 | C153, C153-Lite | [nyc-sleep-current](#nyc-sleep-current), [nyc-power-button](#nyc-power-button), [nyc-pm1-wake](#nyc-pm1-wake), [nyc-gpio0-strap](#nyc-gpio0-strap) |
 | AW9967 frontlight (PWM0) | C153, C153-Lite | [nyc-frontlight](#nyc-frontlight) |
-| M5IOE1 | C153, C153-Lite | leftover-pad rows; full roster [nyc-i2c-ack](#nyc-i2c-ack) |
+| M5IOE1 | C153, C153-Lite | leftover-pad rows; register reads remain item-specific |
 | IP2315 | C153, C153-Lite | [nyc-ip2315-bus](#nyc-ip2315-bus), [nyc-charge-stat](#nyc-charge-stat) |
 | BMI270 | C153, C153-Lite | [nyc-bmi270](#nyc-bmi270); INT [nyc-pm1-wake](#nyc-pm1-wake) |
 | RX8130CE | C153, C153-Lite | [nyc-rx8130](#nyc-rx8130); INT [nyc-pm1-wake](#nyc-pm1-wake) |
@@ -70,7 +70,6 @@ initialize NFC/LoRa on Lite.
 | ST25R3916 | C153 | Confirmed live; Lite pads: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
 | SX1262 die | C153 | Confirmed live; open work is listed under radio reception and safety recipes |
 | Stamp LoRa-1262 module | C153 | Confirmed live; Lite pads: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
-| Full I2C roster incl. `0x50` | C153 | [nyc-i2c-ack](#nyc-i2c-ack) |
 
 ## Index
 
@@ -96,7 +95,6 @@ initialize NFC/LoRa on Lite.
 | [nyc-panel-sheet](#nyc-panel-sheet) | `DEPG0397BBS770F3HP-XM` vs `epd-module` PDF | [datasheets.md](datasheets.md) |
 | [nyc-ft6336-area](#nyc-ft6336-area) | 5–475 / 5–795 (`C153` still) | [touch.md](../references/touch.md) |
 | [nyc-ft6336-points](#nyc-ft6336-points) | Contacts this FPC delivers | [touch.md](../references/touch.md) |
-| [nyc-i2c-ack](#nyc-i2c-ack) | Probe advertised addresses (full) | [pin-map.md](../references/pin-map.md) |
 | [nyc-bmi270](#nyc-bmi270) | `CHIP_ID` payload `0x24` | [sensors.md](../references/sensors.md) |
 | [nyc-rx8130](#nyc-rx8130) | Read `FLAG` `0x1D`; do not write `SEC` | [sensors.md](../references/sensors.md) |
 | [nyc-pdm-mic](#nyc-pdm-mic) | Rate / slot / hole energy GPIO45/46 | [sensors.md](../references/sensors.md) |
@@ -356,19 +354,6 @@ How many simultaneous contacts report? Public sheet says 1–2.
 
 **Partial (2026-09-01, `C153-Lite`):** one-finger walk only
 (`n=1`). Two-point on this FPC still untested.
-
-### nyc-i2c-ack
-
-C153, system I2C scan after M5PM1/M5IOE1 init, IP2315
-isolated: expect `0x32`, `0x38`, `0x4F`, `0x50` (when M5IOE1
-`PYG4` / `IOE1_ENABLE` is driven high), `0x68`, `0x6E`.
-`0x75` only while gated on via `PYG11`.
-[pin-map.md](../references/pin-map.md).
-
-**Lite written (2026-09-02):** `ack=32,38,4f,68,6e`
-`nak=50,6f,75` in [measure.md](../references/measure.md).
-Do not copy that NAK list onto `C153` (`0x50` must ACK
-when gated on).
 
 ### nyc-bmi270
 

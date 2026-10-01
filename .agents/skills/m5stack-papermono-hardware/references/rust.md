@@ -21,7 +21,7 @@ cards are dynamically skipped. Pruned Lite-only builds compile with
 MCU-agnostic. Register facts come from
 [datasheets.md](../resources/datasheets.md). USB/flash geometry:
 [flashing.md](flashing.md). Observed silicon:
-[measure.md](measure.md) (Lite USB/flash). Official HTML
+[measure.md](measure.md) (both SKUs USB/flash and C153 radio results). Official HTML
 `epd_*` times are PaperMono lab reference
 ([display.md](display.md)).
 
@@ -39,7 +39,7 @@ wiring evidence in [cpp-platformio.md](cpp-platformio.md). Do not
 treat `esp-hal` as the only legal Rust stack. Never a generic
 SSD1677 four-gray LUT. Never GPIO45/46 power latching. Never `bq27xxx`.
 
-## On-unit Wi-Fi and BLE (Lite measured)
+## On-unit Wi-Fi and BLE (Lite measured; C153 scan open)
 
 Official HTML names 2.4 GHz Wi-Fi. Silicon also exposes BLE.
 Listen-only `wifi n=` / `ble n=`, BLE passkey pairing as
