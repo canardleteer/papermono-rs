@@ -105,6 +105,9 @@ pub const LORA_TX_CAPACITY: usize = 96;
 /// Bytes reserved for a LoRa packet reception report line (`lora_rx freq=...`).
 pub const LORA_RX_CAPACITY: usize = 96;
 
+/// Capacity for lossless LoRa metrics with maximum field widths.
+pub const LORA_METRICS_CAPACITY: usize = 128;
+
 /// Bytes reserved for a LoRa channel scan report line (`lora_scan slot=...`).
 pub const LORA_SCAN_CAPACITY: usize = 96;
 
@@ -169,8 +172,8 @@ pub const MILLIS_PER_SEC: u32 = 1000;
 pub const HELLO_PERIOD_MS: u32 = HELLO_PERIOD_S * MILLIS_PER_SEC;
 
 const _: () = {
-    assert!(HEARTBEAT_PERIOD_MS % POLL_PERIOD_MS == 0);
-    assert!(HELLO_PERIOD_MS % HEARTBEAT_PERIOD_MS == 0);
+    assert!(HEARTBEAT_PERIOD_MS.is_multiple_of(POLL_PERIOD_MS));
+    assert!(HELLO_PERIOD_MS.is_multiple_of(HEARTBEAT_PERIOD_MS));
 };
 
 /// Why a format into a caller buffer failed.
@@ -345,6 +348,8 @@ pub enum LoraFailure {
     Control,
     /// Chip SPI, GPIO, parameter or BUSY operation failed.
     Chip,
+    /// Hardware IRQ timeout or the diagnostic completion budget elapsed.
+    Timeout,
     /// TX permission denied.
     Denied,
 }
@@ -358,6 +363,7 @@ impl LoraFailure {
             Self::Mismatch => "mismatch",
             Self::Control => "control",
             Self::Chip => "chip",
+            Self::Timeout => "timeout",
             Self::Denied => "denied",
         }
     }
@@ -435,6 +441,20 @@ pub struct LoraRxSample {
     pub first_byte: u8,
     /// Last byte of payload preview.
     pub last_byte: u8,
+}
+
+/// Lossless LoRa readings: integers scaled by two for RSSI and four for SNR.
+/// Existing lora_rx and lora_scan lines retain their whole-unit wire formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraMetricsSample {
+    /// Frequency in thousands of hertz.
+    pub freq_khz: u32,
+    /// Packet RSSI multiplied by two, in half-dBm units.
+    pub rssi_half_dbm: i16,
+    /// Signed SNR multiplied by four, in quarter-dB units.
+    pub snr_quarter_db: i8,
+    /// Signal RSSI multiplied by two, in half-dBm units.
+    pub signal_rssi_half_dbm: i16,
 }
 
 /// Stamp LoRa-1262 (SX1262) US915 channel scan activity report.
@@ -943,6 +963,21 @@ pub fn format_lora_tx<'a>(
             sample.time_ms,
             status_str,
         ),
+    )
+}
+
+/// Writes lossless lora_metrics readings without a trailing newline.
+/// Unit suffixes name the integer scale; returns a buffer error if too small.
+pub fn format_lora_metrics<'a>(
+    sample: &LoraMetricsSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+        "{}: lora_metrics freq={}.{:03} rssi_half_dbm={} snr_quarter_db={} signal_rssi_half_dbm={}",
+        LOG_PREFIX, sample.freq_khz / 1_000, sample.freq_khz % 1_000,
+        sample.rssi_half_dbm, sample.snr_quarter_db, sample.signal_rssi_half_dbm),
     )
 }
 

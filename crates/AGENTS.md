@@ -15,9 +15,14 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) + `BoardModel` enum and profile |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |
 
-`sx1262-phy/` is the generic SX1262 wrapper around published `lora-phy`
+`sx1262-phy/` is the generic SX1262 wrapper around revision-pinned `lora-phy`
 and `lora-modulation`. Board-neutral hooks receive borrowed context.
 Default hooks deny TX; raw `SetTx` requires the same session guard.
+All chip I/O awaits async `SpiDevice` and caller-supplied delay. Default
+features and LoRaWAN stay disabled at reviewed lora-rs revision b47cbdf.
+Keep NSS composition outside the crate. Cancelled sequences invalidate
+readiness; restore NSS, then shutdown/startup before TX. Both typed/raw TX
+require a nonzero chip timeout. Registry publication remains deferred.
 BSP pins, power sequencing and antenna confirmation remain in
 `m5stack-papermono::lora`.
 

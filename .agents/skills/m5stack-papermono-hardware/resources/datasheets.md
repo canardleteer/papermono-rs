@@ -353,4 +353,11 @@ history records a SetTxParams correction in Rev 1.2 and a PA description
 change in Rev 2.2. Keep document revisions attached to upstream claims.
 Module antenna routing differs between S014, S014-I and S014-IF;
 C153's fitted revision remains a physical identification task.
-Sources and comparisons: [sources.md](../references/sources.md#sx1262-document-and-module-variants).
+Sources and comparisons:
+[sources.md](../references/sources.md#sx1262-document-and-module-variants).
+
+The async SX1262 wrapper also uses the cached Rev 2.2 §9.2.1 “Image Calibration
+for Specific Frequency Bands”, §15.2.2 and §15.3.2 “Workaround” for band caching,
+TX clamp and timed-RX RTC cleanup. Named register/mask encodings and their sources
+are in [Stamp LoRa-1262](stamp-lora-1262.md#session-control-and-confirmation).
+These are software sequences awaiting C153 timing/RF confirmation.

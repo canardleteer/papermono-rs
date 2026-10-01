@@ -587,3 +587,11 @@ Confirm the retained 15 ms rail delay across C153 supply conditions;
 the official factory HAL uses 100 ms before reset release. Recheck
 cleanup recovery across diagnostic wrappers, including an interrupted
 operation followed by a new card action.
+
+Async chip I/O also needs C153 bench evidence: confirm one-us post-NSS settling,
+cooperative BUSY timing and reception during packet bursts. Exercise timed-RX
+RTC cleanup and observe hardware TX timeout with the ping's 300 ms limit.
+The host tests cover IRQ acknowledgement and wrapping FIFO offsets, but sticky
+IRQ snapshots cannot distinguish repeated arrivals of the same bit. Registry
+publication remains outstanding. Keep this row open until these measurements
+are made; historical status/RX/TX results do not confirm the async path.

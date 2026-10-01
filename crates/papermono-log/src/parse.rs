@@ -76,6 +76,8 @@ pub enum LineKind {
     LoraSession,
     /// Stamp LoRa-1262 (SX1262) packet reception report (`lora_rx`).
     LoraRx,
+    /// Fractional LoRa readings in explicitly scaled integer units.
+    LoraMetrics,
     /// Stamp LoRa-1262 (SX1262) US915 channel scan report (`lora_scan`).
     LoraScan,
     /// Prefix matched, first token unknown.
@@ -194,6 +196,7 @@ pub fn classify(body: &str) -> LineKind {
         "lora_session" => LineKind::LoraSession,
         "lora_tx" => LineKind::LoraTx,
         "lora_rx" => LineKind::LoraRx,
+        "lora_metrics" => LineKind::LoraMetrics,
         "lora_scan" => LineKind::LoraScan,
         _ => LineKind::Unknown,
     }

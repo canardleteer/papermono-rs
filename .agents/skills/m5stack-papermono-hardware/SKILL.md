@@ -427,3 +427,15 @@ revisions and module variants under [source leads](references/sources.md#sx1262-
 The retained +14 power command and legacy PA names do not establish
 measured +14 dBm RF output. Current Stamp connector variants and legacy
 module controls must not replace PaperMono's own wiring references.
+
+## Async SX1262 commands
+
+The generic chip wrapper uses awaited SPI devices and cooperative BUSY delays.
+Board pin/rail policy stays in `RadioHooks`; firmware composes NSS and retains
+it for cancellation recovery. TX requires a nonzero hardware timer. The default
+BUSY delay budget is 100 ms with one-ms polls, plus a one-us NSS settling delay;
+scheduler latency is additional. These software choices still need C153 timing
+and burst-reception measurements. Command/register sources, calibration bands
+and fractional metric encodings are recorded in
+[stamp-lora-1262.md](resources/stamp-lora-1262.md). Historical hardware results
+do not confirm this async path. C153-Lite radio outputs remain undriven.

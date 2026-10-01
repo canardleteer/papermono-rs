@@ -104,6 +104,16 @@ Failed or interrupted cleanup is remembered across diagnostic wrappers;
 a later operation confirms shutdown before attempting another startup.
 Serial `lora_control` has phase, cadence and expected/observed fields;
 `lora_session` reports attempts, checks, failures and cleanup status.
+Chip I/O uses awaited SPI3 and cooperative BUSY polls. The shared mutex stores
+SPI3 in idle Blocking mode because esp-hal Async is not Send; a firmware
+lease converts it to Async for awaited transfers and restores the idle slot on
+Drop.
+`ExclusiveDevice` composes borrowed NSS and raises it before remembered
+shutdown recovery. Await command sequences; user stops occur between them.
+Ping has a nonzero 300 ms hardware TX limit and reports timeout/read failures.
+Managed RX handles CRC/header rejection, observed-bit acknowledgement, FIFO
+wrapping and RTC cleanup. Failed reads never supply invented signal values.
+Fractional packet readings use `lora_metrics`; existing CDC lines remain stable.
 Do not raise the interval to twenty or forty without deliberate
 configuration and C153 evidence. RF validation needs hardware measurements.
 

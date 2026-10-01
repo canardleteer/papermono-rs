@@ -25,17 +25,18 @@ The crate is `#![no_std]` and fully testable on the host compiler.
 
 ## LoRa sessions
 
-`lora` re-exports the generic `sx1262-phy` API, backed by the published
-`lora-phy` SX126x driver. PaperMono pins, presets and `RadioHooks` remain
-in this BSP. `RadioContext` lends system I2C and an asynchronous delay
+`lora` re-exports the generic `sx1262-phy` API, backed by the revision-pinned
+`lora-phy` SX126x driver at reviewed revision b47cbdf. PaperMono pins,
+presets and `RadioHooks` remain in this BSP. `RadioContext` lends system I2C
+and an asynchronous delay
 for each startup, TX confirmation or shutdown operation; the wrapper
 holds no system-bus borrow between calls.
 
-Use `Sx1262::with_hooks(spi, nss, busy, RadioHooks::default())`, then
+Use `Sx1262::with_hooks(device, busy, delay, RadioHooks::default())`, then
 explicit `startup`, chip configuration, packet operations and `shutdown`.
 Keep that same wrapper active for sustained operation. Antenna control
 stays high across RX, TX, standby and channel changes until shutdown.
-`release` returns SPI, NSS, BUSY and hooks without powering down.
+`release` returns the SPI device, BUSY, delay and hooks without powering down.
 
 Startup and shutdown confirm output mode, push-pull drive, latch and
 sampled level. Fresh confirmation precedes each TX at the initial
@@ -46,3 +47,9 @@ separate SX1262 function. The sequence follows the official
 [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp).
 The new lifecycle readback policy has host tests and awaits physical
 validation on `C153`.
+
+Chip operations await async `SpiDevice`, BUSY and caller-supplied delay.
+Firmware owns NSS composition and recovery. Cancellation invalidates readiness;
+restore NSS and complete shutdown/startup before another TX. The generic
+wrapper requires a nonzero hardware TX timeout and returns the SPI device,
+BUSY, delay and hooks on release without I/O. Registry publication is deferred.

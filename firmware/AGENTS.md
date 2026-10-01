@@ -61,9 +61,16 @@ control changes between packets, standby or channel changes.
 
 Initial verification interval is one. Failures emit typed `lora_control`
 warnings, invalidate readiness and run cleanup; `lora_session` totals
-include lifecycle checks. Both radio cards surface errors. Reject
-CRC/header-failed RX packets. Preserve PA/OCP, channels, payload and
-runtime C153 detection; compile-time Lite prunes both SX1262 crates.
+include lifecycle checks. Both radio cards surface errors. Chip transfers use
+async SPI and cooperative BUSY polling. Compose NSS with
+`embedded-hal-bus::ExclusiveDevice`; keep caller access for recovery after a
+cancelled transfer. Await each command sequence before observing stop requests.
+Ping programs its 300 ms completion budget into the chip TX timer. Managed
+RX rejects CRC/header failures before FIFO reads, acknowledges observed IRQs,
+and applies RTC cleanup after timed RX or early stop. Preserve fractional
+metrics in `lora_metrics`; operation errors warn and trigger cleanup. Preserve
+PA/OCP, channels, payload and runtime C153 detection; compile-time Lite prunes
+both SX1262 crates.
 
 ## Firmware examples as tutorial code
 

@@ -692,15 +692,6 @@ dependencies = [
 
 [[package]]
 name = "defmt"
-version = "0.3.100"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0963443817029b2024136fc4dd07a5107eb8f977eaf18fcd1fdeb11306b64ad"
-dependencies = [
- "defmt 1.1.1",
-]
-
-[[package]]
-name = "defmt"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2953bfe4f93bbd20cc71198842756f77d161884c99ebbabc41d80231ded88d1"
@@ -924,6 +915,9 @@ dependencies = [
  "embassy-sync 0.8.0",
  "embassy-time",
  "embedded-graphics",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-hal-bus",
  "embedded-io-async 0.7.0",
  "esp-alloc",
  "esp-backtrace",
@@ -1181,6 +1175,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4c685bbef7fe13c3c6dd4da26841ed3980ef33e841cddfa15ce8a8fb3f1884"
 dependencies = [
  "embedded-hal 1.0.0",
+]
+
+[[package]]
+name = "embedded-hal-bus"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
+dependencies = [
+ "critical-section",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
 ]
 
 [[package]]
@@ -1581,7 +1586,7 @@ version = "0.3.0"
 source = "git+https://github.com/esp-rs/esp-hal?tag=esp-hal-v1.2.0-rc.0#160b10794227eb84805b8676fe188c1110801e9d"
 dependencies = [
  "allocator-api2",
- "defmt 1.1.1",
+ "defmt",
  "document-features",
  "embassy-executor",
  "embassy-sync 0.8.0",
@@ -2188,7 +2193,7 @@ version = "0.2.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "668b7183bd07af9a4885f5c35b0cc5c83c4607a913c16b7e17291832910d2dcc"
 dependencies = [
- "defmt 1.1.1",
+ "defmt",
  "jiff-core",
  "jiff-static",
  "log",
@@ -2203,7 +2208,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7feca88439efe53da3754500c1851dedf3cb36c524dd5cf8225cc0794de95d09"
 dependencies = [
- "defmt 1.1.1",
+ "defmt",
 ]
 
 [[package]]
@@ -2302,16 +2307,15 @@ dependencies = [
 [[package]]
 name = "lora-modulation"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c96c4a41a1f1ad04de765306e1829c7007a37898fe4033204fa82cf2e055624"
+source = "git+https://github.com/lora-rs/lora-rs?rev=b47cbdf8d3935e9bfe44c4d407bbad087fcfc179#b47cbdf8d3935e9bfe44c4d407bbad087fcfc179"
 
 [[package]]
 name = "lora-phy"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61471c3b2909789e3332083577f6cf6c41a4fcf37674ef15156bcbb20504ac65"
+version = "3.0.2-alpha"
+source = "git+https://github.com/lora-rs/lora-rs?rev=b47cbdf8d3935e9bfe44c4d407bbad087fcfc179#b47cbdf8d3935e9bfe44c4d407bbad087fcfc179"
 dependencies = [
- "defmt 0.3.100",
+ "document-features",
+ "embassy-futures",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "lora-modulation",
@@ -3438,6 +3442,7 @@ version = "0.1.0"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",
+ "embedded-hal-bus",
  "lora-modulation",
  "lora-phy",
 ]

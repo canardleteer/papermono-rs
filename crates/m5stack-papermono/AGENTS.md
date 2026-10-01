@@ -1,6 +1,6 @@
 # m5stack-papermono
 
-Board support for the full M5Stack PaperMono (`C153`) device.
+Board support for the M5Stack PaperMono (`C153`) device.
 Workspace member, default-member for host builds. Re-exports
 `m5stack-papermono-lite`, then NFC (`nfc`) and LoRa (`lora`).
 
@@ -52,7 +52,7 @@ PaperMono-Lite (`C153-Lite`) baseline:
 ## LoRa caller hooks
 
 `lora` re-exports `sx1262-phy`. Keep PaperMono nets and presets here;
-the generic crate delegates modem operations to published `lora-phy`.
+the generic crate delegates modem operations to revision-pinned `lora-phy`.
 `RadioHooks` takes a short `RadioContext` with borrowed I2C, discovered
 expander address and upstream async DelayNs. Startup asserts reset,
 enables antenna and rail, settles, then releases reset. Shutdown
@@ -61,7 +61,10 @@ steps on errors. Confirm mode, push-pull drive, latch and sampled level
 at both boundaries and before TX at interval one. Keep antenna high
 throughout packet/standby/channel operations. Digital readback confirms
 the control net. RF-path validation and new
-physical confirmation remain open for C153.
+physical confirmation remain open for C153. The async chip wrapper accepts
+`SpiDevice`, BUSY and delay. Firmware composes NSS with `ExclusiveDevice`
+and retains it for recovery. Never race command sequences against cancellation;
+all TX paths use a nonzero hardware timeout.
 
 ## Agent Documentation Standards
 

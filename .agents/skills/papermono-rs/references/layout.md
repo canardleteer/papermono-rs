@@ -46,8 +46,8 @@ not default-members. Nearest rules:
 - Device I/O lives in `papermono-host` via the
   [`espflash`](https://crates.io/crates/espflash) **library**
   (`default-features = false`, `serialport`). Do not enable
-  espflash's `cli` feature. **MSRV is split on purpose:**
-  workspace `package.rust-version` is **1.85** (board crates).
+  espflash's `cli` feature. Workspace `package.rust-version` is **1.88**
+  because pinned lora-rs uses let-chains.
   `papermono-host` and `xtask` set
   **1.88** because espflash 4.5 requires it.
 - Live `papermono-host` methods take

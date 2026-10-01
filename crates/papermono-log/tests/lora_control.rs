@@ -87,3 +87,30 @@ fn summary_contains_counters_and_cleanup_failure() {
     )
     .is_ok());
 }
+
+#[test]
+fn fractional_metrics_round_trip_with_explicit_units_and_fit_capacity() {
+    let mut buffer = [0; LORA_METRICS_CAPACITY];
+    let line = format_lora_metrics(
+        &LoraMetricsSample {
+            freq_khz: 917625,
+            rssi_half_dbm: -169,
+            snr_quarter_db: -3,
+            signal_rssi_half_dbm: -177,
+        },
+        &mut buffer,
+    )
+    .unwrap();
+    assert_eq!(line, "simple-debug: lora_metrics freq=917.625 rssi_half_dbm=-169 snr_quarter_db=-3 signal_rssi_half_dbm=-177");
+    assert_eq!(records(line).next().unwrap().kind, LineKind::LoraMetrics);
+    assert!(format_lora_metrics(
+        &LoraMetricsSample {
+            freq_khz: u32::MAX,
+            rssi_half_dbm: i16::MIN,
+            snr_quarter_db: i8::MIN,
+            signal_rssi_half_dbm: i16::MIN
+        },
+        &mut buffer
+    )
+    .is_ok());
+}

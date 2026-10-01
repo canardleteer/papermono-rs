@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(BYTES_PER_ROW, 60);
         assert_eq!(PLANE_BYTES, OTP_PLANE_BYTES);
         const { assert!(WIDTH < HEIGHT) };
-        const { assert!(WIDTH % 8 == 0) };
+        const { assert!(WIDTH.is_multiple_of(8)) };
     }
 
     #[test]

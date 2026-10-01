@@ -3,7 +3,6 @@
 use crate::{Sx1262, SxError, CMD_SET_TX};
 use core::convert::Infallible;
 use core::num::NonZeroU32;
-use lora_phy::mod_traits::RadioKind;
 
 /// Reason for a readiness check. Startup and shutdown checks always run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,7 +109,7 @@ pub struct SessionStats {
     pub tx_attempts: u64,
     /// Hook verification calls, including startup, rollback and shutdown.
     pub verifications: u64,
-    /// Failed checks or permission denials.
+    /// Chip, lifecycle and verification failures, including permission denials.
     pub failures: u64,
 }
 
@@ -131,12 +130,12 @@ impl Default for SessionStats {
 }
 
 /// Primary reason startup could not establish a session.
-#[derive(Debug, PartialEq, Eq)]
-pub enum StartupFailure<S, H> {
+#[derive(Debug, PartialEq)]
+pub enum StartupFailure<S, H, B = Infallible> {
     /// Caller startup control failed.
     Control(H),
     /// SPI pin/BUSY readiness failed.
-    Chip(SxError<S>),
+    Chip(SxError<S, B>),
     /// Caller readback failed.
     Verification(H),
     /// Readback disagreed with the enabled state.
@@ -144,7 +143,7 @@ pub enum StartupFailure<S, H> {
 }
 
 /// Shutdown evidence retains control and verification failures independently.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct ShutdownFailure<H> {
     /// First control failure reported by the hook, after attempting cleanup.
     pub control: Option<H>,
@@ -155,14 +154,14 @@ pub struct ShutdownFailure<H> {
 }
 
 /// Errors from lifecycle and guarded TX operations.
-#[derive(Debug, PartialEq, Eq)]
-pub enum SessionError<S, H> {
-    /// Blocking chip operation failed.
-    Chip(SxError<S>),
+#[derive(Debug, PartialEq)]
+pub enum SessionError<S, H, B = Infallible> {
+    /// Async chip operation failed.
+    Chip(SxError<S, B>),
     /// Startup failed and rollback was attempted; preserve both results.
     Startup {
         /// Original startup failure.
-        cause: StartupFailure<S, H>,
+        cause: StartupFailure<S, H, B>,
         /// Rollback failure, if disabled-state cleanup could not be confirmed.
         cleanup: Option<ShutdownFailure<H>>,
     },
@@ -180,10 +179,10 @@ pub enum SessionError<S, H> {
     Verification(H),
 }
 
-impl<SPI, NSS, BUSY, H> Sx1262<SPI, NSS, BUSY, H>
+impl<SPI, BUSY, DELAY, H> Sx1262<SPI, BUSY, DELAY, H>
 where
-    SPI: embedded_hal::spi::SpiBus,
-    NSS: embedded_hal::digital::OutputPin,
+    SPI: embedded_hal_async::spi::SpiDevice,
+    DELAY: embedded_hal_async::delay::DelayNs,
     BUSY: embedded_hal::digital::InputPin,
 {
     /// Current recorded readiness state; no device I/O.
@@ -213,7 +212,7 @@ where
     pub async fn startup<C: ?Sized>(
         &mut self,
         context: &mut C,
-    ) -> Result<(), SessionError<SPI::Error, H::Error>>
+    ) -> Result<(), SessionError<SPI::Error, H::Error, BUSY::Error>>
     where
         H: Hooks<C>,
     {
@@ -225,12 +224,15 @@ where
         self.stats = SessionStats::new();
         self.modulation = None;
         self.frequency_hz = None;
+        self.calibration_band = None;
+        self.packet = None;
+        self.timed_rx = false;
         self.state = SessionState::NeedsShutdown;
         let control = self.hooks.startup(context).await;
         // Do not wait for a powered chip after a failed control operation, but
         // still collect startup evidence before rollback. Cadence never skips it.
         let chip = if control.is_ok() {
-            self.wait_busy()
+            self.wait_busy().await
         } else {
             Ok(())
         };
@@ -262,7 +264,7 @@ where
     pub async fn shutdown<C: ?Sized>(
         &mut self,
         context: &mut C,
-    ) -> Result<(), SessionError<SPI::Error, H::Error>>
+    ) -> Result<(), SessionError<SPI::Error, H::Error, BUSY::Error>>
     where
         H: Hooks<C>,
     {
@@ -319,17 +321,18 @@ where
     }
 
     /// Starts a packet TX after permission and recorded readiness checks. Checks
-    /// fresh hardware on attempts 1, N+1, 2N+1, ...; chip SPI remains blocking.
-    /// Timeout is a 24-bit count of 15.625 us ticks; zero disables the chip timer.
+    /// fresh hardware on attempts 1, N+1, 2N+1, ...; SPI and BUSY polling await.
+    /// Timeout is a 24-bit count of 15.625 us ticks; zero is rejected so TX
+    /// always has a hardware limit.
     pub async fn set_tx<C: ?Sized>(
         &mut self,
         context: &mut C,
         timeout_ticks: u32,
-    ) -> Result<(), SessionError<SPI::Error, H::Error>>
+    ) -> Result<(), SessionError<SPI::Error, H::Error, BUSY::Error>>
     where
         H: Hooks<C>,
     {
-        if timeout_ticks > 0xFF_FFFF {
+        if timeout_ticks == 0 || timeout_ticks > crate::MAX_TIMEOUT_TICKS {
             return Err(SessionError::Chip(SxError::InvalidParam));
         }
         let bytes = timeout_ticks.to_be_bytes();
@@ -344,14 +347,17 @@ where
         context: &mut C,
         cmd: u8,
         params: &[u8],
-    ) -> Result<(), SessionError<SPI::Error, H::Error>>
+    ) -> Result<(), SessionError<SPI::Error, H::Error, BUSY::Error>>
     where
         H: Hooks<C>,
     {
         if cmd != CMD_SET_TX {
-            return self.write_cmd(cmd, params).map_err(SessionError::Chip);
+            return self
+                .write_cmd(cmd, params)
+                .await
+                .map_err(SessionError::Chip);
         }
-        if params.len() != 3 {
+        if params.len() != 3 || params == [0, 0, 0] {
             return Err(SessionError::Chip(SxError::InvalidParam));
         }
         match self.state {
@@ -364,12 +370,12 @@ where
             self.invalidate();
             return Err(SessionError::TxDenied);
         }
-        if (self.stats.tx_attempts - 1) % u64::from(self.interval.get()) == 0 {
+        if (self.stats.tx_attempts - 1).is_multiple_of(u64::from(self.interval.get())) {
             let request = self.check_request(CheckPhase::BeforeTx);
             // An interrupted verification cannot leave stale permission behind.
-            self.state = SessionState::NeedsShutdown;
+            let saved = self.begin_io();
             match self.hooks.verify(context, request).await {
-                Ok(true) => self.state = SessionState::Active,
+                Ok(true) => (self.state, self.interval) = saved,
                 Ok(false) => {
                     self.invalidate();
                     return Err(SessionError::ReadinessMismatch);
@@ -380,19 +386,13 @@ where
                 }
             }
         }
-        let result = if params == [0, 0, 0] {
-            let mut fault = None;
-            let result = crate::backend::run_ready(self.backend(&mut fault, true).do_tx());
-            crate::backend::finish(result, fault)
-        } else {
-            self.write_unchecked(cmd, params)
-        };
-        match result {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                self.invalidate();
-                Err(SessionError::Chip(error))
-            }
+        // Upstream do_tx disables the hardware timer. Retain local guarded TX
+        // with the caller's nonzero 24-bit limit instead.
+        if self.timed_rx {
+            self.stop_rx().await.map_err(SessionError::Chip)?;
         }
+        self.write_unchecked(cmd, params)
+            .await
+            .map_err(SessionError::Chip)
     }
 }

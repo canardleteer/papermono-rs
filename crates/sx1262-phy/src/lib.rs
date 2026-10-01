@@ -1,7 +1,7 @@
-//! SX1262 commands over blocking `embedded-hal` 1.0 SPI and GPIO.
+//! SX1262 commands over async `embedded-hal` SPI and cooperative BUSY polling.
 //!
 //! The caller supplies power, reset, oscillator and antenna policy through
-//! [`Hooks`]. Hooks may await; SPI commands remain blocking. A session begins
+//! [`Hooks`]. Hooks and chip commands await caller-supplied async I/O. A session begins
 //! with [`Sx1262::startup`] and ends with [`Sx1262::shutdown`]. Packet operations,
 //! channel changes and standby never change that lifetime.
 //!
@@ -19,7 +19,9 @@ mod backend;
 mod session;
 use lora_phy::mod_traits::RadioKind;
 mod params;
+mod receive;
 pub use params::*;
+pub use receive::*;
 pub use session::*;
 
 // =========================================================================
@@ -451,236 +453,346 @@ impl RadioStatus {
     }
 }
 
-/// Decoded packet reception metrics from `GetPacketStatus` (`0x14`).
-///
-/// Semtech SX1261/2 Section 13.5.3 Table 13-80.
+/// Lossless LoRa packet metrics, in half-dBm RSSI and quarter-dB SNR units.
+/// Catalog `sx1262` §13.5.3 “GetPacketStatus”. Whole-unit accessors truncate
+/// toward zero to preserve existing CDC/UI formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PacketStatus {
-    /// Average packet RSSI in dBm.
-    pub rssi_pkt_dbm: i16,
-    /// Estimated packet Signal-to-Noise Ratio (SNR) in dB.
-    pub snr_pkt_db: i8,
-    /// Estimated signal RSSI in dBm.
-    pub signal_rssi_pkt_dbm: i16,
+    /// Average packet RSSI multiplied by two.
+    pub rssi_pkt_half_dbm: i16,
+    /// Signed packet SNR multiplied by four.
+    pub snr_pkt_quarter_db: i8,
+    /// Signal RSSI multiplied by two.
+    pub signal_rssi_pkt_half_dbm: i16,
+}
+impl PacketStatus {
+    /// Whole packet dBm, truncated toward zero.
+    pub const fn rssi_pkt_dbm(self) -> i16 {
+        self.rssi_pkt_half_dbm / 2
+    }
+    /// Whole packet dB, truncated toward zero.
+    pub const fn snr_pkt_db(self) -> i8 {
+        self.snr_pkt_quarter_db / 4
+    }
+    /// Whole signal dBm, truncated toward zero.
+    pub const fn signal_rssi_pkt_dbm(self) -> i16 {
+        self.signal_rssi_pkt_half_dbm / 2
+    }
 }
 
-/// Errors from blocking chip operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SxError<E> {
-    /// SPI bus error; NSS release was attempted.
-    Spi(E),
-    /// BUSY stayed high for the bounded poll budget.
+/// Original transport faults or documented command failures.
+#[derive(Debug, PartialEq)]
+pub enum SxError<S, B = core::convert::Infallible> {
+    /// Original SpiDevice error, including its chip-select error if available.
+    Spi(S),
+    /// Original BUSY input error.
+    Busy(B),
+    /// BUSY stayed high through the cooperative delay budget.
     BusyTimeout,
     /// Parameter outside a documented encoding or buffer range.
     InvalidParam,
-    /// NSS or BUSY GPIO error.
-    Gpio,
+    /// Original upstream command or validation error.
+    Upstream(lora_phy::mod_params::RadioError),
     /// Command outside the supported non-continuous command set.
     UnsupportedCommand,
-    /// Raw `SetTx` needs borrowed hook context and the TX guard.
+    /// Raw SetTx needs borrowed context and the session TX guard.
     ContextRequired,
 }
 
-/// BUSY poll budget in CPU-dependent iterations. Duration depends on the caller's CPU.
-pub const BUSY_TIMEOUT_POLLS: u32 = 50_000;
+/// Delay after NSS rises before checking BUSY, in microseconds.
+/// Catalog `sx1262` §8.3.1 “BUSY Control Line”; bench validation is open.
+pub const NSS_SETTLE_US: u32 = 1;
+/// Maximum encoded RTC timeout, catalog `sx1262` §13.1.4 “SetTx”.
+pub const MAX_TIMEOUT_TICKS: u32 = 0xFF_FFFF;
+/// Continuous reception timeout, catalog `sx1262` §13.1.5 “SetRx”.
+pub const RX_CONTINUOUS: u32 = MAX_TIMEOUT_TICKS;
+/// TX-clamp register, catalog `sx1262` §12.1 “Registers”.
+pub const REG_TX_CLAMP_CONFIG: u16 = 0x08D8;
+/// PA-clamp threshold bits, catalog `sx1262` §15.2.2 “Workaround”.
+pub const TX_CLAMP_MASK: u8 = 0x1E;
+/// RTC counter control, catalog `sx1262` §15.3.2 “Workaround”.
+pub const REG_RTC_CONTROL: u16 = 0x0902;
+/// RTC event clear register, catalog `sx1262` §15.3.2 “Workaround”.
+pub const REG_RTC_EVENT_CLEAR: u16 = 0x0944;
+/// Clear pending RTC event while preserving unrelated bits (same section).
+pub const RTC_EVENT_CLEAR_MASK: u8 = 1 << 1;
 
-/// Owns a dedicated SPI bus, NSS, BUSY, hooks and session state.
-/// No synchronization or executor is supplied by this crate.
-pub struct Sx1262<SPI, NSS, BUSY, H = DenyTx> {
+/// Cooperative BUSY delay budget. Scheduler latency is additional; this is
+/// not a hard wall-clock deadline. Defaults to 100 ms with one-ms polls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BusyTiming {
+    /// Total requested delay before timing out; zero tests the pin once.
+    pub budget_ms: u32,
+    /// Positive poll spacing; the final delay is capped to the remaining budget.
+    pub poll_ms: core::num::NonZeroU32,
+}
+impl Default for BusyTiming {
+    fn default() -> Self {
+        Self {
+            budget_ms: 100,
+            poll_ms: core::num::NonZeroU32::MIN,
+        }
+    }
+}
+
+/// Owns an async SPI device, BUSY, delay, hooks and explicit session state.
+/// Compose NSS and synchronization outside this crate. Await command futures
+/// to completion; cancellation invalidates readiness and may leave NSS low.
+pub struct Sx1262<SPI, BUSY, DELAY, H = DenyTx> {
     spi: SPI,
-    nss: NSS,
     busy: BUSY,
+    delay: DELAY,
     hooks: H,
+    busy_timing: BusyTiming,
     modulation: Option<BaseBandModulationParams>,
+    packet: Option<LoRaPacketParams>,
     frequency_hz: Option<u32>,
+    calibration_band: Option<CalibrationBand>,
+    timed_rx: bool,
     state: SessionState,
     interval: core::num::NonZeroU32,
     stats: SessionStats,
 }
-
-impl<SPI, NSS, BUSY> Sx1262<SPI, NSS, BUSY> {
-    /// Constructs without device I/O. The default policy denies every TX.
-    pub const fn new(spi: SPI, nss: NSS, busy: BUSY) -> Self {
-        Self::with_hooks(spi, nss, busy, DenyTx)
+impl<SPI, BUSY, DELAY> Sx1262<SPI, BUSY, DELAY> {
+    /// Constructs without I/O. Default hooks deny every TX.
+    pub fn new(spi: SPI, busy: BUSY, delay: DELAY) -> Self {
+        Self::with_hooks(spi, busy, delay, DenyTx)
     }
 }
-
-impl<SPI, NSS, BUSY, H> Sx1262<SPI, NSS, BUSY, H> {
-    /// Constructs without device I/O. Explicit startup is required for TX.
-    pub const fn with_hooks(spi: SPI, nss: NSS, busy: BUSY, hooks: H) -> Self {
+impl<SPI, BUSY, DELAY, H> Sx1262<SPI, BUSY, DELAY, H> {
+    /// Constructs without I/O; explicit startup is required for TX.
+    pub fn with_hooks(spi: SPI, busy: BUSY, delay: DELAY, hooks: H) -> Self {
         Self {
             spi,
-            nss,
             busy,
+            delay,
             hooks,
+            busy_timing: BusyTiming::default(),
             modulation: None,
+            packet: None,
             frequency_hz: None,
+            calibration_band: None,
+            timed_rx: false,
             state: SessionState::Inactive,
             interval: core::num::NonZeroU32::MIN,
             stats: SessionStats::new(),
         }
     }
-
-    /// Returns buses, pins and hooks without shutdown. Call shutdown explicitly
-    /// before release if the caller needs the module powered off.
-    pub fn release(self) -> (SPI, NSS, BUSY, H) {
-        (self.spi, self.nss, self.busy, self.hooks)
+    /// Returns device, BUSY, delay and hooks without any I/O. Shutdown is explicit.
+    pub fn release(self) -> (SPI, BUSY, DELAY, H) {
+        (self.spi, self.busy, self.delay, self.hooks)
+    }
+    /// Sets the delay budget without touching hardware or readiness.
+    pub fn set_busy_timing(&mut self, timing: BusyTiming) {
+        self.busy_timing = timing;
+    }
+    /// Current cooperative delay budget; no I/O.
+    pub const fn busy_timing(&self) -> BusyTiming {
+        self.busy_timing
+    }
+    /// Marks an in-flight sequence unsafe until its successful completion.
+    /// Recording this before awaiting also catches cancellation without Drop I/O.
+    fn begin_io(&mut self) -> (SessionState, core::num::NonZeroU32) {
+        let saved = (self.state, self.interval);
+        self.state = SessionState::NeedsShutdown;
+        self.interval = core::num::NonZeroU32::MIN;
+        saved
+    }
+    /// Restores prior readiness only on success. A later command cannot repair
+    /// a previously interrupted sequence; shutdown/startup is required.
+    fn end_io<T, S, B>(
+        &mut self,
+        saved: (SessionState, core::num::NonZeroU32),
+        result: Result<T, SxError<S, B>>,
+    ) -> Result<T, SxError<S, B>> {
+        if result.is_ok() {
+            (self.state, self.interval) = saved;
+        } else {
+            self.stats.failures = self.stats.failures.saturating_add(1);
+        }
+        result
     }
 }
-
-impl<SPI, NSS, BUSY, H> Sx1262<SPI, NSS, BUSY, H>
+impl<SPI, BUSY, DELAY, H> Sx1262<SPI, BUSY, DELAY, H>
 where
-    SPI: embedded_hal::spi::SpiBus,
-    NSS: embedded_hal::digital::OutputPin,
+    SPI: embedded_hal_async::spi::SpiDevice,
     BUSY: embedded_hal::digital::InputPin,
+    DELAY: embedded_hal_async::delay::DelayNs,
 {
-    /// Waits for the BUSY pin to drop low, indicating transceiver readiness.
-    pub fn wait_busy(&mut self) -> Result<(), SxError<SPI::Error>> {
-        for _ in 0..BUSY_TIMEOUT_POLLS {
-            if self.busy.is_low().map_err(|_| SxError::Gpio)? {
-                return Ok(());
-            }
-        }
-        Err(SxError::BusyTimeout)
+    /// Cooperatively waits for BUSY; interrupted/failed waits invalidate readiness.
+    pub async fn wait_busy(&mut self) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        let saved = self.begin_io();
+        let result = backend::wait_busy(&mut self.busy, &mut self.delay, self.busy_timing).await;
+        self.end_io(saved, result)
     }
-
-    /// Attempts NSS release even if selecting the chip reports a GPIO failure.
-    fn select(&mut self) -> Result<(), SxError<SPI::Error>> {
-        if self.nss.set_low().is_err() {
-            let _ = self.nss.set_high();
-            return Err(SxError::Gpio);
-        }
-        Ok(())
+    /// Runs a device transaction with pre/post BUSY checks. NSS belongs to SPI.
+    async fn transaction(
+        &mut self,
+        operations: &mut [embedded_hal::spi::Operation<'_, u8>],
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        let saved = self.begin_io();
+        let result = backend::transaction(
+            &mut self.spi,
+            &mut self.busy,
+            &mut self.delay,
+            self.busy_timing,
+            operations,
+        )
+        .await;
+        self.end_io(saved, result)
     }
-
-    /// Writes a supported non-TX command. Unknown commands and sleep are rejected.
-    /// `SetTx` requires [`Self::write_cmd_with_context`] so hooks cannot be bypassed.
-    pub fn write_cmd(&mut self, cmd: u8, params: &[u8]) -> Result<(), SxError<SPI::Error>> {
+    /// Writes a supported non-TX command. Raw TX cannot bypass session checks.
+    pub async fn write_cmd(
+        &mut self,
+        cmd: u8,
+        params: &[u8],
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if cmd == CMD_SET_TX {
             return Err(SxError::ContextRequired);
         }
         validate_command(cmd, params)?;
-        self.write_unchecked(cmd, params)
-    }
-
-    /// Sends validated bytes while BUSY is low; flushes SPI before releasing NSS.
-    fn write_unchecked(&mut self, cmd: u8, params: &[u8]) -> Result<(), SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let res = (|| {
-            self.spi.write(&[cmd])?;
-            if !params.is_empty() {
-                self.spi.write(params)?;
+        // Leaving timed reception requires RTC cleanup even for raw commands.
+        if self.timed_rx && matches!(cmd, CMD_SET_STANDBY | CMD_SET_FS | CMD_SET_RX | CMD_SET_CAD) {
+            self.stop_rx().await?;
+        }
+        self.write_unchecked(cmd, params).await?;
+        match cmd {
+            CMD_SET_RX => self.timed_rx = params != [0, 0, 0] && params != [0xFF, 0xFF, 0xFF],
+            CMD_CALIBRATE_IMAGE => {
+                self.calibration_band = CalibrationBand::from_codes(params[0], params[1])
             }
-            Ok(())
-        })();
-        self.finish_transaction(res)
+            CMD_SET_MODULATION_PARAMS => self.modulation = None,
+            CMD_SET_PACKET_PARAMS | CMD_SET_PACKET_TYPE => self.packet = None,
+            _ => {}
+        }
+        Ok(())
     }
-
-    /// Completes the bus transfer and attempts NSS release even after SPI failure.
-    fn finish_transaction(
+    /// Sends bytes through the checked transport; callers must validate first.
+    async fn write_unchecked(
         &mut self,
-        result: Result<(), SPI::Error>,
-    ) -> Result<(), SxError<SPI::Error>> {
-        let result = result.and_then(|()| self.spi.flush());
-        let deselect = self.nss.set_high();
-        result.map_err(SxError::Spi)?;
-        deselect.map_err(|_| SxError::Gpio)
+        cmd: u8,
+        params: &[u8],
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        use embedded_hal::spi::Operation;
+        self.transaction(&mut [Operation::Write(&[cmd]), Operation::Write(params)])
+            .await
     }
-
+    /// Reads one complete command response, including command/status dummy bytes.
+    async fn read_response<const N: usize>(
+        &mut self,
+        cmd: u8,
+    ) -> Result<[u8; N], SxError<SPI::Error, BUSY::Error>> {
+        let mut bytes = [0; N];
+        bytes[0] = cmd;
+        self.transaction(&mut [embedded_hal::spi::Operation::TransferInPlace(&mut bytes)])
+            .await?;
+        Ok(bytes)
+    }
     /// Writes an 8-bit value to a 16-bit register address.
-    pub fn write_reg(&mut self, reg: u16, val: u8) -> Result<(), SxError<SPI::Error>> {
+    pub async fn write_reg(
+        &mut self,
+        reg: u16,
+        val: u8,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         let params = [(reg >> 8) as u8, reg as u8, val];
-        self.write_cmd(CMD_WRITE_REGISTER, &params)
+        self.write_unchecked(CMD_WRITE_REGISTER, &params).await
     }
 
     /// Reads an 8-bit value from a 16-bit register address.
-    pub fn read_reg(&mut self, reg: u16) -> Result<u8, SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut out = [0u8; 1];
-        let res = (|| -> Result<(), SPI::Error> {
-            self.spi
-                .write(&[CMD_READ_REGISTER, (reg >> 8) as u8, reg as u8, 0x00])?;
-            self.spi.read(&mut out)?;
-            Ok(())
-        })();
-        self.finish_transaction(res)?;
+    pub async fn read_reg(&mut self, reg: u16) -> Result<u8, SxError<SPI::Error, BUSY::Error>> {
+        let header = [CMD_READ_REGISTER, (reg >> 8) as u8, reg as u8, 0];
+        let mut out = [0];
+        self.transaction(&mut [
+            embedded_hal::spi::Operation::Write(&header),
+            embedded_hal::spi::Operation::Read(&mut out),
+        ])
+        .await?;
         Ok(out[0])
     }
 
     /// Writes data into the internal 256-byte data buffer starting at the given offset.
-    pub fn write_buffer(&mut self, offset: u8, data: &[u8]) -> Result<(), SxError<SPI::Error>> {
-        if data.len() > 256 - usize::from(offset) {
+    pub async fn write_buffer(
+        &mut self,
+        offset: u8,
+        data: &[u8],
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        if data.len() > 256 {
             return Err(SxError::InvalidParam);
         }
         if offset == 0 {
+            let saved = self.begin_io();
             let mut fault = None;
-            let result = backend::run_ready(self.backend(&mut fault, false).set_payload(data));
-            return backend::finish(result, fault);
+            let result = self.backend(&mut fault).set_payload(data).await;
+            return self.end_io(saved, backend::finish(result, fault));
         }
-        self.wait_busy()?;
-        self.select()?;
-        let res = (|| -> Result<(), SPI::Error> {
-            self.spi.write(&[CMD_WRITE_BUFFER, offset])?;
-            self.spi.write(data)?;
-            Ok(())
-        })();
-        self.finish_transaction(res)
+        self.transaction(&mut [
+            embedded_hal::spi::Operation::Write(&[CMD_WRITE_BUFFER, offset]),
+            embedded_hal::spi::Operation::Write(data),
+        ])
+        .await
     }
 
     /// Reads data from the internal 256-byte data buffer starting at the given offset.
-    pub fn read_buffer(&mut self, offset: u8, buf: &mut [u8]) -> Result<(), SxError<SPI::Error>> {
-        if buf.len() > 256 - usize::from(offset) {
+    pub async fn read_buffer(
+        &mut self,
+        offset: u8,
+        buf: &mut [u8],
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        if buf.len() > 256 {
             return Err(SxError::InvalidParam);
         }
-        self.wait_busy()?;
-        self.select()?;
-        let res = (|| -> Result<(), SPI::Error> {
-            self.spi.write(&[CMD_READ_BUFFER, offset, 0x00])?;
-            self.spi.read(buf)?;
-            Ok(())
-        })();
-        self.finish_transaction(res)
+        // The hardware FIFO wraps at 256; an offset near the end is valid.
+        self.transaction(&mut [
+            embedded_hal::spi::Operation::Write(&[CMD_READ_BUFFER, offset, 0]),
+            embedded_hal::spi::Operation::Read(buf),
+        ])
+        .await
     }
 
     /// Queries the transceiver status byte (`CMD_GET_STATUS` `0xC0`).
-    pub fn get_status(&mut self) -> Result<RadioStatus, SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut rx = [0u8; 2];
-        let res = self.spi.transfer(&mut rx, &[CMD_GET_STATUS, 0x00]);
-        self.finish_transaction(res)?;
-        Ok(RadioStatus::from_byte(rx[1]))
+    pub async fn get_status(&mut self) -> Result<RadioStatus, SxError<SPI::Error, BUSY::Error>> {
+        Ok(RadioStatus::from_byte(
+            self.read_response::<2>(CMD_GET_STATUS).await?[1],
+        ))
     }
 
     /// Places the transceiver into standby mode (`STDBY_CONFIG_RC` or `STDBY_CONFIG_XOSC`).
     ///
     /// Semtech SX1262 Section 13.1.2 "SetStandby" (opcode `0x80`).
-    pub fn set_standby(&mut self, config: u8) -> Result<(), SxError<SPI::Error>> {
-        if config != STDBY_CONFIG_RC {
-            return self.write_cmd(CMD_SET_STANDBY, &[config]);
+    pub async fn set_standby(
+        &mut self,
+        config: u8,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        if self.timed_rx {
+            self.stop_rx().await?;
         }
+        if config != STDBY_CONFIG_RC {
+            return self.write_cmd(CMD_SET_STANDBY, &[config]).await;
+        }
+        let saved = self.begin_io();
         let mut fault = None;
-        let result = backend::run_ready(self.backend(&mut fault, false).set_standby());
-        backend::finish(result, fault)
+        let result = self.backend(&mut fault).set_standby().await;
+        self.end_io(saved, backend::finish(result, fault))
     }
 
     /// Configures regulator mode: LDO (`REGULATOR_LDO`) or DC-DC (`REGULATOR_DC_DC`).
     ///
     /// Semtech SX1262 Section 13.1.11 "SetRegulatorMode" (opcode `0x96`).
-    pub fn set_regulator_mode(&mut self, mode: u8) -> Result<(), SxError<SPI::Error>> {
-        self.write_cmd(CMD_SET_REGULATOR_MODE, &[mode])
+    pub async fn set_regulator_mode(
+        &mut self,
+        mode: u8,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        self.write_cmd(CMD_SET_REGULATOR_MODE, &[mode]).await
     }
 
     /// Configures DIO3 as a regulated TCXO supply voltage with stabilization delay ticks.
     ///
     /// Semtech SX1262 Section 13.3.6 "SetDIO3AsTCXOCtrl" (opcode `0x97`).
-    pub fn set_dio3_as_tcxo_ctrl(
+    pub async fn set_dio3_as_tcxo_ctrl(
         &mut self,
         voltage: u8,
         delay_ticks: u32,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if delay_ticks > 0xFF_FFFF {
             return Err(SxError::InvalidParam);
         }
@@ -690,43 +802,66 @@ where
             (delay_ticks >> 8) as u8,
             delay_ticks as u8,
         ];
-        self.write_cmd(CMD_SET_DIO3_AS_TCXO_CTRL, &params)
+        self.write_cmd(CMD_SET_DIO3_AS_TCXO_CTRL, &params).await
     }
 
     /// Calibrates image rejection for the given frequency range.
     ///
     /// Semtech SX1262 Section 13.1.13 "CalibrateImage" (opcode `0x98`).
-    pub fn calibrate_image(&mut self, freq1: u8, freq2: u8) -> Result<(), SxError<SPI::Error>> {
-        self.write_cmd(CMD_CALIBRATE_IMAGE, &[freq1, freq2])
+    pub async fn calibrate_image(
+        &mut self,
+        freq1: u8,
+        freq2: u8,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        self.write_cmd(CMD_CALIBRATE_IMAGE, &[freq1, freq2]).await
     }
 
     /// Configures internal DIO2 to control the external RF switch.
     ///
     /// Semtech SX1262 Section 13.3.5 "SetDIO2AsRfSwitchCtrl" (opcode `0x9D`).
-    pub fn set_dio2_as_rf_switch_ctrl(&mut self, enable: bool) -> Result<(), SxError<SPI::Error>> {
+    pub async fn set_dio2_as_rf_switch_ctrl(
+        &mut self,
+        enable: bool,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         self.write_cmd(
             CMD_SET_DIO2_AS_RF_SWITCH_CTRL,
             &[if enable { 0x01 } else { 0x00 }],
         )
+        .await
     }
 
     /// Sets the packet type modem: `PACKET_TYPE_GFSK` (`0x00`) or `PACKET_TYPE_LORA` (`0x01`).
     ///
     /// Semtech SX1262 Section 13.4.2 "SetPacketType" (opcode `0x8A`).
-    pub fn set_packet_type(&mut self, packet_type: u8) -> Result<(), SxError<SPI::Error>> {
-        self.write_cmd(CMD_SET_PACKET_TYPE, &[packet_type])
+    pub async fn set_packet_type(
+        &mut self,
+        packet_type: u8,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        self.write_cmd(CMD_SET_PACKET_TYPE, &[packet_type]).await
     }
 
     /// Configures the RF carrier frequency in hertz.
     ///
     /// Semtech SX1262 Section 13.4.1 "SetRfFrequency" (opcode `0x86`).
-    pub fn set_rf_frequency(&mut self, freq_hz: u32) -> Result<(), SxError<SPI::Error>> {
+    pub async fn set_rf_frequency(
+        &mut self,
+        freq_hz: u32,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if !(150_000_000..=960_000_000).contains(&freq_hz) {
             return Err(SxError::InvalidParam);
         }
+        if let Some(band) = CalibrationBand::for_frequency(freq_hz) {
+            if self.calibration_band != Some(band) {
+                let (a, b) = band.codes();
+                self.calibrate_image(a, b).await?;
+            }
+        } else {
+            self.calibration_band = None;
+        }
+        let saved = self.begin_io();
         let mut fault = None;
-        let result = backend::run_ready(self.backend(&mut fault, false).set_channel(freq_hz));
-        backend::finish(result, fault)?;
+        let result = self.backend(&mut fault).set_channel(freq_hz).await;
+        self.end_io(saved, backend::finish(result, fault))?;
         self.frequency_hz = Some(freq_hz);
         Ok(())
     }
@@ -734,28 +869,30 @@ where
     /// Configures the Power Amplifier (PA) parameters.
     ///
     /// Semtech SX1262 Section 13.1.14 "SetPaConfig" (opcode `0x95`).
-    pub fn set_pa_config(
+    pub async fn set_pa_config(
         &mut self,
         pa_duty_cycle: u8,
         hp_max: u8,
         device_sel: u8,
         pa_lut: u8,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         self.write_cmd(
             CMD_SET_PA_CONFIG,
             &[pa_duty_cycle, hp_max, device_sel, pa_lut],
         )
+        .await
     }
 
     /// Sets the transmit output power in dBm and ramp time.
     ///
     /// Semtech SX1262 Section 13.4.4 "SetTxParams" (opcode `0x8E`).
-    pub fn set_tx_params(
+    pub async fn set_tx_params(
         &mut self,
         power_dbm: i8,
         ramp_time: u8,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         self.write_cmd(CMD_SET_TX_PARAMS, &[power_dbm as u8, ramp_time])
+            .await
     }
 
     /// Configures Over-Current Protection (OCP) clamp in register `0x08E7`.
@@ -763,36 +900,40 @@ where
     /// Catalog `sx1262` §5.1 “Selecting DC-DC Converter or LDO Regulation”
     /// limits OCP to six bits, in 2.5 mA steps. PA changes reset this register.
     /// Register address: §12.1 “Registers” (OCP).
-    pub fn set_ocp(&mut self, ocp_val: u8) -> Result<(), SxError<SPI::Error>> {
+    pub async fn set_ocp(&mut self, ocp_val: u8) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if ocp_val > OCP_MAX_CODE {
             return Err(SxError::InvalidParam);
         }
-        self.write_reg(REG_OCP, ocp_val)
+        self.write_reg(REG_OCP, ocp_val).await
     }
 
     /// Configures TX and RX FIFO buffer base addresses.
-    pub fn set_buffer_base_address(
+    pub async fn set_buffer_base_address(
         &mut self,
         tx_base: u8,
         rx_base: u8,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        let saved = self.begin_io();
         let mut fault = None;
-        let result = backend::run_ready(
-            self.backend(&mut fault, false)
-                .set_tx_rx_buffer_base_address(usize::from(tx_base), usize::from(rx_base)),
-        );
-        backend::finish(result, fault)
+        let result = self
+            .backend(&mut fault)
+            .set_tx_rx_buffer_base_address(usize::from(tx_base), usize::from(rx_base))
+            .await;
+        self.end_io(saved, backend::finish(result, fault))
     }
 
     /// Configures LoRa modulation parameters: Spreading Factor, Bandwidth, Coding Rate, and Low Data Rate Optimize.
-    pub fn set_lora_modulation_params(
+    pub async fn set_lora_modulation_params(
         &mut self,
         sf: u8,
         bw: u8,
         cr: u8,
         ldro: u8,
-    ) -> Result<(), SxError<SPI::Error>> {
-        validate_command::<SPI::Error>(CMD_SET_MODULATION_PARAMS, &[sf, bw, cr, ldro])?;
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        validate_command::<SPI::Error, BUSY::Error>(
+            CMD_SET_MODULATION_PARAMS,
+            &[sf, bw, cr, ldro],
+        )?;
         let spreading = match sf {
             5 => SpreadingFactor::_5,
             6 => SpreadingFactor::_6,
@@ -823,18 +964,18 @@ where
         };
         let mut params = BaseBandModulationParams::new(spreading, bandwidth, coding);
         params.ldro = ldro != 0;
-        self.configure_lora_modulation(&params)
+        self.configure_lora_modulation(&params).await
     }
 
     /// Configures LoRa packet parameters.
-    pub fn set_lora_packet_params(
+    pub async fn set_lora_packet_params(
         &mut self,
         preamble_len: u16,
         header_type: u8,
         payload_len: u8,
         crc_type: u8,
         invert_iq: u8,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if header_type > 1 || crc_type > 1 || invert_iq > 1 {
             return Err(SxError::InvalidParam);
         }
@@ -845,22 +986,28 @@ where
             crc: crc_type != 0,
             invert_iq: invert_iq != 0,
         })
+        .await
     }
 
     /// Configures the 16-bit LoRa sync word registers (`0x0740` and `0x0741`).
-    pub fn set_lora_sync_word(&mut self, sync_word: u16) -> Result<(), SxError<SPI::Error>> {
-        self.write_reg(REG_LORA_SYNC_WORD_MSB, (sync_word >> 8) as u8)?;
+    pub async fn set_lora_sync_word(
+        &mut self,
+        sync_word: u16,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        self.write_reg(REG_LORA_SYNC_WORD_MSB, (sync_word >> 8) as u8)
+            .await?;
         self.write_reg(REG_LORA_SYNC_WORD_LSB, sync_word as u8)
+            .await
     }
 
     /// Configures DIO interrupt routing lines.
-    pub fn set_dio_irq_params(
+    pub async fn set_dio_irq_params(
         &mut self,
         irq_mask: u16,
         dio1_mask: u16,
         dio2_mask: u16,
         dio3_mask: u16,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         let params = [
             (irq_mask >> 8) as u8,
             irq_mask as u8,
@@ -871,29 +1018,29 @@ where
             (dio3_mask >> 8) as u8,
             dio3_mask as u8,
         ];
-        self.write_cmd(CMD_SET_DIO_IRQ_PARAMS, &params)
+        self.write_cmd(CMD_SET_DIO_IRQ_PARAMS, &params).await
     }
 
     /// Reads the active 16-bit interrupt status flags.
-    pub fn get_irq_status(&mut self) -> Result<u16, SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut rx = [0u8; 4];
-        let res = self
-            .spi
-            .transfer(&mut rx, &[CMD_GET_IRQ_STATUS, 0x00, 0x00, 0x00]);
-        self.finish_transaction(res)?;
-        Ok(((rx[2] as u16) << 8) | (rx[3] as u16))
+    pub async fn get_irq_status(&mut self) -> Result<u16, SxError<SPI::Error, BUSY::Error>> {
+        let rx = self.read_response::<4>(CMD_GET_IRQ_STATUS).await?;
+        Ok(u16::from_be_bytes([rx[2], rx[3]]))
     }
 
     /// Clears active interrupt status flags matching the bitmask.
-    pub fn clear_irq_status(&mut self, clear_mask: u16) -> Result<(), SxError<SPI::Error>> {
+    pub async fn clear_irq_status(
+        &mut self,
+        clear_mask: u16,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         let params = [(clear_mask >> 8) as u8, clear_mask as u8];
-        self.write_cmd(CMD_CLEAR_IRQ_STATUS, &params)
+        self.write_cmd(CMD_CLEAR_IRQ_STATUS, &params).await
     }
 
     /// Commands the transceiver to enter reception with timeout ticks (`0xFFFFFF` = continuous).
-    pub fn set_rx(&mut self, timeout_ticks: u32) -> Result<(), SxError<SPI::Error>> {
+    pub async fn set_rx(
+        &mut self,
+        timeout_ticks: u32,
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if timeout_ticks > 0xFF_FFFF {
             return Err(SxError::InvalidParam);
         }
@@ -902,27 +1049,27 @@ where
             (timeout_ticks >> 8) as u8,
             timeout_ticks as u8,
         ];
-        self.write_cmd(CMD_SET_RX, &params)
+        self.write_cmd(CMD_SET_RX, &params).await
     }
 
     /// Puts the radio into Channel Activity Detection (CAD) mode.
     ///
     /// Semtech SX1261/2 Section 13.1.8 "SetCad".
-    pub fn set_cad(&mut self) -> Result<(), SxError<SPI::Error>> {
-        self.write_cmd(CMD_SET_CAD, &[])
+    pub async fn set_cad(&mut self) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
+        self.write_cmd(CMD_SET_CAD, &[]).await
     }
 
     /// Sets Channel Activity Detection parameters.
     ///
     /// Semtech SX1261/2 Section 13.4.7 "SetCadParams".
-    pub fn set_cad_params(
+    pub async fn set_cad_params(
         &mut self,
         cad_symbol_num: u8,
         cad_det_peak: u8,
         cad_det_min: u8,
         cad_exit_mode: u8,
         cad_timeout: u32,
-    ) -> Result<(), SxError<SPI::Error>> {
+    ) -> Result<(), SxError<SPI::Error, BUSY::Error>> {
         if cad_timeout > 0xFF_FFFF {
             return Err(SxError::InvalidParam);
         }
@@ -935,45 +1082,31 @@ where
             ((cad_timeout >> 8) & 0xFF) as u8,
             (cad_timeout & 0xFF) as u8,
         ];
-        self.write_cmd(CMD_SET_CAD_PARAMS, &params)
+        self.write_cmd(CMD_SET_CAD_PARAMS, &params).await
     }
 
     /// Reads instantaneous RSSI while in reception mode (returns value in dBm, e.g. -105 dBm).
-    pub fn get_rssi_inst(&mut self) -> Result<i16, SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut rx = [0u8; 3];
-        let res = self.spi.transfer(&mut rx, &[CMD_GET_RSSI_INST, 0x00, 0x00]);
-        self.finish_transaction(res)?;
-        let rssi_dbm = -((rx[2] as i16) / 2);
-        Ok(rssi_dbm)
+    pub async fn get_rssi_inst(&mut self) -> Result<i16, SxError<SPI::Error, BUSY::Error>> {
+        Ok(self.get_rssi_inst_half_dbm().await? / 2)
     }
 
     /// Queries RX buffer status: returns `(payload_length, rx_start_buffer_pointer)`.
-    pub fn get_rx_buffer_status(&mut self) -> Result<(u8, u8), SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut rx = [0u8; 4];
-        let res = self
-            .spi
-            .transfer(&mut rx, &[CMD_GET_RX_BUFFER_STATUS, 0x00, 0x00, 0x00]);
-        self.finish_transaction(res)?;
+    pub async fn get_rx_buffer_status(
+        &mut self,
+    ) -> Result<(u8, u8), SxError<SPI::Error, BUSY::Error>> {
+        let rx = self.read_response::<4>(CMD_GET_RX_BUFFER_STATUS).await?;
         Ok((rx[2], rx[3]))
     }
 
-    /// Queries decoded packet status (packet RSSI in dBm, estimated SNR in dB).
-    pub fn get_packet_status(&mut self) -> Result<PacketStatus, SxError<SPI::Error>> {
-        self.wait_busy()?;
-        self.select()?;
-        let mut rx = [0u8; 5];
-        let res = self
-            .spi
-            .transfer(&mut rx, &[CMD_GET_PACKET_STATUS, 0x00, 0x00, 0x00, 0x00]);
-        self.finish_transaction(res)?;
+    /// Queries lossless packet RSSI in half-dBm and estimated SNR in quarter-dB.
+    pub async fn get_packet_status(
+        &mut self,
+    ) -> Result<PacketStatus, SxError<SPI::Error, BUSY::Error>> {
+        let rx = self.read_response::<5>(CMD_GET_PACKET_STATUS).await?;
         Ok(PacketStatus {
-            rssi_pkt_dbm: -((rx[2] as i16) / 2),
-            snr_pkt_db: (rx[3] as i8) / 4,
-            signal_rssi_pkt_dbm: -((rx[4] as i16) / 2),
+            rssi_pkt_half_dbm: -i16::from(rx[2]),
+            snr_pkt_quarter_db: rx[3] as i8,
+            signal_rssi_pkt_half_dbm: -i16::from(rx[4]),
         })
     }
 }

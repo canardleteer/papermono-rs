@@ -1,23 +1,26 @@
 [package]
 name = "sx1262-phy"
 version = "0.1.0"
-description = "SX1262 blocking chip driver with async caller lifecycle and TX readiness hooks"
+description = "SX1262 async chip driver with caller lifecycle and TX readiness hooks"
 readme = "README.md"
-publish = true
+publish = false
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "MIT AND BSD-3-Clause-Clear"
 repository.workspace = true
 authors.workspace = true
 keywords = ["sx1262", "lora", "embedded-hal", "no-std", "radio"]
 categories.workspace = true
-include = ["src/**", "tests/**", "README.md", "Cargo.toml", "LICENSE"]
+include = ["src/**", "tests/**", "README.md", "Cargo.toml", "LICENSE", "LICENSE-Semtech"]
 
 [dependencies]
 embedded-hal.workspace = true
 embedded-hal-async = "1.0.0"
-lora-phy = { version = "=3.0.1", default-features = false }
-lora-modulation = { version = "0.1.5", default-features = false }
+lora-phy = { git = "https://github.com/lora-rs/lora-rs", rev = "b47cbdf8d3935e9bfe44c4d407bbad087fcfc179", default-features = false }
+lora-modulation = { git = "https://github.com/lora-rs/lora-rs", rev = "b47cbdf8d3935e9bfe44c4d407bbad087fcfc179", default-features = false }
+
+[dev-dependencies]
+embedded-hal-bus = { version = "0.3.0", features = ["async"] }
 
 [lints]
 workspace = true

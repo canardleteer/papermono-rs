@@ -125,7 +125,7 @@ mutually exclusive. WPA2 only (no WPA3 in the `esp-radio` blob).
 
 ## LoRa lifecycle and verification
 
-`sx1262-phy` wraps published `lora-phy` chip operations; preserve Semtech
+`sx1262-phy` wraps revision-pinned `lora-phy` chip operations; preserve Semtech
 catalog `sx1262` section citations when adapting them. Board nets,
 presets and `RadioHooks` stay in `m5stack-papermono::lora`. System I2C
 is borrowed for startup, shutdown and scheduled verification only.
@@ -136,9 +136,13 @@ push-pull drive, latch and sampled level on startup and shutdown.
 Initial TX verification interval is one; twenty or forty requires an
 explicit configuration change backed by C153 hardware evidence.
 Failures block TX, invalidate readiness, restore interval one, emit a
-serial warning and trigger cleanup. Digital evidence does not validate
-the RF path. C153-Lite radio outputs remain undriven. The new policy is
-host-tested; do not extend historical hardware confirmations to it.
+serial warning and trigger cleanup. Chip I/O uses async `SpiDevice` and
+cooperative BUSY polling. Await command sequences to completion; interrupted
+sequences require NSS recovery and
+shutdown/startup. Every TX requires a nonzero hardware timeout. Digital
+evidence does not validate the RF path. C153-Lite radio outputs remain
+undriven. The new policy is host-tested; do not extend historical hardware
+confirmations to it.
 
 ## Keep skills updated
 

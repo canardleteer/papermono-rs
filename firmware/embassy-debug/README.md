@@ -124,7 +124,7 @@ benchmark) → tones → targets, then wrap. Survey and hotspot cannot run
 together: starting one stops the other. BUTTON A walks the other way.
 CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
 `wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, `lora_scan`,
-`lora_control`, and `lora_session`.
+`lora_control`, `lora_session`, and `lora_metrics`.
 
 On PaperMono (`C153`), each ping, listen window or scan sweep starts and
 ends a radio session. Antenna control stays high throughout that
@@ -138,6 +138,12 @@ phase and available evidence. TX is blocked until a new session
 confirms shutdown and then restores readiness. A digital confirmation
 does not measure
 the antenna or RF path.
+
+The ping has a 300 ms hardware TX limit. If the chip times out or a read
+fails, the card shows a radio error and serial records a warning. Listening
+and scanning report only successful signal/FIFO reads. `lora_metrics` reports
+half-dBm RSSI and quarter-dB SNR as scaled integers, alongside the existing
+whole-unit `lora_rx` line. Corrupt packets do not count as received packets.
 
 ### Step 5: Slide the lamp
 

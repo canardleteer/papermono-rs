@@ -27,3 +27,7 @@ License: MIT
 LoRa session logs include `lora_control` digital antenna evidence and
 `lora_session` verification totals. The host classifies both record kinds;
 unknown readback remains `unknown`, and failed checks carry `warning=1`.
+
+The CDC parser also recognizes `lora_metrics` records with scaled integer
+half-dBm RSSI and quarter-dB SNR. Existing `lora_rx` and `lora_scan` reports
+retain their whole-unit formats.

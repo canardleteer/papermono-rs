@@ -128,12 +128,25 @@ with 3-sample IMU hysteresis
 
 ## SX1262 wrapper and diagnostics
 
-`sx1262-phy` is a publishable, host-testable `no_std` wrapper around
-published `lora-phy` SX126x operations, with local diagnostic commands.
-`lora-modulation` supplies typed parameters. Caller hooks may await;
-SPI operations stay blocking. `RadioHooks` and borrowed `RadioContext`
-belong in the C153 BSP. `release` returns SPI, NSS, BUSY and hooks;
-shutdown is explicit. Repeated active startup preserves state/counters.
+`sx1262-phy` is a host-testable `no_std` wrapper around `lora-phy` and
+`lora-modulation` at reviewed
+[revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179).
+Default/LoRaWAN features are disabled; publication is deferred. The workspace
+minimum is Rust 1.88 because the pinned upstream uses let-chains. Chip I/O
+awaits async `SpiDevice`, BUSY input and caller-supplied async delay.
+`release` returns those resources and hooks without I/O; shutdown is explicit.
+Repeated active startup preserves configuration and counters. Firmware keeps
+synchronization outside the chip crate and composes NSS with `ExclusiveDevice`.
+Its SPI lease converts the stored idle mode to esp-hal Async for each session
+and restores it on Drop, because Async cannot live in the shared static mutex.
+
+BUSY uses a 100 ms delay budget, polling every millisecond, with a one-us
+post-NSS settling delay. Scheduler latency is additional. Await each sequence
+to completion; cancellation requires restoring NSS and shutdown/startup.
+Managed RX rejects CRC/header failures before FIFO, acknowledges observed IRQs,
+wraps FIFO offsets and applies timed-RX RTC cleanup. Fractional RSSI/SNR uses
+`lora_metrics`; whole-unit CDC formats remain stable. Genuine read failures
+warn and trigger cleanup. Ping programs its 300 ms budget into hardware TX.
 
 The TX guard checks readiness and permission on every attempt, then
 fresh hardware on attempts 1, N+1, 2N+1. It protects raw `SetTx` too.

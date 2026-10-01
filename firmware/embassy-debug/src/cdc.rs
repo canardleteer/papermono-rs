@@ -380,3 +380,13 @@ pub fn lora_session(sample: &papermono_log::LoraSessionSample) {
         emit(line);
     }
 }
+
+/// Emits fractional LoRa readings alongside the existing whole-unit RX record.
+/// A fixed stack buffer bounds CDC formatting; formatting failure emits no line.
+#[cfg(feature = "c153")]
+pub fn lora_metrics(sample: &papermono_log::LoraMetricsSample) {
+    let mut buf = [0; papermono_log::LORA_METRICS_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_metrics(sample, &mut buf) {
+        esp_println::println!("{}", line);
+    }
+}

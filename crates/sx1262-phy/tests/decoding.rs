@@ -38,3 +38,49 @@ fn opcodes_match_sx1262_specification() {
     assert_eq!(CMD_SET_CAD, 0xC5);
     assert_eq!(CMD_SET_CAD_PARAMS, 0x88);
 }
+
+#[test]
+fn airtime_covers_crc_sf5_sf6_and_large_preambles_without_overflow() {
+    let modulation =
+        BaseBandModulationParams::new(SpreadingFactor::_7, Bandwidth::_125KHz, CodingRate::_4_5);
+    let mut packet = LoRaPacketParams {
+        preamble_symbols: 8,
+        implicit_header: false,
+        payload_len: 13,
+        crc: true,
+        invert_iq: false,
+    };
+    assert_eq!(lora_airtime_us(&modulation, &packet), 46_336);
+    packet.crc = false;
+    assert_eq!(lora_airtime_us(&modulation, &packet), 41_216);
+    packet.implicit_header = true;
+    assert_eq!(lora_airtime_us(&modulation, &packet), 36_096);
+    for sf in [SpreadingFactor::_5, SpreadingFactor::_6] {
+        let m = BaseBandModulationParams::new(sf, Bandwidth::_500KHz, CodingRate::_4_5);
+        let p = LoRaPacketParams {
+            preamble_symbols: 1,
+            implicit_header: false,
+            payload_len: 0,
+            crc: false,
+            invert_iq: false,
+        };
+        let expected = if sf == SpreadingFactor::_5 {
+            1680
+        } else {
+            3360
+        };
+        assert_eq!(lora_airtime_us(&m, &p), expected);
+        let with_minimum = LoRaPacketParams {
+            preamble_symbols: 12,
+            ..p
+        };
+        assert_eq!(lora_airtime_us(&m, &p), lora_airtime_us(&m, &with_minimum));
+    }
+    let slow =
+        BaseBandModulationParams::new(SpreadingFactor::_12, Bandwidth::_7KHz, CodingRate::_4_8);
+    packet.preamble_symbols = u16::MAX;
+    packet.payload_len = u8::MAX;
+    let airtime = lora_airtime_us(&slow, &packet);
+    assert!(airtime > u64::from(u32::MAX));
+    assert!(airtime < 40_000_000_000);
+}

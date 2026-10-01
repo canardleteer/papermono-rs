@@ -161,3 +161,13 @@ permission requires an explicit caller policy. Continuous-carrier and
 infinite-preamble commands are unsupported. Digital readback does not
 validate the RF path. The new policy awaits physical C153 validation;
 C153-Lite radio outputs remain undriven.
+
+Chip I/O awaits async SPI and cooperative BUSY polling. Every typed/raw TX
+requires a nonzero hardware timeout; the ping uses 300 ms. Interrupted chip
+sequences invalidate readiness. Restore caller-owned NSS before completing
+shutdown/startup recovery. Do not race command futures against cancellation.
+Managed RX rejects CRC/header failures before FIFO access, and timed reception
+or early stop applies the documented RTC cleanup (`sx1262` §15.3.2
+“Workaround”).
+The one-us NSS settling delay and async reception path await C153 bench
+evidence.

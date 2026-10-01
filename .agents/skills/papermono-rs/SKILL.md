@@ -146,9 +146,18 @@ Do not `idf.py flash` it from this repo.
 
 ## SX1262 sessions
 
-The generic `sx1262-phy` wraps published `lora-phy` operations and uses
-`lora-modulation` types. BSP re-exports preserve imports; PaperMono
-pins/presets and `RadioHooks` stay in `m5stack-papermono::lora`.
+The generic `sx1262-phy` wraps revision-pinned `lora-phy` operations and uses
+`lora-modulation` types. Both are pinned to reviewed lora-rs revision b47cbdf
+with default/LoRaWAN features disabled; registry publication is deferred.
+Every chip-I/O method awaits async `SpiDevice` and cooperative BUSY polling.
+Firmware composes NSS with `ExclusiveDevice`, awaits sequences to completion,
+and restores NSS before shutdown/startup recovery after cancellation.
+Typed/raw TX require a nonzero hardware timeout; ping uses 300 ms.
+Managed RX rejects corrupt frames before FIFO access, acknowledges observed
+IRQ bits, handles wrapping offsets and cleans up timed-RX RTC state.
+`lora_metrics` carries fractional readings without changing existing lines. BSP
+re-exports preserve imports; PaperMono pins/presets and `RadioHooks` stay in
+`m5stack-papermono::lora`.
 Borrow system I2C only for control and verification operations. Keep
 synchronization in firmware. Startup and shutdown always confirm antenna
 mode, drive, latch and sampled level; initial pre-TX cadence is one.

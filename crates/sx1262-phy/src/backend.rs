@@ -1,103 +1,68 @@
-//! Borrowed adapter around the published lora-phy SX126x driver.
+//! Borrowed async transport for the reviewed lora-rs SX126x backend.
 //!
-//! Upstream supplies modem encodings and Semtech errata workarounds. Our adapter
-//! keeps SPI blocking, checks BUSY before and after transactions, preserves the
-//! original bus error, and leaves session antenna control to the lifecycle hooks.
+//! The caller's SpiDevice owns NSS. BUSY polling and the post-NSS settling
+//! delay surround every transaction, including upstream errata register access.
 
 use crate::*;
-use core::future::Future;
-use core::task::{Context, Poll, Waker};
-use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_hal::spi::{ErrorKind, ErrorType, Operation, SpiBus};
-use lora_phy::mod_params::RadioError;
-use lora_phy::mod_traits::InterfaceVariant;
+use embedded_hal::{
+    digital::InputPin,
+    spi::{ErrorKind, ErrorType, Operation},
+};
+use embedded_hal_async::{delay::DelayNs, spi::SpiDevice};
+use lora_phy::{mod_params::RadioError, mod_traits::InterfaceVariant};
 
-/// Blocking device borrowed only while an upstream chip operation executes.
-pub(crate) struct BlockingDevice<'a, SPI: SpiBus, NSS, BUSY> {
-    /// Exclusive SPI bus borrow; no mutex is needed inside this transaction.
-    pub spi: &'a mut SPI,
-    /// Active-low chip select, released on every transaction result.
-    pub nss: &'a mut NSS,
-    /// BUSY input read before selecting the chip and after deselection.
-    pub busy: &'a mut BUSY,
-    /// First hardware error retained despite upstream's flattened SPI error.
-    pub fault: &'a mut Option<SxError<SPI::Error>>,
-    /// Capability granted only by the completed session TX guard.
-    pub allow_tx: bool,
+/// Waits cooperatively using a requested-delay budget. Scheduler latency and
+/// SPI time are outside the configured budget.
+pub(crate) async fn wait_busy<B: InputPin, D: DelayNs, E>(
+    busy: &mut B,
+    delay: &mut D,
+    timing: BusyTiming,
+) -> Result<(), SxError<E, B::Error>> {
+    let mut remaining = timing.budget_ms;
+    loop {
+        if busy.is_low().map_err(SxError::Busy)? {
+            return Ok(());
+        }
+        if remaining == 0 {
+            return Err(SxError::BusyTimeout);
+        }
+        let step = remaining.min(timing.poll_ms.get());
+        delay.delay_ms(step).await;
+        remaining -= step;
+    }
 }
 
-impl<SPI: SpiBus, NSS, BUSY> ErrorType for BlockingDevice<'_, SPI, NSS, BUSY> {
+/// Runs one complete device transaction. Await to completion: a cancelled
+/// SpiDevice future may leave NSS low. Only the caller can recover its NSS pin.
+pub(crate) async fn transaction<S: SpiDevice, B: InputPin, D: DelayNs>(
+    spi: &mut S,
+    busy: &mut B,
+    delay: &mut D,
+    timing: BusyTiming,
+    operations: &mut [Operation<'_, u8>],
+) -> Result<(), SxError<S::Error, B::Error>> {
+    wait_busy(busy, delay, timing).await?;
+    spi.transaction(operations).await.map_err(SxError::Spi)?;
+    // sx1262 §8.3.1 “BUSY Control Line”: allow BUSY to assert after NSS
+    // rises before testing readiness. The one-us delay needs C153 bench evidence.
+    delay.delay_us(NSS_SETTLE_US).await;
+    wait_busy(busy, delay, timing).await
+}
+
+/// Borrowed device; retains the original transport fault when upstream flattens it.
+pub(crate) struct BorrowedDevice<'a, S: SpiDevice, B: InputPin, D> {
+    pub spi: &'a mut S,
+    pub busy: &'a mut B,
+    pub delay: &'a mut D,
+    pub timing: BusyTiming,
+    pub fault: &'a mut Option<SxError<S::Error, B::Error>>,
+}
+impl<S: SpiDevice, B: InputPin, D> ErrorType for BorrowedDevice<'_, S, B, D> {
     type Error = ErrorKind;
 }
-
-impl<SPI: SpiBus, NSS: OutputPin, BUSY: InputPin> BlockingDevice<'_, SPI, NSS, BUSY> {
-    /// Bounded BUSY check from `sx1262` §8.3.1 “BUSY Control Line”.
-    fn wait_busy(&mut self) -> Result<(), SxError<SPI::Error>> {
-        for _ in 0..BUSY_TIMEOUT_POLLS {
-            if self.busy.is_low().map_err(|_| SxError::Gpio)? {
-                return Ok(());
-            }
-        }
-        Err(SxError::BusyTimeout)
-    }
-
-    /// Runs a dedicated-bus SPI transaction, including flush and NSS cleanup.
-    /// Delay operations are unsupported: the upstream calls we expose use none.
-    fn run(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), SxError<SPI::Error>> {
-        let Some(Operation::Write(header)) = operations.first() else {
-            return Err(SxError::UnsupportedCommand);
-        };
-        let Some(&command) = header.first() else {
-            return Err(SxError::InvalidParam);
-        };
-        // Reject continuous TX even if a future upstream operation emits it.
-        if !matches!(
-            command,
-            CMD_READ_REGISTER
-                | CMD_WRITE_REGISTER
-                | CMD_READ_BUFFER
-                | CMD_WRITE_BUFFER
-                | CMD_SET_STANDBY
-                | CMD_SET_MODULATION_PARAMS
-                | CMD_SET_PACKET_PARAMS
-                | CMD_SET_RF_FREQUENCY
-                | CMD_SET_BUFFER_BASE_ADDRESS
-                | CMD_SET_TX
-        ) {
-            return Err(SxError::UnsupportedCommand);
-        }
-        if command == CMD_SET_TX && !self.allow_tx {
-            return Err(SxError::ContextRequired);
-        }
-        self.wait_busy()?;
-        if self.nss.set_low().is_err() {
-            let _ = self.nss.set_high();
-            return Err(SxError::Gpio);
-        }
-        let result = (|| {
-            for operation in operations {
-                match operation {
-                    Operation::Read(data) => self.spi.read(data)?,
-                    Operation::Write(data) => self.spi.write(data)?,
-                    Operation::Transfer(read, write) => self.spi.transfer(read, write)?,
-                    Operation::TransferInPlace(data) => self.spi.transfer_in_place(data)?,
-                    Operation::DelayNs(_) => return Err(SxError::UnsupportedCommand),
-                }
-            }
-            self.spi.flush().map_err(SxError::Spi)
-        })();
-        let deselect = self.nss.set_high();
-        result?;
-        deselect.map_err(|_| SxError::Gpio)?;
-        self.wait_busy()
-    }
-}
-
-impl<SPI: SpiBus, NSS: OutputPin, BUSY: InputPin> embedded_hal_async::spi::SpiDevice
-    for BlockingDevice<'_, SPI, NSS, BUSY>
-{
+impl<S: SpiDevice, B: InputPin, D: DelayNs> SpiDevice for BorrowedDevice<'_, S, B, D> {
     async fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), ErrorKind> {
-        match self.run(operations) {
+        match transaction(self.spi, self.busy, self.delay, self.timing, operations).await {
             Ok(()) => Ok(()),
             Err(error) => {
                 *self.fault = Some(error);
@@ -107,20 +72,11 @@ impl<SPI: SpiBus, NSS: OutputPin, BUSY: InputPin> embedded_hal_async::spi::SpiDe
     }
 }
 
-impl<E: embedded_hal::spi::Error> From<E> for SxError<E> {
-    fn from(error: E) -> Self {
-        Self::Spi(error)
-    }
-}
-
-/// Upstream reset and antenna hooks are deliberately unavailable/no-op. Session
-/// hooks alone own those signals; packet and standby calls cannot toggle them.
+/// Upstream reset/IRQ operations are unavailable. Antenna changes are no-ops;
+/// only the local explicit session hooks may control that hardware.
 pub(crate) struct SessionInterface;
 impl InterfaceVariant for SessionInterface {
-    async fn reset(
-        &mut self,
-        _: &mut impl embedded_hal_async::delay::DelayNs,
-    ) -> Result<(), RadioError> {
+    async fn reset(&mut self, _: &mut impl DelayNs) -> Result<(), RadioError> {
         Err(RadioError::Reset)
     }
     async fn wait_on_busy(&mut self) -> Result<(), RadioError> {
@@ -140,27 +96,25 @@ impl InterfaceVariant for SessionInterface {
     }
 }
 
-/// Concrete borrowed upstream driver; not exposed, so its TX API cannot bypass hooks.
-pub(crate) type Backend<'a, S, N, B> = lora_phy::sx126x::Sx126x<
-    BlockingDevice<'a, S, N, B>,
+/// Unexposed upstream driver: callers cannot reach upstream's unbounded TX API.
+pub(crate) type Backend<'a, S, B, D> = lora_phy::sx126x::Sx126x<
+    BorrowedDevice<'a, S, B, D>,
     SessionInterface,
     lora_phy::sx126x::Sx1262,
 >;
-
-impl<SPI: SpiBus, NSS: OutputPin, BUSY: InputPin, H> Sx1262<SPI, NSS, BUSY, H> {
-    /// Lends transport to upstream without transferring ownership or session state.
+impl<S: SpiDevice, B: InputPin, D: DelayNs, H> Sx1262<S, B, D, H> {
+    /// Lends transport without giving upstream ownership of lifecycle state.
     pub(crate) fn backend<'a>(
         &'a mut self,
-        fault: &'a mut Option<SxError<SPI::Error>>,
-        allow_tx: bool,
-    ) -> Backend<'a, SPI, NSS, BUSY> {
+        fault: &'a mut Option<SxError<S::Error, B::Error>>,
+    ) -> Backend<'a, S, B, D> {
         lora_phy::sx126x::Sx126x::new(
-            BlockingDevice {
+            BorrowedDevice {
                 spi: &mut self.spi,
-                nss: &mut self.nss,
                 busy: &mut self.busy,
+                delay: &mut self.delay,
+                timing: self.busy_timing,
                 fault,
-                allow_tx,
             },
             SessionInterface,
             lora_phy::sx126x::Config {
@@ -173,28 +127,13 @@ impl<SPI: SpiBus, NSS: OutputPin, BUSY: InputPin, H> Sx1262<SPI, NSS, BUSY, H> {
     }
 }
 
-/// Polls a fully blocking upstream operation once. Our SPI/interface futures never
-/// yield; Pending is an explicit compatibility failure, never a spinning executor.
-pub(crate) fn run_ready<T>(
-    future: impl Future<Output = Result<T, RadioError>>,
-) -> Result<T, RadioError> {
-    let mut future = core::pin::pin!(future);
-    match future
-        .as_mut()
-        .poll(&mut Context::from_waker(Waker::noop()))
-    {
-        Poll::Ready(result) => result,
-        Poll::Pending => Err(RadioError::InvalidConfiguration),
-    }
-}
-
-/// Preserves transport details; maps upstream parameter errors to the chip API.
-pub(crate) fn finish<E, T>(
+/// Keeps transport and upstream failures distinct, including upstream validation.
+pub(crate) fn finish<S, B, T>(
     result: Result<T, RadioError>,
-    fault: Option<SxError<E>>,
-) -> Result<T, SxError<E>> {
+    fault: Option<SxError<S, B>>,
+) -> Result<T, SxError<S, B>> {
     if let Some(error) = fault {
         return Err(error);
     }
-    result.map_err(|_| SxError::InvalidParam)
+    result.map_err(SxError::Upstream)
 }

@@ -3,7 +3,7 @@ name = "embassy-debug-fw"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "PaperMono Embassy debug image (Lite baseline, or Full with --features c153). Flash only via cargo xtask flash-app after a matching snapshot exists."
+description = "Unified PaperMono and PaperMono-Lite Embassy debug image. Flash only via cargo xtask flash-app after a matching snapshot exists."
 license = "MIT"
 
 # Workspace member, not a default-member: host `cargo test` skips this
@@ -13,8 +13,8 @@ license = "MIT"
 
 [features]
 default = ["c153", "touch", "panel", "sleep", "radio", "orient"]
-# PaperMono Full SKU C153 hardware: ST25R3916 NFC identity & Stamp LoRa-1262 discovery
-c153 = ["dep:m5stack-papermono"]
+# PaperMono SKU C153 hardware: ST25R3916 NFC identity & Stamp LoRa-1262 discovery
+c153 = ["dep:m5stack-papermono", "dep:embedded-hal-bus", "dep:embedded-hal", "dep:embedded-hal-async"]
 # Compile-time pruned Lite-only profile (excludes C153 radio drivers, leaves radio pins unassigned).
 lite = ["touch", "panel", "sleep", "radio", "orient"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
@@ -108,6 +108,9 @@ embedded-io-async = { version = "0.7", optional = true }
 m5stack-papermono-lite = { path = "../../crates/m5stack-papermono-lite" }
 m5stack-papermono = { path = "../../crates/m5stack-papermono", optional = true }
 papermono-log = { path = "../../crates/papermono-log" }
+embedded-hal = { workspace = true, optional = true }
+embedded-hal-async = { version = "1.0.0", optional = true }
+embedded-hal-bus = { version = "0.3.0", optional = true, features = ["async"] }
 embedded-graphics = "0.8.2"
 static_cell = "2.1.1"
 

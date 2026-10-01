@@ -263,6 +263,7 @@ fn kind_name(kind: LineKind) -> &'static str {
         LineKind::LoraSession => "lora_session",
         LineKind::LoraTx => "lora_tx",
         LineKind::LoraRx => "lora_rx",
+        LineKind::LoraMetrics => "lora_metrics",
         LineKind::LoraScan => "lora_scan",
         LineKind::Unknown => "unknown",
     }

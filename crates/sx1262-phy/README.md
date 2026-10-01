@@ -1,11 +1,14 @@
 # sx1262-phy
 
-An SX1262 `no_std` driver using blocking `embedded-hal` 1.0 SPI/GPIO,
-with caller-supplied asynchronous lifecycle and antenna-readiness hooks.
-It wraps the published `lora-phy` SX126x driver for modem configuration,
-frequency, standby, FIFO writes and packet TX. `lora-modulation` supplies
-LoRa types and symbol timing. Local commands cover diagnostic readback,
-explicit PA/OCP settings, register access, IRQs and bounded RX/TX timers.
+An SX1262 `no_std` driver with async `SpiDevice`, BUSY input, caller-supplied
+async delay, and lifecycle/antenna-readiness hooks. Both `lora-phy` and
+`lora-modulation` are pinned to reviewed
+[revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179),
+with default and LoRaWAN features disabled. Rust 1.88 is required for
+upstream let-chains; registry publication is deferred.
+Borrowed upstream backends supply modem configuration, frequency, standby,
+FIFO writes, and bandwidth/IQ workarounds. Local commands retain diagnostics,
+PA/OCP selection, calibration caching, managed RX and guarded timed TX.
 
 Command references use Semtech SX1261/2 Rev 2.2, Dec 2024 (catalog
 `sx1262`), §8.3.1 “BUSY Control Line” and §13 “Commands Interface”.
@@ -15,10 +18,12 @@ Operation” workarounds.
 
 ## Caller responsibilities
 
-Supply a dedicated SPI bus, initially high NSS, and a BUSY input.
-BUSY polling has an iteration budget. Its duration depends on CPU speed.
-SPI transactions block; hooks may await without requiring an executor
-inside this crate. Keep synchronization at the application boundary.
+Supply an async SPI device, BUSY input and async `DelayNs`. Compose SPI/NSS
+outside this crate, for example with `embedded-hal-bus::ExclusiveDevice`.
+Keep synchronization at the application boundary. Check BUSY before SPI,
+then wait one microsecond after NSS rises before checking BUSY again.
+`BusyTiming` defaults to a 100 ms delay budget with one-ms cooperative polls.
+Scheduler latency is additional: this is not a hard wall-clock deadline.
 
 The caller owns power, reset, oscillator settling, antenna readiness and
 the operating profile. Select regulator, TCXO/DIO3, DIO2 switching,
@@ -76,7 +81,7 @@ impl<C: Controls> Hooks<C> for ExpanderHooks {
 }
 ```
 
-Construct with `Sx1262::with_hooks(spi, nss, busy, ExpanderHooks)`.
+Construct with `Sx1262::with_hooks(device, busy, delay, ExpanderHooks)`.
 The default `Sx1262::new` uses `DenyTx`, which denies every transmission.
 `m5stack-papermono::lora::RadioHooks` implements this pattern for
 PaperMono (`C153`); its board constants and operating presets stay in
@@ -91,18 +96,19 @@ has already established power/reset and a permanent antenna connection.
 Its lifecycle and confirmation hooks perform no hardware I/O.
 
 ```rust
-use embedded_hal::{digital::{InputPin, OutputPin}, spi::SpiBus};
+use embedded_hal::digital::InputPin;
+use embedded_hal_async::{delay::DelayNs, spi::SpiDevice};
 use sx1262_phy::{AlwaysConnected, SessionError, Sx1262};
 use core::convert::Infallible;
 
-async fn session<S: SpiBus, N: OutputPin, B: InputPin>(
-    spi: S, nss: N, busy: B,
-) -> Result<(), SessionError<S::Error, Infallible>> {
-    let mut radio = Sx1262::with_hooks(spi, nss, busy, AlwaysConnected);
+async fn session<S: SpiDevice, B: InputPin, D: DelayNs>(
+    device: S, busy: B, delay: D,
+) -> Result<(), SessionError<S::Error, Infallible, B::Error>> {
+    let mut radio = Sx1262::with_hooks(device, busy, delay, AlwaysConnected);
     radio.startup(&mut ()).await?;
-    // Configure the module's modem, oscillator and PA before packet operations.
+    // Await the module's modem, oscillator and PA configuration before packets.
     radio.shutdown(&mut ()).await?;
-    let (_spi, _nss, _busy, _hooks) = radio.release();
+    let (_device, _busy, _delay, _hooks) = radio.release();
     Ok(())
 }
 ```
@@ -114,8 +120,8 @@ then `shutdown(context)` for a short diagnostic. For sustained operation,
 keep the same wrapper active across RX, TX, standby and frequency
 changes. Those operations never start or stop the module. An active
 session preserves configuration and counters on repeated `startup`.
-Restart requires shutdown followed by startup. `release` returns SPI,
-NSS, BUSY and hooks; it does not perform shutdown.
+Restart requires shutdown followed by startup. `release` returns the SPI device,
+BUSY, delay and hooks; it does not perform shutdown.
 
 TX requires recorded active readiness and permission on every attempt.
 Fresh hardware confirmation runs before attempts 1, N+1, 2N+1, and so on.
@@ -128,21 +134,47 @@ Further TX requires successful shutdown and startup recovery.
 
 `set_tx(context, ticks).await` and
 `write_cmd_with_context(context, CMD_SET_TX, bytes).await` share the guard.
-Blocking `write_cmd` rejects raw `SetTx`. Unknown commands, continuous
-carrier/preamble TX, chip sleep and duty-cycle RX are unsupported.
-Do not cancel lifecycle or verification futures: cancellation leaves
-`NeedsShutdown`, requiring explicit cleanup before another startup.
+Async `write_cmd` rejects raw `SetTx`. Both typed and raw TX require a
+nonzero 24-bit hardware timeout. Unknown commands, continuous carrier/preamble
+TX, chip sleep and duty-cycle RX are unsupported.
 
-`BaseBandModulationParams::new` selects LDRO from symbol duration. The
-published upstream driver owns its LDRO choice; inconsistent manual
-LDRO overrides are rejected. Modulation must be configured before
-packet parameters. Upstream raises SF5/SF6 preambles to twelve symbols.
-The caller must select a matching peer profile. General GFSK packet
-configuration is outside this wrapper's LoRa parameter API.
+Await every command sequence to completion. Dropping an in-flight command or
+lifecycle/verification future leaves `NeedsShutdown`. Recover caller-owned NSS
+first, then shut down and start a new session before another TX. Successful
+commands cannot repair invalidated readiness. `release` performs no I/O.
+Upstream [issue 350](https://github.com/lora-rs/lora-rs/issues/350) describes
+why command processing futures need care around cancellation.
+
+`BaseBandModulationParams::new` computes LDRO from symbol duration. The wrapper
+passes that value to upstream and rejects inconsistent manual overrides.
+Modulation must precede packet configuration. SF5/SF6 preambles are raised to
+twelve symbols. `lora_airtime_us` includes optional CRC and 16-bit preambles,
+uses u64 arithmetic, and follows
+[Semtech's airtime reference](https://github.com/Lora-net/sx126x_driver/blob/a10c5dfdf89788c6ac805e9fe98889de44175aa2/src/sx126x.c#L1084).
+Semtech attribution and license terms accompany the package in LICENSE-Semtech.
+
+`set_rf_frequency` caches the documented image-calibration band and recalibrates
+when crossing bands; startup discards that cache. Frequencies outside documented
+bands require caller-selected `calibrate_image` codes. Configure the TX clamp
+with `configure_tx_clamp` after reset, retaining the selected PA/OCP settings.
+Catalog `sx1262` §9.2.1 “Image Calibration for Specific Frequency Bands” and
+§15.2.2 “Workaround” define these operations.
+
+`poll_receive` rejects CRC/header failures before FIFO access and acknowledges
+only observed IRQ bits during continuous RX. Caller buffers may hold a preview;
+FIFO offsets wrap at 256. Timed RX completion or `stop_rx` applies the RTC
+cleanup from §15.3.2 “Workaround”, preserving unrelated event-register bits.
+Packet metrics retain half-dBm RSSI and quarter-dB SNR; whole-unit accessors
+truncate toward zero. Repeated arrivals of the same sticky IRQ bit cannot be
+distinguished by snapshots.
 
 ## Verification
 
 Host tests cover session lifetimes, cadence one/twenty/forty, raw TX
 protection, denial and recovery, rollback, shutdown evidence, BUSY/SPI/NSS
 failures, parameter bounds, chip readback and upstream modem workarounds.
-These tests establish software behavior. RF validation requires hardware.
+Pending mocks also cover yielding, cancellation, BUSY delay budgets, original
+transport/upstream errors, NSS recovery, IRQ acknowledgement, timed-RX cleanup,
+FIFO wrapping, fractional metrics, LDRO and airtime boundaries. These tests
+establish software behavior. Settling, async timing, burst reception, RF power
+and antenna performance require C153 hardware evidence.

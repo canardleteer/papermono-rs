@@ -20,7 +20,7 @@
 //!
 //! Presets remain 915.000 MHz for ping and 917.625/906.875 MHz for reception.
 //! CDC logs packet metrics and bounded preview bytes. Embassy timers yield
-//! during settling and IRQ polling; dedicated SPI transactions are blocking.
+//! during settling and IRQ polling; SPI transactions and BUSY polling also yield.
 //! Ownership and borrowing follow the
 //! [Embedded Rust Book](https://docs.rust-embedded.org/book/peripherals/borrowing.html),
 //! [Rust on ESP Book](https://docs.espressif.com/projects/rust/book/application-development/),
@@ -38,13 +38,13 @@ use esp_hal::gpio::{Input, Output};
 use esp_hal::spi::master::Spi;
 #[cfg(feature = "c153")]
 use m5stack_papermono::lora::{
-    self, PacketStatus, RadioStatus, Sx1262, CAL_IMG_902_MHZ, CAL_IMG_928_MHZ, FREQ_BENCH_PING_HZ,
-    FREQ_RX_SNIFFER_PRI_HZ, FREQ_RX_SNIFFER_SEC_HZ, IRQ_ALL, IRQ_CRC_ERR, IRQ_RX_DONE, IRQ_TIMEOUT,
-    IRQ_TX_DONE, LORA_BW_125_KHZ, LORA_BW_250_KHZ, LORA_CRC_ON, LORA_CR_4_5, LORA_HEADER_VARIABLE,
-    LORA_IQ_STANDARD, LORA_LDRO_OFF, LORA_SF11, LORA_SF7, OCP_60_MA, PACKET_TYPE_LORA,
-    PA_DEVICE_SEL_SX1262, PA_DUTY_CYCLE_14DBM, PA_HP_MAX_14DBM, PA_LUT_DEFAULT, RAMP_40_US,
-    REGULATOR_LDO, STDBY_CONFIG_RC, SYNC_WORD_ALT, SYNC_WORD_MESHTASTIC, SYNC_WORD_PRIVATE,
-    TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS,
+    self, PacketStatus, RadioStatus, ReceivePoll, Sx1262, CAL_IMG_902_MHZ, CAL_IMG_928_MHZ,
+    FREQ_BENCH_PING_HZ, FREQ_RX_SNIFFER_PRI_HZ, FREQ_RX_SNIFFER_SEC_HZ, IRQ_ALL, IRQ_CRC_ERR,
+    IRQ_RX_DONE, IRQ_TIMEOUT, IRQ_TX_DONE, LORA_BW_125_KHZ, LORA_BW_250_KHZ, LORA_CRC_ON,
+    LORA_CR_4_5, LORA_HEADER_VARIABLE, LORA_IQ_STANDARD, LORA_LDRO_OFF, LORA_SF11, LORA_SF7,
+    OCP_60_MA, PACKET_TYPE_LORA, PA_DEVICE_SEL_SX1262, PA_DUTY_CYCLE_14DBM, PA_HP_MAX_14DBM,
+    PA_LUT_DEFAULT, RAMP_40_US, REGULATOR_LDO, STDBY_CONFIG_RC, SYNC_WORD_ALT,
+    SYNC_WORD_MESHTASTIC, SYNC_WORD_PRIVATE, TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS,
 };
 #[cfg(feature = "c153")]
 use m5stack_papermono::lora::{
@@ -219,9 +219,15 @@ pub fn set_scanning(scanning: bool) {
 }
 
 #[cfg(feature = "c153")]
+/// Caller-owned resources stored between diagnostic sessions. esp-hal's Async
+/// mode is not Send; only the idle Blocking mode crosses this static mutex.
+/// On C153-Lite this container remains empty and no radio output is configured.
 struct LoraHardware {
-    spi: Spi<'static, esp_hal::Blocking>,
+    /// SPI3 resource, temporarily taken by AsyncSpiLease while a session runs.
+    spi: Option<Spi<'static, esp_hal::Blocking>>,
+    /// NSS output retained for recovery after an interrupted device transaction.
     nss: Output<'static>,
+    /// BUSY input on GPIO21, without an internal pull.
     busy: Input<'static>,
 }
 
@@ -250,7 +256,11 @@ pub async fn init_hardware(
     busy: Input<'static>,
 ) {
     let mut lock = LORA_HW.lock().await;
-    *lock = Some(LoraHardware { spi, nss, busy });
+    *lock = Some(LoraHardware {
+        spi: Some(spi),
+        nss,
+        busy,
+    });
 }
 
 /// Retrieves the current snapshot of the LoRa card UI state.
@@ -351,23 +361,105 @@ pub fn control_failed() -> bool {
 
 /// Borrowed SPI3 transport and PaperMono hooks. System I2C is not stored here.
 #[cfg(feature = "c153")]
-type Radio<'a> = Sx1262<
-    &'a mut Spi<'static, esp_hal::Blocking>,
+type RadioDevice<'a> = embedded_hal_bus::spi::ExclusiveDevice<
+    AsyncSpiLease<'a>,
     &'a mut Output<'static>,
-    &'a mut Input<'static>,
-    RadioHooks,
+    embassy_time::Delay,
 >;
+/// Borrowed async SPI device, BUSY, cooperative delay and board lifecycle hooks.
+/// The device owns NSS only for this session; LoraHardware retains the pin.
+#[cfg(feature = "c153")]
+type Radio<'a> = Sx1262<RadioDevice<'a>, &'a mut Input<'static>, embassy_time::Delay, RadioHooks>;
+/// Complete SPI-device error, including NSS, retained by the chip wrapper.
+#[cfg(feature = "c153")]
+type ChipError =
+    SxError<embedded_hal_bus::spi::DeviceError<esp_hal::spi::Error, core::convert::Infallible>>;
 
-/// Constructs a radio wrapper without GPIO/SPI transactions. The caller's existing
-/// Embassy mutex guard excludes other users of SPI3 for this diagnostic session.
+/// Re-establishes NSS high before recovery and composes borrowed async SPI/NSS.
+/// The SPI3 mutex excludes other callers. No command future is raced against a
+/// timer: user stop requests are checked only between completed sequences.
 #[cfg(feature = "c153")]
 fn session(hw: &mut LoraHardware) -> Radio<'_> {
-    Sx1262::with_hooks(
-        &mut hw.spi,
+    // ExclusiveDevice::new drives NSS high even if a previous future was dropped
+    // mid-transaction. The retained cleanup flag then forces shutdown/startup.
+    let device = embedded_hal_bus::spi::ExclusiveDevice::new(
+        AsyncSpiLease::new(&mut hw.spi),
         &mut hw.nss,
+        embassy_time::Delay,
+    )
+    .expect("infallible NSS output");
+    Sx1262::with_hooks(
+        device,
         &mut hw.busy,
+        embassy_time::Delay,
         RadioHooks::new(report_antenna),
     )
+}
+
+/// Owns async SPI3 for one session and restores idle mode on Drop, including
+/// cancellation. This mode conversion follows esp-hal's single-core async
+/// ownership rule; it does not run a command or change antenna/power controls.
+#[cfg(feature = "c153")]
+struct AsyncSpiLease<'a> {
+    /// Async peripheral, always Some until Drop transfers it back to the slot.
+    spi: Option<Spi<'static, esp_hal::Async>>,
+    /// Vacant caller-owned storage behind the already-held SPI3 mutex guard.
+    slot: &'a mut Option<Spi<'static, esp_hal::Blocking>>,
+}
+#[cfg(feature = "c153")]
+impl<'a> AsyncSpiLease<'a> {
+    /// Takes the idle peripheral. Exclusivity guarantees the slot is populated.
+    fn new(slot: &'a mut Option<Spi<'static, esp_hal::Blocking>>) -> Self {
+        let spi = slot
+            .take()
+            .expect("SPI3 lease returned by previous session")
+            .into_async();
+        Self {
+            spi: Some(spi),
+            slot,
+        }
+    }
+    /// Borrows the active async peripheral; the lease keeps it alive until Drop.
+    fn spi(&mut self) -> &mut Spi<'static, esp_hal::Async> {
+        self.spi.as_mut().expect("active SPI3 lease")
+    }
+}
+#[cfg(feature = "c153")]
+impl Drop for AsyncSpiLease<'_> {
+    /// Returns ownership to the mutex's idle slot. NSS is re-established at the
+    /// next session boundary, before the remembered shutdown recovery runs.
+    fn drop(&mut self) {
+        if let Some(spi) = self.spi.take() {
+            *self.slot = Some(spi.into_blocking());
+        }
+    }
+}
+#[cfg(feature = "c153")]
+impl embedded_hal::spi::ErrorType for AsyncSpiLease<'_> {
+    type Error = esp_hal::spi::Error;
+}
+#[cfg(feature = "c153")]
+impl embedded_hal_async::spi::SpiBus for AsyncSpiLease<'_> {
+    /// Reads SPI3 asynchronously; returns the original HAL error.
+    async fn read(&mut self, data: &mut [u8]) -> Result<(), Self::Error> {
+        embedded_hal_async::spi::SpiBus::read(self.spi(), data).await
+    }
+    /// Writes SPI3 asynchronously; device-level NSS remains in ExclusiveDevice.
+    async fn write(&mut self, data: &[u8]) -> Result<(), Self::Error> {
+        embedded_hal_async::spi::SpiBus::write(self.spi(), data).await
+    }
+    /// Exchanges separate slices asynchronously without allocating a buffer.
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        embedded_hal_async::spi::SpiBus::transfer(self.spi(), read, write).await
+    }
+    /// Exchanges one caller-owned slice asynchronously, propagating HAL failures.
+    async fn transfer_in_place(&mut self, data: &mut [u8]) -> Result<(), Self::Error> {
+        embedded_hal_async::spi::SpiBus::transfer_in_place(self.spi(), data).await
+    }
+    /// Awaits idle SPI3 before ExclusiveDevice raises NSS, including on errors.
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        embedded_hal_async::spi::SpiBus::flush(self.spi()).await
+    }
 }
 
 /// Lends system I2C for one control operation and uses Embassy's upstream DelayNs
@@ -439,7 +531,7 @@ fn report_failure(
 /// Classifies lifecycle errors without discarding the original readback reason.
 /// Board bus errors are distinguished from chip SPI/BUSY failures on serial.
 #[cfg(feature = "c153")]
-fn session_failure<S, H>(error: &SessionError<S, H>) -> papermono_log::LoraFailure {
+fn session_failure<S, H, B>(error: &SessionError<S, H, B>) -> papermono_log::LoraFailure {
     use papermono_log::LoraFailure;
     match error {
         SessionError::TxDenied | SessionError::NotActive | SessionError::RecoveryRequired => {
@@ -542,17 +634,28 @@ pub async fn probe_and_park(i2c: &mut ioe::SysI2c) -> bool {
     if !start_radio(&mut sx, i2c).await {
         return false;
     }
-    let status_res = sx.get_status();
+    let status_res = sx.get_status().await;
 
     let success = match status_res {
         Ok(status) if status.is_ok() => {
             let raw = status.raw;
             LORA_RAW_STATUS.store(raw, Ordering::Release);
             init_status(true);
-            let _ = sx.set_standby(STDBY_CONFIG_RC);
+            if sx.stop_rx().await.is_err() {
+                report_failure(
+                    &sx,
+                    papermono_log::LoraPhase::Shutdown,
+                    papermono_log::LoraFailure::Chip,
+                );
+            }
             true
         }
         _ => {
+            report_failure(
+                &sx,
+                papermono_log::LoraPhase::Startup,
+                papermono_log::LoraFailure::Chip,
+            );
             init_status(false);
             false
         }
@@ -595,17 +698,18 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
         return None;
     }
 
-    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+    let setup = async {
         // 1. Enter Standby RC:
-        sx.set_standby(STDBY_CONFIG_RC)?;
-        sx.set_regulator_mode(REGULATOR_LDO)?;
-        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
-        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
-        sx.set_dio2_as_rf_switch_ctrl(true)?;
+        sx.set_standby(STDBY_CONFIG_RC).await?;
+        sx.set_regulator_mode(REGULATOR_LDO).await?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)
+            .await?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ).await?;
+        sx.set_dio2_as_rf_switch_ctrl(true).await?;
 
         // 2. Configure LoRa modem on 915.000 MHz:
-        sx.set_packet_type(PACKET_TYPE_LORA)?;
-        sx.set_rf_frequency(FREQ_BENCH_PING_HZ)?;
+        sx.set_packet_type(PACKET_TYPE_LORA).await?;
+        sx.set_rf_frequency(FREQ_BENCH_PING_HZ).await?;
 
         // 3. Retained PA profile, +14 power command and 60 mA OCP code:
         sx.set_pa_config(
@@ -613,12 +717,15 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
             PA_HP_MAX_14DBM,
             PA_DEVICE_SEL_SX1262,
             PA_LUT_DEFAULT,
-        )?;
-        sx.set_tx_params(14, RAMP_40_US)?;
-        sx.set_ocp(OCP_60_MA)?;
+        )
+        .await?;
+        sx.set_tx_params(14, RAMP_40_US).await?;
+        sx.set_ocp(OCP_60_MA).await?;
+        sx.configure_tx_clamp().await?;
 
         // 4. Modulation & Packet format:
-        sx.set_lora_modulation_params(LORA_SF7, LORA_BW_125_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
+        sx.set_lora_modulation_params(LORA_SF7, LORA_BW_125_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)
+            .await?;
         let payload = b"PAPEBENCH-PING#001";
         sx.set_lora_packet_params(
             8,
@@ -626,19 +733,22 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
             payload.len() as u8,
             LORA_CRC_ON,
             LORA_IQ_STANDARD,
-        )?;
-        sx.set_lora_sync_word(SYNC_WORD_PRIVATE)?;
+        )
+        .await?;
+        sx.set_lora_sync_word(SYNC_WORD_PRIVATE).await?;
 
         // 5. Load FIFO buffer:
-        sx.set_buffer_base_address(0x00, 0x00)?;
-        sx.write_buffer(0x00, payload)?;
+        sx.set_buffer_base_address(0x00, 0x00).await?;
+        sx.write_buffer(0x00, payload).await?;
 
         // 6. Arm TX IRQ:
-        sx.clear_irq_status(IRQ_ALL)?;
-        sx.set_dio_irq_params(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE, 0, 0)?;
+        sx.clear_irq_status(IRQ_ALL).await?;
+        sx.set_dio_irq_params(IRQ_TX_DONE | IRQ_TIMEOUT, IRQ_TX_DONE, 0, 0)
+            .await?;
 
-        Ok(())
-    })();
+        Ok::<(), ChipError>(())
+    }
+    .await;
     if setup.is_err() {
         report_failure(
             &sx,
@@ -651,29 +761,43 @@ pub async fn transmit_ping(i2c: &mut ioe::SysI2c) -> Option<papermono_log::LoraT
 
     // 7. Initiate single burst transmission:
     let start = Instant::now();
-    if let Err(error) = sx.set_tx(&mut context(i2c), 0).await {
+    if let Err(error) = sx
+        .set_tx(&mut context(i2c), TX_COMPLETION_MS * RTC_TICKS_PER_MS)
+        .await
+    {
         let reason = session_failure(&error);
         report_failure(&sx, papermono_log::LoraPhase::BeforeTx, reason);
         stop_radio(&mut sx, i2c).await;
         return None;
-    } // Zero disables the chip timer; this diagnostic polls for TxDone.
+    } // The same 300 ms budget bounds both chip TX and completion polling.
 
     let mut confirmed = false;
-    for _ in 0..60 {
+    let mut failure = papermono_log::LoraFailure::Timeout;
+    while start.elapsed() < Duration::from_millis(u64::from(TX_COMPLETION_MS)) {
         Timer::after(Duration::from_millis(5)).await;
-        if let Ok(irq) = sx.get_irq_status() {
-            if irq & IRQ_TX_DONE != 0 {
+        match sx.get_irq_status().await {
+            Ok(irq) if irq & IRQ_TIMEOUT != 0 => {
+                break;
+            }
+            Ok(irq) if irq & IRQ_TX_DONE != 0 => {
                 confirmed = true;
                 break;
             }
+            Ok(_) => {}
+            Err(_) => {
+                failure = papermono_log::LoraFailure::Chip;
+                break;
+            }
         }
+    }
+    if !confirmed {
+        report_failure(&sx, papermono_log::LoraPhase::BeforeTx, failure);
     }
     let elapsed = start.elapsed();
     let elapsed_ms = elapsed.as_millis() as u32;
 
     // 8. Immediately return to standby and park the hardware rails:
-    let _ = sx.set_standby(STDBY_CONFIG_RC);
-    let cleanup_ok = stop_radio(&mut sx, i2c).await;
+    let cleanup_ok = finish_radio(&mut sx, i2c).await;
 
     let sample = papermono_log::LoraTxSample {
         freq_khz: FREQ_BENCH_PING_HZ / 1_000,
@@ -700,7 +824,9 @@ pub async fn transmit_ping(_i2c: &mut crate::ioe::SysI2c) -> Option<papermono_lo
 }
 
 /// Listens for incoming LoRa packets on the sniffer frequency for up to 60 seconds,
-/// or until cancelled by button press or screen tap. Records ambient noise floor if quiet.
+/// or until a stop request from a button press or screen tap. Records measured
+/// ambient noise when quiet; returns an error on chip/control failure, with CDC
+/// warning and cleanup. Stop requests are observed between awaited sequences.
 ///
 /// # Hardware Sequencing
 /// 1. Engages antenna via M5IOE1 `PYG2`, powers module via M5PM1 `G2`, and releases reset.
@@ -719,9 +845,9 @@ pub async fn listen_rx(
     btn_a: &esp_hal::gpio::Input<'static>,
     btn_b: &esp_hal::gpio::Input<'static>,
     tp: &esp_hal::gpio::Input<'static>,
-) -> Result<Option<papermono_log::LoraRxSample>, i16> {
+) -> Result<Option<papermono_log::LoraRxSample>, ()> {
     let mut lock = LORA_HW.lock().await;
-    let hw = lock.as_mut().ok_or(-120i16)?;
+    let hw = lock.as_mut().ok_or(())?;
 
     // Alternate sniffer frequency on consecutive taps:
     let slot = LORA_SNIFFER_SLOT.fetch_xor(1, Ordering::Relaxed);
@@ -735,37 +861,42 @@ pub async fn listen_rx(
 
     let mut sx = session(hw);
     if !start_radio(&mut sx, i2c).await {
-        return Err(-120);
+        return Err(());
     }
 
-    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+    let setup = async {
         // 1. Enter Standby RC:
-        sx.set_standby(STDBY_CONFIG_RC)?;
-        sx.set_regulator_mode(REGULATOR_LDO)?;
-        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
-        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
-        sx.set_dio2_as_rf_switch_ctrl(true)?;
+        sx.set_standby(STDBY_CONFIG_RC).await?;
+        sx.set_regulator_mode(REGULATOR_LDO).await?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)
+            .await?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ).await?;
+        sx.set_dio2_as_rf_switch_ctrl(true).await?;
 
         // 2. Configure receiver parameters: SF11, BW 250 kHz (Meshtastic LongFast standard)
-        sx.set_packet_type(PACKET_TYPE_LORA)?;
-        sx.set_rf_frequency(target_freq)?;
-        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
-        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)?;
-        sx.set_lora_sync_word(SYNC_WORD_ALT)?;
+        sx.set_packet_type(PACKET_TYPE_LORA).await?;
+        sx.set_rf_frequency(target_freq).await?;
+        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)
+            .await?;
+        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)
+            .await?;
+        sx.set_lora_sync_word(SYNC_WORD_ALT).await?;
 
         // 3. Clear IRQs and start continuous reception (0xFFFFFF = Rx Continuous):
-        sx.clear_irq_status(IRQ_ALL)?;
+        sx.clear_irq_status(IRQ_ALL).await?;
         sx.set_dio_irq_params(
             IRQ_RX_DONE | IRQ_TIMEOUT | IRQ_CRC_ERR | lora::IRQ_HEADER_ERR,
             IRQ_RX_DONE,
             0,
             0,
-        )?;
-        sx.set_buffer_base_address(0x00, 0x00)?;
-        sx.set_rx(0xFFFFFF)?;
+        )
+        .await?;
+        sx.set_buffer_base_address(0x00, 0x00).await?;
+        sx.set_rx(0xFFFFFF).await?;
 
-        Ok(())
-    })();
+        Ok::<(), ChipError>(())
+    }
+    .await;
     if setup.is_err() {
         report_failure(
             &sx,
@@ -773,7 +904,7 @@ pub async fn listen_rx(
             papermono_log::LoraFailure::Chip,
         );
         stop_radio(&mut sx, i2c).await;
-        return Err(-120);
+        return Err(());
     }
 
     // 4. Debounce initial tap: wait until finger is lifted off glass (up to 400 ms)
@@ -785,48 +916,35 @@ pub async fn listen_rx(
     }
 
     // 5. Polling window (up to 60 seconds: 1200 x 50 ms):
-    let mut rx_done = false;
+    let mut received = None;
+    let mut preview_buf = [0; 4];
     for _ in 0..1200 {
         Timer::after(Duration::from_millis(50)).await;
-
-        if let Ok(irq) = sx.get_irq_status() {
-            if irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) != 0 {
-                let _ = sx.clear_irq_status(IRQ_ALL);
-            }
-            if irq & IRQ_RX_DONE != 0 && irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) == 0 {
-                rx_done = true;
+        match sx.poll_receive(&mut preview_buf).await {
+            Ok(ReceivePoll::Packet { len, status, .. }) => {
+                received = Some((len, status));
                 break;
             }
+            Ok(ReceivePoll::Pending | ReceivePoll::Rejected { .. }) => {}
+            Ok(ReceivePoll::Timeout { .. }) | Err(_) => {
+                report_failure(
+                    &sx,
+                    papermono_log::LoraPhase::Startup,
+                    papermono_log::LoraFailure::Chip,
+                );
+                stop_radio(&mut sx, i2c).await;
+                return Err(());
+            }
         }
-
         if btn_a.is_low() || btn_b.is_low() || tp.is_low() {
             break;
         }
     }
 
-    if rx_done {
+    if let Some((len, pkt_status)) = received {
         crate::beep::tone(80);
-        let (len, start_ptr) = sx.get_rx_buffer_status().unwrap_or((0, 0));
-        let pkt_status = sx.get_packet_status().unwrap_or(PacketStatus {
-            rssi_pkt_dbm: -100,
-            snr_pkt_db: 0,
-            signal_rssi_pkt_dbm: -100,
-        });
-
-        let mut preview_buf = [0u8; 4];
-        let _ = sx.read_buffer(start_ptr, &mut preview_buf);
-
-        let _ = sx.set_standby(STDBY_CONFIG_RC);
-        let cleanup_ok = stop_radio(&mut sx, i2c).await;
-
-        let sample = papermono_log::LoraRxSample {
-            freq_khz: target_freq / 1_000,
-            rssi: pkt_status.rssi_pkt_dbm,
-            snr: pkt_status.snr_pkt_db,
-            len,
-            first_byte: preview_buf[0],
-            last_byte: preview_buf[3.min((len as usize).saturating_sub(1))],
-        };
+        let sample = packet_sample(target_freq, len, pkt_status, preview_buf);
+        let cleanup_ok = finish_radio(&mut sx, i2c).await;
 
         LORA_FREQ_KHZ.store(sample.freq_khz, Ordering::Release);
         LORA_RSSI.store(sample.rssi, Ordering::Release);
@@ -841,14 +959,23 @@ pub async fn listen_rx(
         if cleanup_ok {
             Ok(Some(sample))
         } else {
-            Err(-120)
+            Err(())
         }
     } else {
-        // Measure ambient noise floor:
-        let ambient = sx.get_rssi_inst().unwrap_or(-115);
-
-        let _ = sx.set_standby(STDBY_CONFIG_RC);
-        let cleanup_ok = stop_radio(&mut sx, i2c).await;
+        // A failed signal read is an operation error, never an ambient value.
+        let ambient = match sx.get_rssi_inst().await {
+            Ok(value) => value,
+            Err(_) => {
+                report_failure(
+                    &sx,
+                    papermono_log::LoraPhase::Startup,
+                    papermono_log::LoraFailure::Chip,
+                );
+                stop_radio(&mut sx, i2c).await;
+                return Err(());
+            }
+        };
+        let cleanup_ok = finish_radio(&mut sx, i2c).await;
 
         LORA_FREQ_KHZ.store(target_freq / 1_000, Ordering::Release);
         LORA_RSSI.store(ambient, Ordering::Release);
@@ -857,7 +984,7 @@ pub async fn listen_rx(
         if cleanup_ok {
             Ok(None)
         } else {
-            Err(-120)
+            Err(())
         }
     }
 }
@@ -869,8 +996,8 @@ pub async fn listen_rx(
     _btn_a: &esp_hal::gpio::Input<'static>,
     _btn_b: &esp_hal::gpio::Input<'static>,
     _tp: &esp_hal::gpio::Input<'static>,
-) -> Result<Option<papermono_log::LoraRxSample>, i16> {
-    Err(-120)
+) -> Result<Option<papermono_log::LoraRxSample>, ()> {
+    Err(())
 }
 
 /// Executes a full sweep across the US915 band (104 channels, 902.125 MHz to 927.875 MHz).
@@ -881,7 +1008,8 @@ pub async fn listen_rx(
 /// - Queries instantaneous RSSI (Semtech SX1262 Section 13.5.4 "GetRssiInst").
 /// - Emits acoustic feedback via GPIO42 passive buzzer: 25 ms chirp on elevated RSSI
 ///   (above -105 dBm) and 80 ms tone on packet detection.
-/// - Parks transceiver and powers down rails upon completion or cancellation.
+/// - Parks transceiver and powers down rails after completion, a stop request,
+///   or an operation failure. Await each SPI sequence before observing a stop.
 #[cfg(feature = "c153")]
 pub async fn run_scan_sweep(
     i2c: &mut ioe::SysI2c,
@@ -911,20 +1039,24 @@ pub async fn run_scan_sweep(
         return false;
     }
 
-    let setup = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+    let setup = async {
         // Initial transceiver configuration:
-        sx.set_standby(STDBY_CONFIG_RC)?;
-        sx.set_regulator_mode(REGULATOR_LDO)?;
-        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)?;
-        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ)?;
-        sx.set_dio2_as_rf_switch_ctrl(true)?;
-        sx.set_packet_type(PACKET_TYPE_LORA)?;
-        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)?;
-        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)?;
-        sx.set_lora_sync_word(SYNC_WORD_MESHTASTIC)?;
+        sx.set_standby(STDBY_CONFIG_RC).await?;
+        sx.set_regulator_mode(REGULATOR_LDO).await?;
+        sx.set_dio3_as_tcxo_ctrl(TCXO_CTRL_3_0V, TCXO_DEFAULT_DELAY_TICKS)
+            .await?;
+        sx.calibrate_image(CAL_IMG_902_MHZ, CAL_IMG_928_MHZ).await?;
+        sx.set_dio2_as_rf_switch_ctrl(true).await?;
+        sx.set_packet_type(PACKET_TYPE_LORA).await?;
+        sx.set_lora_modulation_params(LORA_SF11, LORA_BW_250_KHZ, LORA_CR_4_5, LORA_LDRO_OFF)
+            .await?;
+        sx.set_lora_packet_params(16, LORA_HEADER_VARIABLE, 255, LORA_CRC_ON, LORA_IQ_STANDARD)
+            .await?;
+        sx.set_lora_sync_word(SYNC_WORD_MESHTASTIC).await?;
 
-        Ok(())
-    })();
+        Ok::<(), ChipError>(())
+    }
+    .await;
     if setup.is_err() {
         report_failure(
             &sx,
@@ -965,20 +1097,23 @@ pub async fn run_scan_sweep(
         }
 
         let freq_hz = m5stack_papermono::lora::us915_channel_freq_hz(slot);
-        let channel = (|| -> Result<(), SxError<esp_hal::spi::Error>> {
+        let channel = async {
             // Standby changes only the chip mode; PYG2 stays high for this sweep.
-            sx.set_standby(STDBY_CONFIG_RC)?;
-            sx.set_rf_frequency(freq_hz)?;
-            sx.clear_irq_status(IRQ_ALL)?;
+            sx.set_standby(STDBY_CONFIG_RC).await?;
+            sx.set_rf_frequency(freq_hz).await?;
+            sx.clear_irq_status(IRQ_ALL).await?;
             sx.set_dio_irq_params(
                 IRQ_RX_DONE | IRQ_TIMEOUT | IRQ_CRC_ERR | lora::IRQ_HEADER_ERR,
                 IRQ_RX_DONE,
                 0,
                 0,
-            )?;
-            sx.set_buffer_base_address(0x00, 0x00)?;
-            sx.set_rx(0xFFFFFF)
-        })();
+            )
+            .await?;
+            sx.set_buffer_base_address(0x00, 0x00).await?;
+            sx.set_rx(0xFFFFFF).await?;
+            Ok::<(), ChipError>(())
+        }
+        .await;
         if channel.is_err() {
             report_failure(
                 &sx,
@@ -994,36 +1129,41 @@ pub async fn run_scan_sweep(
         let dwell_ms = if is_expected { 25 } else { 10 };
         Timer::after(Duration::from_millis(dwell_ms)).await;
 
-        let rssi = sx.get_rssi_inst().unwrap_or(-120);
-
+        let mut preview = [0; 4];
+        let readings = async {
+            let rssi = sx.get_rssi_inst().await?;
+            let packet = sx.poll_receive(&mut preview).await?;
+            Ok::<_, ChipError>((rssi, packet))
+        }
+        .await;
+        let (rssi, packet) = match readings {
+            Ok(value) => value,
+            Err(_) => {
+                report_failure(
+                    &sx,
+                    papermono_log::LoraPhase::Startup,
+                    papermono_log::LoraFailure::Chip,
+                );
+                stopped = true;
+                break;
+            }
+        };
         let mut hit = false;
         let mut packet_received = false;
         let mut sample_opt = None;
-
-        if let Ok(irq) = sx.get_irq_status() {
-            if irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) != 0 {
-                let _ = sx.clear_irq_status(IRQ_ALL);
-            }
-            if irq & IRQ_RX_DONE != 0 && irq & (IRQ_CRC_ERR | lora::IRQ_HEADER_ERR) == 0 {
-                hit = true;
-                packet_received = true;
-                let (len, start_ptr) = sx.get_rx_buffer_status().unwrap_or((0, 0));
-                let pkt_status = sx.get_packet_status().unwrap_or(PacketStatus {
-                    rssi_pkt_dbm: rssi,
-                    snr_pkt_db: 0,
-                    signal_rssi_pkt_dbm: rssi,
-                });
-                let mut preview_buf = [0u8; 4];
-                let _ = sx.read_buffer(start_ptr, &mut preview_buf);
-                sample_opt = Some(papermono_log::LoraRxSample {
-                    freq_khz: freq_hz / 1_000,
-                    rssi: pkt_status.rssi_pkt_dbm,
-                    snr: pkt_status.snr_pkt_db,
-                    len,
-                    first_byte: preview_buf[0],
-                    last_byte: preview_buf[3.min((len as usize).saturating_sub(1))],
-                });
-            }
+        if let ReceivePoll::Packet { len, status, .. } = packet {
+            hit = true;
+            packet_received = true;
+            sample_opt = Some(packet_sample(freq_hz, len, status, preview));
+        }
+        if matches!(packet, ReceivePoll::Timeout { .. }) {
+            report_failure(
+                &sx,
+                papermono_log::LoraPhase::Startup,
+                papermono_log::LoraFailure::Chip,
+            );
+            stopped = true;
+            break;
         }
 
         if rssi > -105 {
@@ -1068,8 +1208,7 @@ pub async fn run_scan_sweep(
         Timer::after(Duration::from_millis(2)).await;
     }
 
-    let _ = sx.set_standby(STDBY_CONFIG_RC);
-    let cleanup_ok = stop_radio(&mut sx, i2c).await;
+    let cleanup_ok = finish_radio(&mut sx, i2c).await;
 
     stopped |= !cleanup_ok;
     SCAN_DATA.lock(|cell| {
@@ -1106,4 +1245,53 @@ pub async fn run_scan_sweep(
     _tp: &esp_hal::gpio::Input<'static>,
 ) -> bool {
     false
+}
+
+/// Existing ping completion limit, now also programmed into the hardware timer.
+/// Catalog `sx1262` §13.1.4 “SetTx”; 300 ms bounds this diagnostic.
+#[cfg(feature = "c153")]
+const TX_COMPLETION_MS: u32 = 300;
+/// RTC ticks per millisecond (15.625 us each), same SetTx section.
+#[cfg(feature = "c153")]
+const RTC_TICKS_PER_MS: u32 = 64;
+
+/// Stops chip reception and then shuts down board controls even if chip I/O
+/// fails. The return combines both results, and failures remain visible on CDC.
+#[cfg(feature = "c153")]
+async fn finish_radio(sx: &mut Radio<'_>, i2c: &mut ioe::SysI2c) -> bool {
+    let chip_ok = sx.stop_rx().await.is_ok();
+    if !chip_ok {
+        report_failure(
+            sx,
+            papermono_log::LoraPhase::Shutdown,
+            papermono_log::LoraFailure::Chip,
+        );
+    }
+    let cleanup_ok = stop_radio(sx, i2c).await;
+    chip_ok && cleanup_ok
+}
+
+/// Emits lossless half-dBm/quarter-dB metrics, then builds the existing whole-unit
+/// RX record. Preview bytes beyond the chip length stay zero in the stack buffer.
+#[cfg(feature = "c153")]
+fn packet_sample(
+    freq: u32,
+    len: u8,
+    status: PacketStatus,
+    preview: [u8; 4],
+) -> papermono_log::LoraRxSample {
+    crate::cdc::lora_metrics(&papermono_log::LoraMetricsSample {
+        freq_khz: freq / 1_000,
+        rssi_half_dbm: status.rssi_pkt_half_dbm,
+        snr_quarter_db: status.snr_pkt_quarter_db,
+        signal_rssi_half_dbm: status.signal_rssi_pkt_half_dbm,
+    });
+    papermono_log::LoraRxSample {
+        freq_khz: freq / 1_000,
+        rssi: status.rssi_pkt_dbm(),
+        snr: status.snr_pkt_db(),
+        len,
+        first_byte: preview[0],
+        last_byte: preview[3.min(usize::from(len).saturating_sub(1))],
+    }
 }

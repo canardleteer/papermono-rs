@@ -71,3 +71,8 @@ attempt/check/failure counters and the cleanup result. Both line kinds
 are classified by the host parser and tested with fixed buffer limits.
 These records describe digital control evidence. RF validation requires hardware
 measurements.
+
+`lora_metrics` preserves packet RSSI in half-dBm and SNR in quarter-dB units
+using scaled integers. `lora_rx` and `lora_scan` keep their whole-unit formats.
+The host parser recognizes the typed metrics record; formatting is tested at
+maximum field widths against its fixed buffer capacity.
