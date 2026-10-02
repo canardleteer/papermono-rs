@@ -137,10 +137,16 @@ its wiring references.
 
 ## PaperMono LoRa startup timing
 
-The official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp)
-raises the rail before setting antenna-high/reset-low, waits 100 ms,
-releases reset and waits 20 ms. The lifecycle wrapper asserts reset
-before raising antenna/rail and retains this repository's existing
-15 ms rail and 20 ms boot waits. BUSY readiness and digital readback
-provide software checks; they do not prove electrical settling under
-all supply conditions. The shorter retained delay requires C153 evidence.
+The current [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora)
+`enableLoRaHardware` (reviewed 2026-10-01) enables the rail and waits
+200 ms before asserting reset, holds it low for 100 ms, then waits
+200 ms after release. The C153 lifecycle follows these reset timings.
+Host mocks check rail-first operation order and all three waits; BUSY
+readiness and digital readback do not prove settling across supply conditions.
+
+The older [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107/main/hal/hal_lora.cpp)
+(reviewed V1.2, 2026-08-10) enables the rail before antenna-high/reset-low,
+holds reset for 100 ms and waits 20 ms after release. That dated sequence
+is comparison evidence. Physical confirmation of the new lifecycle remains
+open under
+[nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).

@@ -43,10 +43,12 @@ sampled level. Fresh confirmation precedes each TX at the initial
 interval of one. A denial, mismatch or readback error blocks TX and
 requires shutdown/startup recovery. Digital readback confirms the
 control signal; it cannot measure the RF path. DIO2 switching is a
-separate SX1262 function. The sequence follows the official
-[M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp).
-The new lifecycle readback policy has host tests and awaits physical
-validation on `C153`.
+separate SX1262 function. Startup follows the current official
+[M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora):
+enable the rail, wait 200 ms, assert reset for 100 ms with antenna control
+high, then release reset and wait 200 ms before BUSY readiness.
+Host mocks check ordering, delays and readback; physical settling and RF
+validation remain open on `C153`.
 
 Chip operations await async `SpiDevice`, BUSY and caller-supplied delay.
 Firmware owns NSS composition and recovery. Cancellation invalidates readiness;

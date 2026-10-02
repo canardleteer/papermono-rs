@@ -164,6 +164,9 @@ re-exports preserve imports; PaperMono pins/presets and `RadioHooks` stay in
 Borrow system I2C only for control and verification operations. Keep
 synchronization in firmware. Startup and shutdown always confirm antenna
 mode, drive, latch and sampled level; initial pre-TX cadence is one.
+Startup uses the current PaperMono LoRa tutorial's rail-first 200 ms
+wait, 100 ms reset assertion and 200 ms after release, then BUSY readiness.
+Host mocks check the timing; physical C153 confirmation remains open.
 Twenty or forty needs deliberate configuration and C153 evidence.
 Failures warn on serial, block TX and run cleanup. Session summaries
 report verification counts. Both short and sustained sessions keep

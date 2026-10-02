@@ -58,6 +58,10 @@ Lend system I2C only during startup, shutdown and scheduled TX checks.
 Keep the existing on-demand ping, receive-window and sweep lifetimes.
 One active wrapper also supports sustained operation without antenna
 control changes between packets, standby or channel changes.
+Startup follows the current PaperMono LoRa tutorial's rail-first
+200 ms wait, 100 ms reset assertion and 200 ms after release, then
+BUSY readiness. These timings have host mock coverage; C153 physical
+confirmation remains open.
 
 Initial verification interval is one. Failures emit typed `lora_control`
 warnings, invalidate readiness and run cleanup; `lora_session` totals

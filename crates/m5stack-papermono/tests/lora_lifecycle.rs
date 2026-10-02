@@ -15,7 +15,8 @@ struct Model {
     pointer: u8,
     writes: Vec<(u8, u8, u8)>,
     delays: Vec<u32>,
-    events: Vec<&'static str>,
+    events: Vec<(&'static str, u32)>,
+    elapsed_ms: u32,
     fail_next: bool,
     fail_read: Option<u8>,
     sampled: Option<bool>,
@@ -29,6 +30,7 @@ impl Default for Model {
             writes: vec![],
             delays: vec![],
             events: vec![],
+            elapsed_ms: 0,
             fail_next: false,
             fail_read: None,
             sampled: None,
@@ -47,9 +49,10 @@ impl i2c::I2c for Bus {
         operations: &mut [Operation<'_>],
     ) -> Result<(), Self::Error> {
         let mut model = self.0.borrow_mut();
+        let elapsed_ms = model.elapsed_ms;
         if model.fail_next {
             model.fail_next = false;
-            model.events.push("failed");
+            model.events.push(("failed", elapsed_ms));
             return Err(i2c::ErrorKind::Other);
         }
         for op in operations {
@@ -62,27 +65,30 @@ impl i2c::I2c for Bus {
                         if address == addresses::M5IOE1 {
                             model.expander[usize::from(reg)] = byte;
                             if reg == m5ioe1::GPIO_O_H {
-                                model.events.push(if byte & 2 == 0 {
+                                let event = if byte & 2 == 0 {
                                     "reset-low"
                                 } else {
                                     "reset-high"
-                                });
+                                };
+                                model.events.push((event, elapsed_ms));
                             }
                             if reg == m5ioe1::GPIO_O_L {
-                                model.events.push(if byte & 2 == 0 {
+                                let event = if byte & 2 == 0 {
                                     "antenna-low"
                                 } else {
                                     "antenna-high"
-                                });
+                                };
+                                model.events.push((event, elapsed_ms));
                             }
                         } else {
                             model.pmic[usize::from(reg)] = byte;
                             if reg == m5pm1::GPIO_OUT {
-                                model.events.push(if byte & 4 == 0 {
+                                let event = if byte & 4 == 0 {
                                     "rail-low"
                                 } else {
                                     "rail-high"
-                                });
+                                };
+                                model.events.push((event, elapsed_ms));
                             }
                         }
                     }
@@ -120,7 +126,9 @@ impl embedded_hal_async::delay::DelayNs for Delay {
     async fn delay_ns(&mut self, ns: u32) {
         let mut model = self.0.borrow_mut();
         model.delays.push(ns / 1_000_000);
-        model.events.push("delay");
+        let elapsed_ms = model.elapsed_ms;
+        model.events.push(("delay", elapsed_ms));
+        model.elapsed_ms += ns / 1_000_000;
     }
 }
 fn ready<T>(future: impl Future<Output = T>) -> T {
@@ -154,12 +162,27 @@ fn startup_and_shutdown_confirm_control_and_preserve_other_expander_pins() {
     };
     ready(hooks.startup(&mut c)).unwrap();
     assert!(ready(hooks.verify(&mut c, request(CheckPhase::Startup))).unwrap());
-    assert_eq!(model.borrow().delays, [RAIL_SETTLE_MS, BOOT_SETTLE_MS]);
+    // Literal vendor durations catch accidental changes to the named constants.
+    assert_eq!(model.borrow().delays, [200, 100, 200]);
+    assert_eq!(model.borrow().elapsed_ms, 500);
     let events = model.borrow().events.clone();
-    let first = |event| events.iter().position(|s| *s == event).unwrap();
+    let first = |event| events.iter().position(|(s, _)| *s == event).unwrap();
+    assert_eq!(events[first("rail-high")], ("rail-high", 0));
+    assert_eq!(events[first("reset-low")], ("reset-low", 200));
+    assert_eq!(events[first("reset-high")], ("reset-high", 300));
+    let delays: Vec<_> = events
+        .iter()
+        .copied()
+        .filter(|(s, _)| *s == "delay")
+        .collect();
+    assert_eq!(delays, [("delay", 0), ("delay", 200), ("delay", 300)]);
+    assert!(first("rail-high") < first("reset-low"));
     assert!(first("reset-low") < first("antenna-high"));
-    assert!(first("antenna-high") < first("rail-high"));
-    assert!(first("rail-high") < first("reset-high"));
+    assert!(first("antenna-high") < first("reset-high"));
+    // Expander helpers rewrite both banks; none may lower PYG2 once enabled.
+    assert!(!events[first("antenna-high")..]
+        .iter()
+        .any(|(s, _)| *s == "antenna-low"));
     assert_eq!(model.borrow().expander[usize::from(m5ioe1::GPIO_O_L)], 0x82);
     ready(hooks.shutdown(&mut c)).unwrap();
     assert!(ready(hooks.verify(&mut c, request(CheckPhase::Shutdown))).unwrap());
@@ -180,9 +203,28 @@ fn shutdown_attempts_antenna_and_rail_after_reset_control_fails() {
     assert!(ready(hooks.shutdown(&mut c)).is_err());
     assert!(ready(hooks.verify(&mut c, request(CheckPhase::Shutdown))).unwrap());
     let events = model.borrow().events.clone();
-    let failed = events.iter().position(|s| *s == "failed").unwrap();
-    assert!(events[failed..].contains(&"antenna-low"));
-    assert!(events[failed..].contains(&"rail-low"));
+    let failed = events.iter().position(|(s, _)| *s == "failed").unwrap();
+    assert!(events[failed..].iter().any(|(s, _)| *s == "antenna-low"));
+    assert!(events[failed..].iter().any(|(s, _)| *s == "rail-low"));
+}
+
+#[test]
+fn failed_rail_enable_does_not_start_reset_sequence() {
+    let model = Rc::new(RefCell::new(Model::default()));
+    model.borrow_mut().fail_next = true;
+    let mut bus = Bus(model.clone());
+    let mut hooks = RadioHooks::default();
+    let mut c = RadioContext {
+        i2c: &mut bus,
+        delay: Delay(model.clone()),
+        ioe_address: addresses::M5IOE1,
+    };
+    assert!(ready(hooks.startup(&mut c)).is_err());
+    assert!(model.borrow().writes.is_empty());
+    assert!(model.borrow().delays.is_empty());
+    assert_eq!(model.borrow().events, [("failed", 0)]);
+    ready(hooks.shutdown(&mut c)).unwrap();
+    assert!(ready(hooks.verify(&mut c, request(CheckPhase::Shutdown))).unwrap());
 }
 #[test]
 fn every_evidence_field_is_required_and_bus_failure_is_distinct() {

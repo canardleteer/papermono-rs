@@ -326,7 +326,10 @@ Arduino / M5PM1 docs:
 6. Touch: `PYG13` VDD, `PYG6` RST; FT6336G `0x38`; INT GPIO4.
 7. Sensors on the same I2C: BMI270 `0x68`, RX8130CE `0x32`.
 8. C153 only: ST25R3916 `0x50`, SX1262 on the LoRa GPIOs
-   after `LoRa_EN` (M5PM1 G2).
+   after `LoRa_EN` (M5PM1 G2). Current LoRa tutorial reset timing:
+   rail-first 200 ms wait, 100 ms reset assertion, 200 ms after release,
+   then BUSY readiness. Host-tested only; see
+   [Stamp LoRa-1262](resources/stamp-lora-1262.md#session-control-and-confirmation).
 
 UserDemo eval HAL
 ([user-demo.md](references/user-demo.md)): 500 ms wait,

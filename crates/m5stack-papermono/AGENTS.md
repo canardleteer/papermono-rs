@@ -54,8 +54,11 @@ PaperMono-Lite (`C153-Lite`) baseline:
 `lora` re-exports `sx1262-phy`. Keep PaperMono nets and presets here;
 the generic crate delegates modem operations to revision-pinned `lora-phy`.
 `RadioHooks` takes a short `RadioContext` with borrowed I2C, discovered
-expander address and upstream async DelayNs. Startup asserts reset,
-enables antenna and rail, settles, then releases reset. Shutdown
+expander address and upstream async DelayNs. Startup enables the rail,
+waits 200 ms, asserts reset and enables antenna, holds reset 100 ms,
+then releases reset and waits 200 ms before BUSY readiness. Timing
+follows the current M5Stack PaperMono LoRa tutorial; C153 physical
+confirmation remains open. Shutdown
 asserts reset, lowers antenna and disables the rail; attempt remaining
 steps on errors. Confirm mode, push-pull drive, latch and sampled level
 at both boundaries and before TX at interval one. Keep antenna high

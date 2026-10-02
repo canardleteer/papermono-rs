@@ -26,6 +26,11 @@ require a nonzero chip timeout. Registry publication remains deferred.
 BSP pins, power sequencing and antenna confirmation remain in
 `m5stack-papermono::lora`.
 
+C153 startup follows the current M5Stack PaperMono LoRa tutorial:
+rail enabled, 200 ms settling, reset asserted for 100 ms, then 200 ms
+after release. Antenna control stays high until shutdown. Host mocks
+check ordering and durations; physical settling and RF remain open.
+
 ## SKU split
 
 Two crates, not a `lite` / `nfc` Cargo feature. They are not two

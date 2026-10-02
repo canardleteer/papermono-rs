@@ -71,19 +71,22 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
 
 ## Session control and confirmation
 
-Software policy for PaperMono (`C153`): assert `SX_NRST`, drive
-`SX_ANT_SW` high, enable `LoRa_EN`, wait the existing 15 ms rail delay,
-release reset and wait the existing 20 ms boot delay plus BUSY readiness.
+Software policy for PaperMono (`C153`): enable `LoRa_EN`, wait
+`RAIL_SETTLE_MS` (200 ms), assert `SX_NRST` and drive `SX_ANT_SW` high,
+hold reset for `RESET_HOLD_MS` (100 ms), release reset and wait
+`BOOT_SETTLE_MS` (200 ms), then check BUSY readiness. The rail-first reset
+sequence follows the current [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora)
+`enableLoRaHardware`, reviewed 2026-10-01. Host mocks check operation
+order and durations; electrical settling still needs C153 confirmation.
 Confirm antenna output mode, push-pull drive, high latch and sampled high
 before marking the session ready. Shutdown invalidates readiness first,
 asserts reset, lowers antenna control, disables the rail, then confirms
 low latch and sampled low. Remaining cleanup steps run after failures.
-Control nets and polarities follow the official
-[M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/main/main/hal/hal_lora.cpp).
-Its startup raises the rail before asserting reset and waits 100 ms before
-release, then 20 ms. This wrapper asserts reset first and retains our
-existing 15/20 ms delays. Its ordering, readback and cadence policy await
-C153 measurement; the factory delay does not validate our shorter delay.
+The older official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107/main/hal/hal_lora.cpp)
+(reviewed firmware V1.2, 2026-08-10) raises the rail, sets antenna-high
+and reset-low, waits 100 ms before release, then 20 ms afterward.
+Keep that dated sequence as comparison, rather than treating it as
+the current tutorial's timing or a measurement of the new lifecycle.
 
 Keep `SX_ANT_SW` high across RX, TX, standby and frequency changes.
 Short diagnostics stop after their operation; sustained sessions retain

@@ -55,6 +55,10 @@ USB-C-down portrait.
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
 
+On `C153`, each LoRa operation starts with about half a second of power
+settling and reset before the radio becomes ready. The antenna control
+stays enabled throughout the operation and is disabled at shutdown.
+
 ## Card walk and lamp
 
 ### Step 1: Is the port free?

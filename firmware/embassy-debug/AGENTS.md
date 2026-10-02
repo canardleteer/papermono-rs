@@ -243,6 +243,11 @@ behavior is tracked per SKU in the measurement ledger.
 On `C153`, the Stamp LoRa-1262 (Semtech SX1262) transceiver is
 exercised via two interactive cards:
 
+Both use the BSP's rail-first startup: wait 200 ms before reset,
+assert it for 100 ms, release it and wait 200 ms before BUSY readiness.
+Keep PYG2 high until shutdown and preserve the existing PA/OCP profile.
+This timing is host-tested and awaits physical C153 confirmation.
+
 1. **LoRa Sweeper (`lora_scan`)**:
    - Sweeps across all 104 US915 channels (902.125 MHz to 927.875 MHz).
    - Touch `[ START SCAN ]` to begin continuous sweeping passes (~2.5 s/pass).

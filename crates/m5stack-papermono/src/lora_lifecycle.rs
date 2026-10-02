@@ -1,7 +1,8 @@
 //! PaperMono C153 controls for a generic SX1262 session.
 //!
-//! Nets follow the official PaperMono PinMap and M5PaperMono-UserDemo
-//! `main/hal/hal_lora.cpp`. Expander readback follows catalog `m5ioe1`,
+//! Nets follow the official PaperMono PinMap; reset timing follows the
+//! [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora)
+//! `enableLoRaHardware` (reviewed 2026-10-01). Expander readback follows catalog `m5ioe1`,
 //! UM V1.4 Table 3 “Register Map” and “GPIO control (IO1–IO14)”.
 
 use crate::addresses;
@@ -10,10 +11,14 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_async::delay::DelayNs;
 use m5stack_papermono_lite::{m5ioe1, m5pm1};
 
-/// Existing diagnostic rail settling delay, retained pending C153 measurements.
-pub const RAIL_SETTLE_MS: u32 = 15;
-/// Existing diagnostic reset-release delay before the chip's BUSY check.
-pub const BOOT_SETTLE_MS: u32 = 20;
+/// Rail-first settling time before asserting SX_NRST (M5Stack LoRa tutorial,
+/// `enableLoRaHardware`, reviewed 2026-10-01). Physical C153 confirmation is open.
+pub const RAIL_SETTLE_MS: u32 = 200;
+/// SX_NRST low pulse width from the same official tutorial's reset sequence.
+pub const RESET_HOLD_MS: u32 = 100;
+/// Settling time after releasing SX_NRST, before the chip's BUSY check,
+/// from the same official tutorial. BUSY readiness is still required.
+pub const BOOT_SETTLE_MS: u32 = 200;
 
 /// System I2C is lent only for one lifecycle or TX verification call.
 /// Other peripherals may use it once the operation's future completes.
@@ -109,13 +114,15 @@ impl<I: I2c, D: DelayNs> Hooks<RadioContext<'_, I, D>> for RadioHooks {
     }
 
     async fn startup(&mut self, context: &mut RadioContext<'_, I, D>) -> Result<(), I::Error> {
-        // Assert reset before raising antenna and rail. Any failure rolls back
-        // through the wrapper's shutdown, including disabled-state readback.
-        m5ioe1::set_push_pull_output(context.i2c, context.ioe_address, IOE1_RESET, false)?;
-        m5ioe1::set_push_pull_output(context.i2c, context.ioe_address, IOE1_ANTENNA_SWITCH, true)?;
+        // Follow the current guide's rail-first 200/100/200 ms sequence.
+        // Any failure rolls back through the wrapper's shutdown, including
+        // disabled-state readback. Never change antenna control during RF use.
         m5pm1::M5pm1::new(&mut *context.i2c, addresses::M5PM1)
             .set_gpio_output(PMIC_ENABLE, true)?;
         context.delay.delay_ms(RAIL_SETTLE_MS).await;
+        m5ioe1::set_push_pull_output(context.i2c, context.ioe_address, IOE1_RESET, false)?;
+        m5ioe1::set_push_pull_output(context.i2c, context.ioe_address, IOE1_ANTENNA_SWITCH, true)?;
+        context.delay.delay_ms(RESET_HOLD_MS).await;
         m5ioe1::set_push_pull_output(context.i2c, context.ioe_address, IOE1_RESET, true)?;
         context.delay.delay_ms(BOOT_SETTLE_MS).await;
         Ok(())

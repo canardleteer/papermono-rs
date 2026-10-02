@@ -170,7 +170,10 @@ and remaining physical confirmation.
 
 C153 `PYG2` antenna control is held high for the complete SX1262 session,
 including RX, TX, standby and channel changes. Board `RadioHooks` owns
-reset, rail and antenna sequencing; generic `sx1262-phy` wraps revision-pinned
+reset, rail and antenna sequencing. Startup enables the rail, waits 200 ms,
+asserts reset for 100 ms with antenna high, then releases reset and waits
+200 ms before BUSY readiness. These tutorial-derived timings are host-tested
+and await physical C153 confirmation. Generic `sx1262-phy` wraps revision-pinned
 `lora-phy` async modem operations at reviewed revision b47cbdf. `RadioContext`
 borrows system I2C for each control/readback call. Confirmation fields and source
 encodings:

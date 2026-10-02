@@ -485,8 +485,10 @@ RF output for the retained PA/OCP profile. Compare against catalog
 matching network. Module connectors and a successful digital readback
 cannot close these measurements. See [source leads](../references/sources.md#sx1262-document-and-module-variants).
 
-Confirm the retained 15 ms rail delay across C153 supply conditions;
-the official factory HAL uses 100 ms before reset release. Recheck
+Confirm the current tutorial's rail-first 200 ms wait, 100 ms reset
+assertion and 200 ms release wait across C153 supply conditions.
+Host mocks establish sequencing only. The older factory HAL's 100 ms
+assertion and 20 ms release wait are dated comparison evidence. Recheck
 cleanup recovery across diagnostic wrappers, including an interrupted
 operation followed by a new card action.
 
