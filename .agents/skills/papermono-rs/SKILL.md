@@ -64,6 +64,13 @@ When a live ask is present, the **only** in-repo device I/O is
 `monitor` needs the usbfs udev rule
 ([xtask.md](references/xtask.md#usbfs-udev-for-monitor)).
 
+`flash-app --force` is an explicit identity override for a copied
+original. It still requires every local original to agree on the
+`factory` offset and size, match the measured live flash size, and
+cannot be combined with `--capture`.
+The write remains limited to the validated `factory` partition; image
+format and size checks and `--yes` remain required.
+
 When they accept `flash-app`, pack every **safe unattended**
 probe into that image (I2C roster, `FLAG`, `CHIP_ID`, lamp +
 `EPD_VDD`, leftover input levels). Do not split those across

@@ -85,6 +85,14 @@ Use `--capture SLUG` for a `--name` dump. Without it the tool
 looks under `original/` (still untested). Confirm does not
 rewrite the snapshot. Stdout names a unit-id; do not paste it.
 
+If an original was copied into this workspace from elsewhere,
+`flash-app --force` can skip original-to-unit identity matching.
+Use it only after checking the copied snapshot; it proceeds only
+when every local original matches the live flash size and has the
+same safe `factory` offset and size. It cannot be used with
+`--capture`, does not relax image validation, and still requires
+`--yes`.
+
 Run-mode listen (needs
 [usbfs udev](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor)):
 

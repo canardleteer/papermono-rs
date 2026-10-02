@@ -104,9 +104,13 @@ cargo xtask backup-factory-firmware --as-original
 cargo xtask backup-factory-firmware --name my-unit
 ```
 
-`flash-app` checks for an existing original or named capture before proceeding.
-If multiple Espressif devices are connected, specify the target port with
-`ESPFLASH_PORT`.
+`flash-app` checks for an original or named capture bound to this device before
+proceeding. If you copied an original snapshot from another workspace, `--force`
+can bypass that identity check only when every local original matches the live
+flash size and agrees on factory offset and size. It still writes only the
+`factory` partition and validates the image. Do not combine `--force` with
+`--capture`. If multiple Espressif devices
+are connected, specify the target port with `ESPFLASH_PORT`.
 
 ### Path A — without Embassy (`simple-debug`)
 
@@ -187,7 +191,7 @@ Common configuration issues:
 | `rustc 1.x is not supported … esp-hal` | The installed toolchain is outdated. Run `espup update` |
 | `linker 'xtensa-esp32s3-elf-gcc' not found` | The environment file was not sourced. Run `. $HOME/export-esp.sh` |
 | `QinHeng` / `1a86:55d3` refused | The connected device is not an Espressif native USB node |
-| `flash-app` wants a matching snapshot | An original or snapshot capture must be saved for this device first |
+| `flash-app` wants a matching snapshot | Use a matching snapshot, or `--force` for a copied original only when all local originals match live flash size and agree on factory geometry |
 | Flash succeeded, glass / CDC unchanged | The target remained in bootloader mode; short-press the power button |
 | `monitor` silent on stock factory demo | Official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) does not output `simple-debug:` text lines |
 | `monitor` cannot claim usbfs | Confirm udev rules are active and your user belongs to dialout |

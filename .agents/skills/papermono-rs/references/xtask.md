@@ -29,7 +29,7 @@ assuming a command works on a unit.
 | `backup-factory-firmware` | live dump yes; `--import` no | Uncertain stock: `--name SLUG` or `--as-original`. Write-once under `developer-data/backups/`. Dump length is the measured size. Alias `backup-firmware`. `--import DIR` is host-only (`flash.bin` / `flash-16mb.bin`; refuse `flash-32mb.bin` unless length matches) |
 | `confirm-factory-firmware` | yes | Compare live flash to the matching original, or `--capture SLUG`. Writes gitignored divergence JSON. Does not rewrite the snapshot |
 | `restore-factory-firmware` | yes | `write_bin` of **that unit's** original, or `--capture SLUG`. Requires `--yes`. Full image at `0x0`, or `--part LABEL`. Never a full-chip erase |
-| `flash-app` | yes | `write_bin` of `--image FILE` (a `save-image` payload, not an ELF) into snapshot **`factory`** only. Requires `--yes` and a matching original or `--capture`. Lite factory is `0x10000` / `0xF00000`. Flasher stays in bootloader; short-press red to run. Never a caller-chosen offset, never `espflash flash`, never erase |
+| `flash-app` | yes | `write_bin` of `--image FILE` (a `save-image` payload, not an ELF) into snapshot **`factory`** only. Requires `--yes` and a matching original or `--capture`. `--force` may bypass original identity for copied originals only when all local originals match live flash size and agree on factory offset and size; it cannot combine with `--capture`. Both SKUs use `0x10000` / `0xF00000`. Flasher stays in bootloader; short-press red to run. Never a caller-chosen offset, never `espflash flash`, never erase |
 | `vet-idle-log` | no | Idle grammar: `hello image=` / `sku=`, at least one `hb`, no `mac`, no `edge`, idle `btn_a=1 btn_b=1`. `--image embassy-debug` for the Embassy image. `--allow-activity` for a busy capture. Parse lives in `papermono-log`. There is no `learn-uart` |
 | `ci` | no | Host + firmware clippy: fmt, host clippy/test, `cargo +esp clippy -p simple-debug-fw` (default, `--features c153`, `--all-features`), `embassy-debug-fw` (default, `--features c153`, `--all-features`, `--no-default-features`, then `touch` / `c153,touch` / `mic` / `panel` / `touch,radio` / `touch,sleep` / `touch,panel,orient` with `--no-default-features`), rumdl, machete, audit. Needs esp toolchain |
 | `monitor` | yes | USB-Serial/JTAG listen at 115200 via usbfs CDC (no ACM TTY, no `--acm-tty`). Needs the [usbfs udev rule](#usbfs-udev-for-monitor). After a listen, ACM may be gone; `--port /dev/bus/usb/BBB/DDD` from `lsusb` still works. `--reset` is in `--help` as **do not use**: Lite live DTR/RTS left CDC silent. Short-press red. Not download |
@@ -51,6 +51,8 @@ cargo xtask detect-connected
 # cargo xtask build-fw embassy-debug --no-default-features \
 #   --features touch,mic,radio
 # cargo xtask flash-app --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin --yes --capture stock-lite
+# cargo xtask flash-app --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin --yes --force
+# cargo xtask flash-app --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin --yes --force
 # cargo xtask vet-idle-log --input idle-simple.log
 # cargo xtask encode-assets
 # cargo xtask ci
@@ -58,7 +60,10 @@ cargo xtask detect-connected
 ```
 
 `idle-simple.log` is gitignored. `flash-app` needs a `save-image`
-payload; run `cargo xtask build-fw` first.
+payload; run `cargo xtask build-fw` first. `--force` is for an
+already-copied original when the device identity does not match; it
+still requires all originals to match live flash size and agree on
+factory geometry.
 
 ## Intentional xtask scope exclusions
 

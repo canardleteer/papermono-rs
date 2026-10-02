@@ -129,7 +129,7 @@ QinHeng `1a86:55d3` is refused. Download is a power-button hold
 | `backup-factory-firmware` | live dump yes; `--import` no | Named capture or `--as-original` under `developer-data/backups/`. Alias `backup-firmware` |
 | `confirm-factory-firmware` | yes | Compare live flash to that unit's original, or `--capture SLUG` |
 | `restore-factory-firmware` | yes | write-bin that unit's original or `--capture` (`--yes`). Never a full-chip erase |
-| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs matching original or `--capture`. Does not compile |
+| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs `--yes`; `--force` bypasses original identity only when all originals match live flash size and agree on factory geometry. Does not compile |
 | `vet-idle-log` | no | Host-only idle grammar on a `monitor` capture |
 | `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` (`--features c153`, `--all-features`) |
 | `ci` | no | Host-only CI gate (fmt, host clippy/test, firmware clippy, rumdl, machete, audit) |
