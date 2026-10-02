@@ -58,6 +58,10 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
    RF switch control (`set_dio2_as_rf_switch_ctrl(true)`), TCXO powered at
    3.0 V via DIO3 (`set_dio3_as_tcxo_ctrl`), and internal regulator set to
    `REGULATOR_LDO`.
+   The current M5Stack LoRa tutorial instead sets PYG2 LOW for RX.
+   That conflicts with the historical HIGH reception evidence and
+   retained session policy; [the source inventory](../references/sources.md#papermono-lora-antenna-and-power-conflicts)
+   keeps the RX polarity unresolved pending C153 RF measurements.
 6. **Confirmed Live Verification**:
    Hardware verified live on PaperMono (`C153`) (2026-09-05):
    - SPI interface, status queries (`0xC0` → `0xAA` `STBY_RC`), and power
@@ -68,6 +72,9 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
      Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, confirming the
      complete RF receive chain through the built-in FPC antenna.
    - Continuous 104-channel US915 sweeper with double-duty scanning.
+
+   These historical results do not validate the current reset timing,
+   lifecycle readback policy, fitted module revision or actual TX power.
 
 ## Session control and confirmation
 
@@ -82,13 +89,15 @@ Confirm antenna output mode, push-pull drive, high latch and sampled high
 before marking the session ready. Shutdown invalidates readiness first,
 asserts reset, lowers antenna control, disables the rail, then confirms
 low latch and sampled low. Remaining cleanup steps run after failures.
-The older official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107/main/hal/hal_lora.cpp)
+The older official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107271d31a0678d661a896e2b04dbb331ea/main/hal/hal_lora.cpp)
 (reviewed firmware V1.2, 2026-08-10) raises the rail, sets antenna-high
 and reset-low, waits 100 ms before release, then 20 ms afterward.
 Keep that dated sequence as comparison, rather than treating it as
 the current tutorial's timing or a measurement of the new lifecycle.
 
 Keep `SX_ANT_SW` high across RX, TX, standby and frequency changes.
+The current tutorial's LOW-during-RX example remains a documented
+source conflict, not a change to this session policy.
 Short diagnostics stop after their operation; sustained sessions retain
 the same wrapper and counters across operations. System I2C is borrowed
 only during control/verification. Firmware uses initial cadence one,
@@ -136,6 +145,9 @@ Use PaperMono's wiring for its PYG2 control.
 The historical “+14 dBm” diagnostic uses command +14, PA duty cycle 2
 and hpMax 3. This is retained, but differs from the cached datasheet's
 optimal +14 reference row. Actual output power requires measurement.
+The current PaperMono LoRa tutorial also requests 22 dBm but labels
+its TX display 16 dBm; that unresolved example mismatch does not
+justify changing the retained PA/OCP profile.
 See
 [PA source comparison and document revisions](../references/sources.md#sx1262-pa-profile-comparison).
 

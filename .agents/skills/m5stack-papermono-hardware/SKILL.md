@@ -66,6 +66,9 @@ questions live in
    snapshot retained):
    [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md).
    Living HTML can still change.
+   The current PaperMono LoRa tutorial supplies reset timing; its RX
+   antenna and TX power-label conflicts remain open in
+   [sources.md](references/sources.md#papermono-lora-antenna-and-power-conflicts).
 7. **Vendor datasheets** —
    [resources/datasheets.md](resources/datasheets.md). Registers,
    opcodes, timings for parts named on this model. **Vendor the

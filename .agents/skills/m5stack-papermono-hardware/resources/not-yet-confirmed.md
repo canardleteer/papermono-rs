@@ -485,6 +485,13 @@ RF output for the retained PA/OCP profile. Compare against catalog
 matching network. Module connectors and a successful digital readback
 cannot close these measurements. See [source leads](../references/sources.md#sx1262-document-and-module-variants).
 
+Resolve the current M5Stack tutorial's LOW-during-RX PYG2 example
+against the historical HIGH reception path on the fitted C153 module.
+The runtime policy stays HIGH until shutdown. The tutorial also requests
+22 dBm but labels TX as 16 dBm; measure RF output rather than inferring
+it from either example value. Both [source conflicts](../references/sources.md#papermono-lora-antenna-and-power-conflicts)
+remain open; neither host tests nor historical reception close them.
+
 Confirm the current tutorial's rail-first 200 ms wait, 100 ms reset
 assertion and 200 ms release wait across C153 supply conditions.
 Host mocks establish sequencing only. The older factory HAL's 100 ms

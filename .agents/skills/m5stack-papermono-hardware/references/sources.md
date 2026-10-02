@@ -42,6 +42,7 @@ External: [external.md](../resources/external.md). Vendor C++:
 | Official **M5GFX LUT Refresh Speed** (`epd_quality` / `epd_text` / `epd_fast` / `epd_fastest`) | Official | PaperMono laboratory results under M5GFX modes; reference only; times vary with content. Lite page reprints the same table. Snapshot 2026-10-01: [official-html/SOURCE.md](../resources/official-html/SOURCE.md). [display.md](display.md) |
 | Schematic PDFs + gallery PNGs V0.6.2 2026-05-22 ([datasheets.md](../resources/datasheets.md), [catalog.md](catalog.md)) | Official | Dated OSS snapshot from those HTML pages. Walk PDF/PNGs. Nets. HTML may ship a newer set |
 | [M5Stack PaperMono Arduino examples](https://docs.m5stack.com/en/arduino/papermono/program) | Official (intent; checked 2026-10-01) | Board Manager >=3.3.9; examples for display, buttons, touch, IMU, mic, microSD, NFC, LoRa, buzzer, power management, and wakeup. Individual pages and qualified observations: [catalog.md](catalog.md) |
+| [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora) | Official (intent; checked 2026-10-01) | `enableLoRaHardware`: rail first, 200 ms before reset, 100 ms low, 200 ms after release. RX sets PYG2 LOW; TX requests 22 dBm but labels the display 16 dBm. These antenna/power conflicts remain unresolved; see below |
 | [M5PM1 & M5IOE1 Arduino](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Official (intent) | L0–L3B are independently switched from L0; current power/wake examples. Does not make their sequences physical measurements |
 | [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo) | Official (intent) | OTP path; panel PN `DEPG0397BBS770F3HP-XM`. Direct dep M5Unified; M5GFX is transitive. Panel SPI is `EDP_OTP_LUT_demo` |
 | [M5GFX](https://github.com/m5stack/M5GFX) (`Panel_SSD1677_4Gray`) | Official (intent) | Reviewed 0.2.31 release and current development tree. UserDemo / M5Unified panel; four `epd_*` modes. Product page still warns LUTs unstable and recommends OTP |
@@ -84,6 +85,8 @@ linked measurements. Name
 | Battery / telemetry | M5PM1 ADC `VBAT_L`/`VBAT_H` and `VIN_L`/`VIN_H`. 1S LiPo linear mapping 3300..4150 mV to 0..100% SoC. Lite 2026-09-03: live battery gauge and power status on Legend card, 60 s auto-refresh, IP2315 isolated ([measure.md](measure.md)) | IP2315 charge transaction requires PYG11 gate; low VBAT can hang bus. Live drain rate not yet profiled |
 | LoRa SPI host | Pin table / schematic name those GPIOs SPI1 | UserDemo `hal_lora.cpp` uses ESP-IDF `SPI3_HOST` (SPI0/1 are flash). 868.0 MHz RadioLib begin vs product 868–923 MHz |
 | LoRa module vs die | Stamp LoRa-1262: 868–923 MHz, `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, FPC on C153 | SX1262 sheet: 150–960 MHz ISM. Both switch lines are required on C153: DIO2 controls SX1262 internal RF switch; M5IOE1 `PYG2` (`SX_ANT_SW`) gates the built-in FPC antenna and must be driven HIGH. [stamp-lora-1262.md](../resources/stamp-lora-1262.md) |
+| C153 LoRa RX antenna control | Current [M5Stack LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora) drives PYG2 LOW in RX startup and `resumeReceive` | Older factory HAL and historical C153 reception used HIGH. Runtime retains HIGH throughout the session; module revision and RF-path comparison remain open. [Antenna conflict](#papermono-lora-antenna-and-power-conflicts) |
+| LoRa tutorial TX power | Current tutorial sets `kTxPowerDbm` to 22 and passes it to `radio.begin` | Its TX screen says 16 dBm. Neither value is measured RF output; the repository's PA/OCP settings remain unchanged. [Power conflict](#papermono-lora-antenna-and-power-conflicts) |
 | Bring-up | Arduino: M5PM1 then M5IOE1 then peripherals | UserDemo: 500 ms, `M5.begin`, then PM1/IOE1, then NFC identity probe for SKU |
 | Lite NFC/LoRa | HTML **PinMap** and SKU compare: modules absent | Lite schematic V0.6.2 gallery page 05 / PDF still draws Stamp LoRa-1262 and RFID/`PYB_NFC_EN`. Do not flatten |
 
@@ -144,9 +147,33 @@ The current [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduin
 Host mocks check rail-first operation order and all three waits; BUSY
 readiness and digital readback do not prove settling across supply conditions.
 
-The older [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107/main/hal/hal_lora.cpp)
+The older [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107271d31a0678d661a896e2b04dbb331ea/main/hal/hal_lora.cpp)
 (reviewed V1.2, 2026-08-10) enables the rail before antenna-high/reset-low,
 holds reset for 100 ms and waits 20 ms after release. That dated sequence
 is comparison evidence. Physical confirmation of the new lifecycle remains
 open under
 [nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).
+
+## PaperMono LoRa antenna and power conflicts
+
+The current [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora),
+reviewed 2026-10-01, sets `kAntennaSwitchPin` (M5IOE1 PYG2) LOW
+in the receiver's `enableLoRaHardware` and before `radio.startReceive`
+in `resumeReceive`. The older [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107271d31a0678d661a896e2b04dbb331ea/main/hal/hal_lora.cpp)
+(V1.2, 2026-08-10) sets antenna control HIGH during startup.
+Historical [C153 reception](measure.md) used HIGH too. These are
+different layers of evidence; successful reception alone does not
+characterize the switch, fitted module revision or RF impedance.
+The RX polarity conflict is unresolved. Keep the repository session
+policy HIGH across RX, TX, standby and channel changes until shutdown.
+
+The tutorial's transmitter requests `kTxPowerDbm = 22` through
+`radio.begin`, while `drawScreen` labels it 16 dBm. This is an
+unresolved mismatch within the example, rather than a measured
+calibration or a basis for changing our diagnostic PA/OCP settings.
+The retained profile still needs C153 RF-output characterization;
+see [PA profile comparison](#sx1262-pa-profile-comparison).
+
+Board measurements remain open under
+[nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).
+No physical panel or radio confirmation was performed for this source review.

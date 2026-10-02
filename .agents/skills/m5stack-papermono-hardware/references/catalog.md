@@ -115,7 +115,7 @@ for our units.
 | Microphone | [PaperMono Microphone](https://docs.m5stack.com/en/arduino/papermono/mic) | GPIO45/46, PYG12, 16 kHz right channel; matches the pin map and current firmware intent |
 | microSD | [PaperMono microSD](https://docs.m5stack.com/en/arduino/papermono/microsd) | Enables PYG14 and configures CLK, CMD, DAT0–DAT3 with `SD_MMC.setPins` |
 | NFC | [PaperMono NFC](https://docs.m5stack.com/en/arduino/papermono/nfc) | M5IOE1 PYG4 enables the NFC module; C153-only |
-| LoRa | [PaperMono LoRa](https://docs.m5stack.com/en/arduino/papermono/lora) | PM1 GPIO2 power; IOE1 GPIO10 reset and GPIO2 antenna switch; dedicated SPI SCK39/MISO40/MOSI38/NSS41 |
+| LoRa | [PaperMono LoRa](https://docs.m5stack.com/en/arduino/papermono/lora) | C153 rail-first 200/100/200 ms reset sequence; PM1 G2 power, IOE1 PYG10 reset / PYG2 antenna, HSPI/SPI3 on SCK39/MISO40/MOSI38/NSS41. RX antenna LOW and TX requested-22/displayed-16 dBm remain [source conflicts](sources.md#papermono-lora-antenna-and-power-conflicts) |
 | Buzzer | [PaperMono Buzzer](https://docs.m5stack.com/en/arduino/papermono/buzzer) | M5Unified speaker API |
 | Power management | [M5PM1 and M5IOE1](https://docs.m5stack.com/en/arduino/papermono/m5pm1_m5ioe1) | Clarifies L1–L3B are independently powered from L0, with wake and timer examples |
 | Wakeup | [PaperMono Wakeup](https://docs.m5stack.com/en/arduino/papermono/wakeup) | Separate light-sleep and deep-sleep examples; not a measurement of our sleep paths |
