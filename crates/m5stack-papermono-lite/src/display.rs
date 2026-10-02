@@ -37,11 +37,28 @@ pub const OTP_ORIENT_TITLE: &str = "otp_orient";
 pub const OTP_TARGET_TITLE: &str = "otp_target";
 /// Legacy CDC stamp that mixed first Mode 1 and later partial.
 pub const OTP_FAST_TITLE: &str = "otp_fast";
-/// Catalog default for “partials then one Mode 1 full”.
+/// Maximum partial updates before the next monochrome update needs a full refresh.
 ///
-/// Official guidance is about ten. Embassy-debug uses this value
-/// (18 = 3× the prior firmware budget of 6) for non-soft mono paints.
-pub const PARTIALS_BEFORE_FULL: u8 = 18;
+/// M5Stack's [PaperMono](https://docs.m5stack.com/en/core/PaperMono) and
+/// [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite) product pages,
+/// “E-Paper Usage Precautions” and “E-Paper Driver Notes”, recommend a full refresh after
+/// about ten partial fast refreshes. Applies to same-card updates too.
+pub const PARTIALS_BEFORE_FULL: u8 = 10;
+
+/// Whether the next monochrome update must rebuild its OTP baseline with
+/// [`OtpRefresh::MonoFull`].
+///
+/// `mono_ready` records a valid monochrome baseline; a grayscale refresh
+/// invalidates it. `partials` counts partial updates since the last full
+/// refresh. No baseline, or reaching [`PARTIALS_BEFORE_FULL`], requires a full
+/// refresh even for same-card status or orientation changes. Callers reset the
+/// counter after a full refresh and increment it after each partial update.
+/// This pure policy performs no SPI/I2C operations and cannot fail; panel
+/// ghosting at this cadence still needs physical confirmation for each SKU.
+#[must_use]
+pub const fn mono_full_due(mono_ready: bool, partials: u8) -> bool {
+    !mono_ready || partials >= PARTIALS_BEFORE_FULL
+}
 
 /// Official HTML **M5GFX LUT Refresh Speed** titles.
 ///
@@ -197,6 +214,18 @@ pub const fn framebuffer_to_page(fx: u16, fy: u16, rotation: PageRotation) -> Op
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mono_baseline_and_vendor_budget_require_full_refresh() {
+        assert_eq!(PARTIALS_BEFORE_FULL, 10);
+        for partials in 0..=u8::MAX {
+            assert!(
+                mono_full_due(false, partials),
+                "missing baseline at {partials}"
+            );
+            assert_eq!(mono_full_due(true, partials), partials >= 10);
+        }
+    }
 
     #[test]
     fn official_geometry_is_portrait_tables() {

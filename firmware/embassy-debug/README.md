@@ -44,8 +44,11 @@ compile time, build with `--no-default-features --features lite`.
 The `mic` feature is opt-in.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
-and 180° flips). Cards redraw upright for the hold via soft
-OTP Partial; CDC prints `imu pose=` with raw XYZ. Lite axis map
+and 180° flips). Cards redraw upright for the hold using OTP partial
+refreshes. After ten partials, the next monochrome redraw performs a
+full clearing refresh, including status and orientation updates on the
+same card. The first monochrome redraw after tones also uses a full
+refresh. CDC prints `imu pose=` with raw XYZ. Lite axis map
 (2026-09-04): USB-C down = −X. Without `orient`, the UI stays
 USB-C-down portrait.
 

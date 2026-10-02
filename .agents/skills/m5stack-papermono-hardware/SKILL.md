@@ -223,9 +223,10 @@ flash size is 16 MB
    What not to do: [safety.md](references/safety.md). The
    vendor recommends one full refresh after about 10 partial
    fast refreshes and warns against uninterrupted partials.
-   Firmware's 18-partial limit and same-card exemption are
-   implementation choices, not verified panel guidance; see
-   [display.md](references/display.md).
+   The shared `display::mono_full_due` policy requires the next
+   monochrome update to use `MonoFull` after ten partials,
+   including same-card redraws. Physical ghosting confirmation
+   remains open; see [display.md](references/display.md).
 4. **Park IP2315 off the system I2C bus** except for the charge
    transaction. M5IOE1 `PYG11_PWM3` gates `0x75`. Sheet: I2C
    high is VBAT; pins 8/9 mux LED vs I2C; at VIN both must

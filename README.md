@@ -109,6 +109,10 @@ The default firmware detects board hardware at startup and operates PaperMono
 - [embassy-rs](./firmware/embassy-debug)
   - [quick install](./docs/getting-started.md#path-b--with-embassy-embassy-debug)
 
+The Embassy image uses panel OTP waveforms. After ten partial updates, the
+next monochrome redraw performs a full clearing refresh, including updates
+on the same card.
+
 ## cargo xtask
 
 From the repo root (`cargo xtask <subcommand>`).

@@ -22,7 +22,7 @@ physical unit point at an `nyc-*` id. Name `C153` vs
 
 | Hazard | Safe default | Forbidden until proven |
 | --- | --- | --- |
-| E-paper OTP / LUT | Call panel OTP only ([display.md](display.md) **What to do**). After ~10 partials, one OTP mono full | Invented or generic-example 105-byte `0x32` table; copying M5GFX `lut_*`; mapping `epd_*` onto OTP `0x22`; custom waveforms that are not DC-balanced; uninterrupted continuous partials; `0xFF` after `0xD7` without rebuild; a second bare `0x14` |
+| E-paper OTP / LUT | Call panel OTP only ([display.md](display.md) **What to do**). After ten partials, the next monochrome update uses OTP mono full, including same-card redraws | Invented or generic-example 105-byte `0x32` table; copying M5GFX `lut_*`; mapping `epd_*` onto OTP `0x22`; custom waveforms that are not DC-balanced; uninterrupted continuous partials; `0xFF` after `0xD7` without rebuild; a second bare `0x14` |
 | E-paper environment | Indoor, avoid prolonged sun / high UV / high temperature on the panel | Baking the glass in sun as a “feature” |
 | IP2315 on I2C | Mount via M5IOE1 `PYG11_PWM3` only for the charge transaction, then disconnect. Sheet: I2C high is VBAT; VIN detect needs pins 8/9 high | Leaving `0x75` on the bus; assuming it always enumerates at low VBAT |
 | Power path | M5PM1 button: short = on/reset, double = off, hold ~2 s until red blink = download | Driving GPIO45/46 as a power latch; pulsing PDM pins as `PWR_HOLD` / `PWR_LOCK` |

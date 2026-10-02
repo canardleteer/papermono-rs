@@ -131,10 +131,11 @@ that baseline. After gray, `MonoFull` before any `Partial`.
 until overdrawn; the `Partial` was fast. Successes and
 failures: hardware skill
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md#refresh-trials-lite-2026-09-01).
-After `PARTIALS_BEFORE_FULL` (18) partials, one `MonoFull`
-(`0` never). That cadence satisfies the official display safety
-contract (a full refresh after roughly ten partials to prevent DC
-imbalance). Do not send a second bare Mode 1.
+After shared `PARTIALS_BEFORE_FULL` (10) partials, the next monochrome
+update uses `MonoFull`, including same-card redraws. Use the shared
+`display::mono_full_due` helper; it also requires a full refresh when
+the mono baseline is missing. Physical ghosting confirmation remains
+open for both SKUs. Do not send a second bare Mode 1.
 
 `RefreshMode` is the official HTML **M5GFX LUT Refresh
 Speed** catalog only (PaperMono lab, reference only). Not a
@@ -142,16 +143,13 @@ timeout and not a `0x22` map.
 
 embassy-debug: tones use `GrayFull`. Splash / shapes /
 legend / bluetooth / wifi_survey / wifi_ap use
-`paint_mono_fast` (`MonoFull` then `Partial`). Same-card
-Legend / Bluetooth / Wi-Fi status redraws and same-card
-orientation remaps pass `soft = true` so they stay on
-`Partial` even after the budget (avoids flashing `MonoFull`
-on every PIN / client / survey update or hold flip). Card
-navigation passes `soft = false` and
-still takes `MonoFull` when `PARTIALS_BEFORE_FULL` (18) is
-due. Embassy-debug Prev/Next arm after both buttons release
+`paint_mono_fast` (`MonoFull` then `Partial` within the budget).
+Same-card status redraws, orientation remaps, navigation and sleep
+notices all honor the ten-partial budget; there is no `soft` argument.
+Embassy-debug Prev/Next arm after both buttons release
 (release edges) so a hold through Shapes paint does not require
 a second press. Target enter uses `enter_mono` (`MonoFull`). Marks use
-`Partial`. Deep sleep after each refresh; hardware reset to
-wake. No `otp_fast` stamp. Soft-refresh contract:
+`Partial`, preceded by a full white clear when the baseline or budget
+requires it. Deep sleep after each refresh; hardware reset to
+wake. No `otp_fast` stamp. Refresh contract:
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md).

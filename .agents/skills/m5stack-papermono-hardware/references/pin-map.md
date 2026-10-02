@@ -158,6 +158,14 @@ those nets as extra GPIO until
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)
 close.
 
+## Shared panel policy
+
+Shared panel policy lives in `m5stack-papermono-lite::display`:
+`mono_full_due` requires OTP `MonoFull` after ten partials or when the
+mono baseline is missing, including same-card status/orientation redraws.
+The nets above are unchanged; [display.md](display.md) records the policy
+and remaining physical confirmation.
+
 ## LoRa session ownership
 
 C153 `PYG2` antenna control is held high for the complete SX1262 session,

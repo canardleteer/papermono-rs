@@ -323,8 +323,11 @@ physical X. Write-up:
 
 ### nyc-partial-ghost
 
-Ten partials then a full, vs twenty partials with no full.
-Operator observation of ghosting. Not a license to skip OTP.
+On each SKU, observe ghosting with the current ten-partial budget:
+the next monochrome update must perform a full refresh, including repeated
+same-card status and orientation redraws. Confirm clearing on glass and
+the matching `otp_mono` stamp. Do not run uninterrupted partials or skip
+OTP. Host policy tests do not close this physical confirmation.
 [display.md](../references/display.md).
 
 **Partial (2026-09-01, `C153-Lite`):** ~7 OTP `0xFF`

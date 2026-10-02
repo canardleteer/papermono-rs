@@ -58,10 +58,10 @@ Panel call site is `display::OtpRefresh` only:
 | Card / step | Sequence |
 | --- | --- |
 | Tones | `GrayFull` |
-| Splash / shapes / legend / bluetooth / wifi_survey / wifi_ap | `paint_mono_fast` (`soft` on same-card Bluetooth / Wi-Fi / Legend status redraws **and** same-card orientation remaps → stay on `Partial`; card change honors partial budget → `MonoFull`) |
+| Monochrome cards, including same-card status and orientation updates | `paint_mono_fast`: `MonoFull` if `display::mono_full_due`, otherwise `Partial` |
 | Enter targets | `MonoFull` |
-| Marks | `Partial` |
-| After `PARTIALS_BEFORE_FULL` (18) | next **non-soft** mono is `MonoFull` |
+| Marks | `Partial`, preceded by a full white clear if baseline/budget requires it |
+| After shared `PARTIALS_BEFORE_FULL` (10) | next monochrome update uses `MonoFull`, including same-card redraws |
 
 Deep sleep after each refresh; M5IOE1 `EPD_RST` to wake; no
 SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
@@ -210,11 +210,11 @@ do not echo those on the wire.
 `FONT_10X20` at `x = 40` (~10 px/glyph) → stay at about **40
 glyphs** or they clip the right edge.
 
-**Soft refresh:** same-card Bluetooth / Wi-Fi / Legend redraws
-and same-card orientation remaps use
-`paint_mono_fast(..., soft = true)` so they stay on OTP
-`Partial` past `PARTIALS_BEFORE_FULL` instead of flashing
-`MonoFull`. Card change honors the budget.
+**Refresh budget:** same-card Bluetooth / Wi-Fi / Legend redraws and
+orientation remaps use `paint_mono_fast` with the shared ten-partial
+budget. `display::mono_full_due` requires `MonoFull` on the next update
+when due; the firmware has no same-card exemption. Ghosting at this
+cadence remains unconfirmed on either SKU.
 
 1. **Channel survey**: Human opens the `wifi_survey` card and taps
    `[ START SURVEY ]`. CDC prints `wifi_survey count=… ch1=… ch6=… ch11=…`.
@@ -299,7 +299,8 @@ Default Cargo feature. Sticky-rs policy ported to BMI270:
 - CDC `imu pose=… x=… y=… z=…` every 5 s and on page change.
 - Axis→pose (Lite 2026-09-04): −X `Portrait0`, +X `Portrait180`,
   +Y `Landscape0`, −Y `Landscape180`. `C153` still unconfirmed.
-- Same-card remaps are **soft** `Partial` (no `MonoFull` budget hit).
+- Same-card remaps honor the shared budget: `Partial` while allowed,
+  then `MonoFull` after ten partials or without a mono baseline.
 - Bring-up: Bosch standard **8 KiB** `bmi270_config_file` with
   `INIT_ADDR_*` chunking; `INTERNAL_STATUS` is `0x21`. Do **not**
   use the maximum-FIFO config blob (wrong variant; XYZ stay zero).
@@ -317,7 +318,7 @@ Button monitoring runs concurrently during long EPD paints
 (`paint_with_buttons` via `select`), queuing navigation events so rapid clicks
 are never dropped. Button A short-press fires on release (distinguishing
 long-press sleep); Button B fires immediately on press-down (falling edge).
-Audible key clicks sound on every valid button press. Soft orientation / radio
+Audible key clicks sound on every valid button press. Orientation / radio
 refreshes run after button handling so a same-tick press wins.
 
 ## Firmware examples as tutorial code

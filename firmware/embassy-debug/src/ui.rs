@@ -32,12 +32,9 @@
 //! - **IMU page rotation** (`orient` feature): BMI270 dominant-axis classify (sticky-rs
 //!   policy) remaps the current card into portrait/landscape page space. Face-up /
 //!   face-down keep the last in-plane page. Lamp gutter stays physical USB-down.
-//! - **Soft same-card redraws**: Bluetooth, Wi-Fi survey/hotspot, and Legend
-//!   status updates reuse OTP Partial when a mono baseline exists, even after
-//!   the usual partial budget, so PIN / AP / battery telemetry does not flash a
-//!   full mono wipe. Same-card **orientation** remaps also stay soft (Partial).
-//!   Card navigation still takes `MonoFull` once the budget is reached
-//!   (DC-balance).
+//! - **Bounded monochrome redraws**: status updates, orientation remaps and
+//!   navigation share [`display::mono_full_due`]. After ten OTP partials,
+//!   the next monochrome redraw uses `MonoFull`, including same-card telemetry.
 //! - **Zero Heap Allocation**: Framebuffers are statically allocated using
 //!   [`static_cell::ConstStaticCell`], eliminating heap usage while retaining 480×800
 //!   framebuffers in BSS memory.
@@ -106,7 +103,7 @@ const IMU_REPORT_MS: u32 = 5_000;
 /// Consecutive IMU polls that must agree on a new page before remapping.
 ///
 /// Avoids a one-sample chatter (hand torque on a button press) from stealing
-/// the next card edge as a soft orientation refresh.
+/// the next card edge as an orientation refresh.
 #[cfg(feature = "orient")]
 const IMU_STABLE_POLLS: u8 = 3;
 
@@ -134,8 +131,6 @@ pub async fn run(
     if !has_radios && scene.is_c153_only() {
         scene = Scene::Splash;
     }
-    let mut last_painted: Option<Scene> = None;
-    let mut last_rotation: Option<PageRotation> = None;
     let mut rotation = PageRotation::Portrait0;
     let mut lamp = LampSlide::new();
     let mut vol = VolumeSlide::new();
@@ -169,11 +164,6 @@ pub async fn run(
     }
 
     loop {
-        let same_scene = last_painted == Some(scene);
-        let orient_changed = last_rotation.is_some_and(|r| r != rotation);
-        let soft = same_scene
-            && (orient_changed
-                || (last_rotation == Some(rotation) && scene_allows_soft_refresh(scene)));
         let mut pending_nav: Option<Nav> = None;
         let drawn_revs = paint_with_buttons(
             &mut i2c,
@@ -181,15 +171,12 @@ pub async fn run(
             &busy,
             scene,
             planes,
-            soft,
             rotation,
             &btn_a,
             &btn_b,
             &mut pending_nav,
         )
         .await;
-        last_painted = Some(scene);
-        last_rotation = Some(rotation);
         if scene == Scene::Targets {
             panel.enter_mono(&mut i2c, &busy).await;
             match targets::walk(&mut i2c, &mut panel, &btn_a, &btn_b, &tp, &busy).await {
@@ -341,20 +328,6 @@ struct DrawnRevs {
     wifi: u32,
 }
 
-/// Same-card telemetry scenes that should stay on OTP Partial for live redraws.
-const fn scene_allows_soft_refresh(scene: Scene) -> bool {
-    matches!(
-        scene,
-        Scene::Legend
-            | Scene::Bluetooth
-            | Scene::WifiSurvey
-            | Scene::WifiAp
-            | Scene::Nfc
-            | Scene::Lora
-            | Scene::LoraScan
-    )
-}
-
 /// Renders a card onto framebuffers and executes e-paper refresh while concurrently
 /// monitoring BUTTON A and BUTTON B so navigation presses during paint are not dropped.
 #[allow(clippy::too_many_arguments)]
@@ -364,14 +337,13 @@ async fn paint_with_buttons(
     busy: &Input<'static>,
     scene: Scene,
     planes: &mut Planes,
-    soft: bool,
     rotation: PageRotation,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
     pending_nav: &mut Option<Nav>,
 ) -> DrawnRevs {
     match select(
-        paint(i2c, panel, busy, scene, planes, soft, rotation),
+        paint(i2c, panel, busy, scene, planes, rotation),
         monitor_buttons_during_paint(btn_a, btn_b, pending_nav),
     )
     .await
@@ -458,17 +430,16 @@ async fn monitor_buttons_during_paint(
 /// Returns the BLE and Wi-Fi state revisions observed before rendering began, allowing
 /// caller tasks to detect if asynchronous radio events arrived during the panel refresh.
 ///
-/// When `soft` is true (same-card Bluetooth / Wi-Fi / Legend status update, or
-/// same-card orientation remap), the mono path prefers OTP Partial even after
-/// the usual partial budget so a black-and-white redraw does not flash
-/// `MonoFull`. Card navigation passes `soft = false`.
+/// The mono path enforces the shared ten-partial budget for every redraw,
+/// including same-card telemetry and orientation changes. Panel SPI2 and
+/// system-I2C EPD_RST sequencing remain in [`Panel::paint_mono_fast`], whose
+/// cooperative waits let the executor poll the button-monitoring future.
 async fn paint(
     i2c: &mut SysI2c,
     panel: &mut Panel,
     busy: &Input<'static>,
     scene: Scene,
     planes: &mut Planes,
-    soft: bool,
     rotation: PageRotation,
 ) -> DrawnRevs {
     let ble_rev = crate::radio::state_rev();
@@ -493,7 +464,7 @@ async fn paint(
         panel.paint_gray(i2c, &planes.bw, &planes.red, busy).await;
     } else {
         panel
-            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, soft)
+            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
             .await;
     }
     DrawnRevs {
@@ -650,7 +621,7 @@ async fn wait_nav(
                             ctx.rotation,
                         );
                         panel
-                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                             .await;
 
                         // 2. Dispatch backend action (which transitions to Starting/Stopping):
@@ -705,7 +676,7 @@ async fn wait_nav(
                             ctx.rotation,
                         );
                         panel
-                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                             .await;
 
                         // 2. Perform bounded ISO14443-A poll:
@@ -753,7 +724,7 @@ async fn wait_nav(
                             ctx.rotation,
                         );
                         panel
-                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                             .await;
 
                         // 2. Perform safe single-burst transmission:
@@ -776,7 +747,7 @@ async fn wait_nav(
                             ctx.rotation,
                         );
                         panel
-                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                             .await;
 
                         // 2. Perform up to 60s sniffer window (aborted by touch or buttons):
@@ -811,7 +782,7 @@ async fn wait_nav(
                             ctx.rotation,
                         );
                         panel
-                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                            .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                             .await;
 
                         // Debounce initial tap:
@@ -832,7 +803,7 @@ async fn wait_nav(
                                 ctx.rotation,
                             );
                             panel
-                                .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, true)
+                                .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                                 .await;
                             if btn_a.is_low() || btn_b.is_low() || tp.is_low() {
                                 break;
@@ -930,7 +901,7 @@ async fn enter_sleep(
     // 1. Draw and paint the sleep notice to the e-paper panel.
     draw::draw_sleeping(&mut planes.bw, &mut planes.red, rotation);
     panel
-        .paint_mono_fast(i2c, &planes.bw, &planes.red, busy, false)
+        .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
         .await;
 
     // 2. Wait until Button A (and Button B) are fully released before arming sleep.

@@ -38,6 +38,8 @@ Put new code where the hardware is:
   `m5stack-papermono-lite` (or a chip-driver crate both SKUs
   use). Panel call site is `display::OtpRefresh`.
   `display::RefreshMode` is the HTML `epd_*` catalog only.
+  `display::mono_full_due` enforces a missing mono baseline or ten
+  accumulated partials; same-card redraws have no exemption.
 - NFC / LoRa pins and bring-up: `m5stack-papermono` only. A
   C153 firmware package depends on that crate when the image
   actually uses a radio.

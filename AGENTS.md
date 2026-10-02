@@ -10,8 +10,9 @@ not default-members.
 
 1. **OTP waveforms first.** Do not invent an MCU `0x32` LUT.
    Custom external waveforms must stay DC-balanced. After about
-   ten partial refreshes, do a full refresh. Uninterrupted
-   partials can damage the panel.
+   ten partial refreshes, do a full refresh. The next monochrome
+   update after ten partials must use `MonoFull`, including same-card
+   redraws. Uninterrupted partials can damage the panel.
 2. **Park IP2315 off the system I2C bus** except for the charge
    transaction (M5IOE1 `PYG11_PWM3`). Leaving it mounted can hang
    the bus, especially at low VBAT.
