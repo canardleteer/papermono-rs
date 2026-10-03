@@ -158,8 +158,11 @@ Recovery requires successful shutdown followed by startup.
 
 Raw `SetTx` uses the same guard. Default hooks deny TX; permanent-antenna
 permission requires an explicit caller policy. Continuous-carrier and
-infinite-preamble commands are unsupported. Digital readback does not
-validate the RF path. The new policy awaits physical C153 validation;
+infinite-preamble commands are unsupported. One normal async receive session
+on C153 (2026-10-02) confirmed startup/shutdown digital readbacks and one
+controlled packet. Digital readback does not measure TX RF output. Failure
+recovery, sustained operation and timing remain open in the
+[NYC ledger](../resources/not-yet-confirmed.md#nyc-lora-session-recovery).
 C153-Lite radio outputs remain undriven.
 
 Chip I/O awaits async SPI and cooperative BUSY polling. Every typed/raw TX
@@ -169,5 +172,6 @@ shutdown/startup recovery. Do not race command futures against cancellation.
 Managed RX rejects CRC/header failures before FIFO access, and timed reception
 or early stop applies the documented RTC cleanup (`sx1262` §15.3.2
 “Workaround”).
-The one-us NSS settling delay and async reception path await C153 bench
-evidence.
+The one-us NSS settling delay and detailed BUSY / timed-RX behavior still need
+C153 measurements. One normal receive path has been live-confirmed; see the
+[measurement ledger](measure.md).

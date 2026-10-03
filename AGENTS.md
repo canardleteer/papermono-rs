@@ -142,8 +142,10 @@ cooperative BUSY polling. Await command sequences to completion; interrupted
 sequences require NSS recovery and
 shutdown/startup. Every TX requires a nonzero hardware timeout. Digital
 evidence does not validate the RF path. C153-Lite radio outputs remain
-undriven. The new policy is host-tested; do not extend historical hardware
-confirmations to it.
+undriven. One current C153 receive session confirmed normal startup/shutdown
+readbacks and one packet; it does not close failure recovery, sustained
+sessions, reset timing, or TX power. Record scope in the hardware
+[measurement ledger](.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## Keep skills updated
 

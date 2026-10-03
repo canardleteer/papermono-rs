@@ -90,11 +90,11 @@ before assuming a command works on silicon.
 
 **Both SKUs have live factory evidence:** `detect-connected` (run
 and download) and C153 factory backup/partition results are recorded in the
-hardware measurement ledger. Host-tool live verification to date is mainly
-Lite: `detect-connected` (run and download), `--probe`
-(`NoReset`), named backup / confirm / restore, `flash-app` (`factory` at `0x10000`;
-short-press red after), and `monitor` (stock silent;
-custom images print `simple-debug:`). Silicon facts:
+hardware measurement ledger. Host-tool live verification is mainly Lite:
+`detect-connected` (run and download), `--probe` (`NoReset`), named backup /
+confirm / restore, and `flash-app` (`factory` at `0x10000`; short-press red
+after). `monitor` has also been live-tested on C153 with the current custom
+image; stock is silent and custom images print `simple-debug:`. Silicon facts:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
 C153 USB and partition-table results are recorded in the
@@ -173,13 +173,17 @@ synchronization in firmware. Startup and shutdown always confirm antenna
 mode, drive, latch and sampled level; initial pre-TX cadence is one.
 Startup uses the current PaperMono LoRa tutorial's rail-first 200 ms
 wait, 100 ms reset assertion and 200 ms after release, then BUSY readiness.
-Host mocks check the timing; physical C153 confirmation remains open.
+Host mocks check the timing. One normal async RX session on C153 was live-tested
+2026-10-02, confirming startup/shutdown readbacks and one controlled packet;
+the delay values, failure recovery, sustained sessions and actual TX power
+remain open in the hardware measurement ledger.
 Twenty or forty needs deliberate configuration and C153 evidence.
 Failures warn on serial, block TX and run cleanup. Session summaries
 report verification counts. Both short and sustained sessions keep
 antenna control high between packet, standby and channel operations.
 C153-Lite outputs stay undriven and pruned builds exclude `sx1262-phy`
-and `lora-phy`. Host verification cannot confirm the RF path.
+and `lora-phy`. Host verification cannot confirm RF behavior; the single C153
+receive result does not measure radiated TX power.
 
 Firmware remembers failed or interrupted cleanup across short diagnostic
 wrappers. A later operation must confirm shutdown before starting again.

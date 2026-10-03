@@ -283,15 +283,23 @@ peripheral registers are referenced in [DATASHEETS.md](DATASHEETS.md).
 
 1. **Open the LoRa card.** After starting the Embassy image, short-press
    BUTTON B to reach `lora`. Tap `[ TX PING ]` for one configured packet
-   or `[ LISTEN RX ]` for the receive window. PaperMono-Lite skips these
+   or `[ LISTEN RX ]` for the receive window. While listening, the control
+   reads `[ STOP RX ]`; tap it to stop early. PaperMono-Lite skips these
    cards because its radio hardware is absent.
 2. **Read the result.** A successful ping reports `lora_tx status=ok` and
    `lora_session n=1 attempts=1 checks=3 failures=0 cleanup=ok` on serial.
-   `lora_control` shows high antenna control during startup and pre-TX,
-   then low during shutdown. Mode and drive both read `1`.
+   A received packet reports `lora_rx freq=... rssi=... snr=... len=...`
+   and a `lora_session` with two checks. `lora_control` shows high antenna
+   control during startup and pre-TX, then low during shutdown. Mode and
+   drive both read `1`.
 3. **Respond to a failed confirmation.** If the card shows
    `RADIO ERROR - CHECK SERIAL`, read the warning's phase and reason.
    A mismatch or bus error blocks transmission and starts cleanup.
    A later tap starts a new session; it must confirm readiness before
    transmission can resume. Control readback does not establish RF-path
    performance.
+
+A normal async receive session on PaperMono (`C153`) was live-tested on
+2026-10-02: one controlled 18-byte packet arrived at 917.625 MHz, and startup
+and shutdown readbacks passed. The recorded sample is in the
+[hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).

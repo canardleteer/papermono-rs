@@ -61,7 +61,11 @@ control changes between packets, standby or channel changes.
 Startup follows the current PaperMono LoRa tutorial's rail-first
 200 ms wait, 100 ms reset assertion and 200 ms after release, then
 BUSY readiness. These timings have host mock coverage; C153 physical
-confirmation remains open.
+confirmation of the delay values remains open. A normal current-image C153
+receive session on 2026-10-02 confirmed startup/high and shutdown/low antenna
+readbacks, `checks=2 failures=0 cleanup=ok`, and one received packet; it does
+not confirm reset timing, failure recovery, or TX behavior. See the hardware
+[measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 Initial verification interval is one. Failures emit typed `lora_control`
 warnings, invalidate readiness and run cleanup; `lora_session` totals
@@ -69,6 +73,10 @@ include lifecycle checks. Both radio cards surface errors. Chip transfers use
 async SPI and cooperative BUSY polling. Compose NSS with
 `embedded-hal-bus::ExclusiveDevice`; keep caller access for recovery after a
 cancelled transfer. Await each command sequence before observing stop requests.
+During RX and scanning, arm the active-low GPIO4 falling edge while the UI task
+is inside the radio operation; clear it after cleanup so a short `[ STOP RX ]`
+or `[ STOP SCAN ]` touch is not lost between polls. Do not add system-I2C touch
+reads while the radio is active.
 Ping programs its 300 ms completion budget into the chip TX timer. Managed
 RX rejects CRC/header failures before FIFO reads, acknowledges observed IRQs,
 and applies RTC cleanup after timed RX or early stop. Preserve fractional

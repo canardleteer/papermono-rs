@@ -146,6 +146,14 @@ confirms shutdown and then restores readiness. A digital confirmation
 does not measure
 the antenna or RF path.
 
+On the LoRa card, `[ LISTEN RX ]` starts a receive window and changes to
+`[ STOP RX ]`. Tap it to end listening early; Button A or B also stops the
+window. GPIO4's active-low touch edge is latched during the radio operation,
+so a brief tap is not lost between polls. The channel scanner's `[ STOP SCAN ]`
+uses the same edge latch. The 2026-10-02 C153 test captured one successful
+18-byte receive and clean lifecycle readbacks. This stop-edge change is ready
+to flash; its live button behavior is still unverified.
+
 The ping has a 300 ms hardware TX limit. If the chip times out or a read
 fails, the card shows a radio error and serial records a warning. Listening
 and scanning report only successful signal/FIFO reads. `lora_metrics` reports

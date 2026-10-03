@@ -68,7 +68,7 @@ initialize NFC/LoRa on Lite.
 | RGB LED | C153, C153-Lite | [nyc-rgb-led](#nyc-rgb-led) |
 | microSD | C153, C153-Lite | [nyc-sdmmc-width](#nyc-sdmmc-width), [nyc-tf-det](#nyc-tf-det) |
 | ST25R3916 | C153 | Confirmed live; Lite pads: [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) |
-| SX1262 die | C153 | Confirmed live; open work is listed under radio reception and safety recipes |
+| SX1262 die | C153 | [Normal RX session confirmed](#nyc-lora-session-confirmation); remaining work: [nyc-lora-session-recovery](#nyc-lora-session-recovery), [nyc-lora-tx-power](#nyc-lora-tx-power), [nyc-lora-async-timing](#nyc-lora-async-timing) |
 | Stamp LoRa-1262 module | C153 | Confirmed live; Lite pads: [nyc-lite-lora-pads](#nyc-lite-lora-pads) |
 
 ## Index
@@ -102,6 +102,10 @@ initialize NFC/LoRa on Lite.
 | [nyc-tf-det](#nyc-tf-det) | Insert = 0 | [input-storage.md](../references/input-storage.md) |
 | [nyc-lite-nfc-pads](#nyc-lite-nfc-pads) | Lite GPIO6 / PYG4 NC vs routed | [pin-map.md](../references/pin-map.md) |
 | [nyc-lite-lora-pads](#nyc-lite-lora-pads) | Lite SPI1 / IRQ NC vs routed | [pin-map.md](../references/pin-map.md) |
+| [nyc-lora-session-confirmation](#nyc-lora-session-confirmation) | Normal C153 RX readbacks and one controlled packet | [measure.md](../references/measure.md) |
+| [nyc-lora-session-recovery](#nyc-lora-session-recovery) | Sustained sessions; failed readback and cleanup recovery | [measure.md](../references/measure.md) |
+| [nyc-lora-tx-power](#nyc-lora-tx-power) | Ping verification; module revision and actual RF output | [measure.md](../references/measure.md) |
+| [nyc-lora-async-timing](#nyc-lora-async-timing) | Rail/reset timing, BUSY/NSS, timed RX/TX cleanup | [measure.md](../references/measure.md) |
 | [nyc-rgb-led](#nyc-rgb-led) | Red not PWM; G/B range | [sensors.md](../references/sensors.md) |
 | [nyc-buzzer](#nyc-buzzer) | GPIO42 resonance | [input-storage.md](../references/input-storage.md) |
 | [nyc-enclosure-edges](#nyc-enclosure-edges) | Power / BUTTON A (UP) / BUTTON B (DOWN) / USB-C / SD vs photos | [enclosure.md](../references/enclosure.md) |
@@ -464,45 +468,55 @@ Still need the same row on **`C153`**. Write leftovers in
 
 ### nyc-lora-session-confirmation
 
-Open for `C153`: capture startup/high and shutdown/low antenna mode,
-drive, latch and input-sample evidence from the new lifecycle wrapper.
-Check `lora_session` totals: one ping at initial cadence one has three
-checks, a receive window or channel sweep has two. A sustained session
-must retain antenna control high across packet, standby and channel
-changes and preserve counters on repeated active startup. Exercise
-mismatch/readback failure and successful recovery with controlled hardware
-faults. Do not infer this policy from historical RX/TX observations.
+**Closed for a normal receive session on `C153` (2026-10-02).** The current
+`embassy-debug` image logged startup with PYG2 mode/drive/latch/sample all high,
+then shutdown with output mode and drive retained, latch/sample low, and
+`lora_session checks=2 failures=0 cleanup=ok`. It received one 18-byte packet
+at 917.625 MHz (`rssi=-72`, `snr=7`, preview endpoints `0x48` and `0x54`),
+matching the controlled Heltec payload's first and fourth bytes. Raw fractional
+metrics were RSSI `-144` half-dBm and SNR `30` quarter-dB. The Heltec host
+reported one configured transmission completed without timeout at requested
+power `-9 dBm`. The requested power is not a measurement of radiated output.
+See [measure.md](../references/measure.md) and the [module notes](stamp-lora-1262.md).
 
-Host tests cover cadence one/twenty/forty and cleanup failure behavior.
-Physical evidence is required before deliberately changing firmware from
-one to twenty or forty. Digital control confirmation is distinct from
-RF-path validation, which remains a separate hardware task. No new
-physical session or RF validation occurred during this implementation.
+This closes only the normal receive-session control and one-way packet
+reception check. Remaining hardware measurements are split into the rows below.
+Host tests cover cadence one/twenty/forty and cleanup failure behavior;
+physical evidence is required before deliberately changing firmware from one
+to twenty or forty.
 
-For `C153`, identify the fitted Stamp module revision and characterize
-RF output for the retained PA/OCP profile. Compare against catalog
-`sx1262` Rev 2.2 §13.1.14.1 “PA Optimal Settings” using the board's actual
-matching network. Module connectors and a successful digital readback
-cannot close these measurements. See [source leads](../references/sources.md#sx1262-document-and-module-variants).
+### nyc-lora-session-recovery
 
-Resolve the current M5Stack tutorial's LOW-during-RX PYG2 example
-against the historical HIGH reception path on the fitted C153 module.
-The runtime policy stays HIGH until shutdown. The tutorial also requests
-22 dBm but labels TX as 16 dBm; measure RF output rather than inferring
-it from either example value. Both [source conflicts](../references/sources.md#papermono-lora-antenna-and-power-conflicts)
-remain open; neither host tests nor historical reception close them.
+For `C153`, verify a sustained session retains antenna control high across
+packet, standby and channel changes and preserves counters on repeated active
+startup. Exercise mismatch/readback failure and successful recovery with
+controlled faults, including an interrupted operation followed by a new card
+action. Do not infer failure-path behavior from a successful receive. Digital
+control confirmation remains distinct from RF-path validation.
 
-Confirm the current tutorial's rail-first 200 ms wait, 100 ms reset
-assertion and 200 ms release wait across C153 supply conditions.
-Host mocks establish sequencing only. The older factory HAL's 100 ms
-assertion and 20 ms release wait are dated comparison evidence. Recheck
-cleanup recovery across diagnostic wrappers, including an interrupted
-operation followed by a new card action.
+### nyc-lora-tx-power
 
-Async chip I/O also needs C153 bench evidence: confirm one-us post-NSS settling,
-cooperative BUSY timing and reception during packet bursts. Exercise timed-RX
-RTC cleanup and observe hardware TX timeout with the ping's 300 ms limit.
-The host tests cover IRQ acknowledgement and wrapping FIFO offsets, but sticky
-IRQ snapshots cannot distinguish repeated arrivals of the same bit. Registry
-publication remains outstanding. Keep this row open until these measurements
-are made; historical status/RX/TX results do not confirm the async path.
+For `C153`, capture the current ping's three lifecycle checks and hardware TX
+timeout response. Identify the fitted Stamp module revision and characterize
+RF output for the retained PA/OCP profile. Compare against catalog `sx1262`
+Rev 2.2 §13.1.14.1 “PA Optimal Settings” using the board's actual matching
+network. Module connectors, a successful digital readback, and a decoded packet
+cannot establish transmitted power. See [source leads](../references/sources.md#sx1262-document-and-module-variants).
+
+The current M5Stack tutorial's LOW-during-RX PYG2 example still conflicts with
+the runtime HIGH policy. One controlled receive succeeded with HIGH on this
+`C153`; that single result does not settle the source conflict for other units
+or module variants. The tutorial also requests 22 dBm but labels TX as 16 dBm;
+measure RF output rather than inferring it from either example value. Both
+[source conflicts](../references/sources.md#papermono-lora-antenna-and-power-conflicts)
+remain open.
+
+### nyc-lora-async-timing
+
+Confirm the current tutorial's rail-first 200 ms wait, 100 ms reset assertion
+and 200 ms release wait across C153 supply conditions. Host mocks establish
+sequencing only. Measure one-us post-NSS settling and cooperative BUSY timing;
+exercise reception during packet bursts and timed-RX RTC cleanup. The host
+tests cover IRQ acknowledgement and wrapping FIFO offsets, but sticky IRQ
+snapshots cannot distinguish repeated arrivals of the same bit. Registry
+publication remains outstanding.

@@ -28,8 +28,11 @@ BSP pins, power sequencing and antenna confirmation remain in
 
 C153 startup follows the current M5Stack PaperMono LoRa tutorial:
 rail enabled, 200 ms settling, reset asserted for 100 ms, then 200 ms
-after release. Antenna control stays high until shutdown. Host mocks
-check ordering and durations; physical settling and RF remain open.
+after release. Antenna control stays high until shutdown. A normal C153 async
+RX session on 2026-10-02 confirmed startup/shutdown readbacks and received one
+controlled packet. Host mocks check sequencing and durations; the actual delay
+values and TX RF output remain open in the hardware
+[measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## SKU split
 

@@ -113,7 +113,7 @@ The same rows are in
 | `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite` 16 MB capture. Do not commit dumps |
 | `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched. No `--capture` untested |
 | `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite`. `--part` / `original/` untested |
-| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:`. [udev](#usbfs-udev-for-monitor) |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01; `C153` / 2026-10-02 | Custom `embassy-debug` image produced CDC heartbeat and LoRa RX/control/session records. [udev](#usbfs-udev-for-monitor) |
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | DTR/RTS: 0 CDC bytes. Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log`. `--image embassy-debug` |
 | `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug`; `save-image --flash-size 16mb` |

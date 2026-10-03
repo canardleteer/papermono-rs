@@ -246,7 +246,12 @@ exercised via two interactive cards:
 Both use the BSP's rail-first startup: wait 200 ms before reset,
 assert it for 100 ms, release it and wait 200 ms before BUSY readiness.
 Keep PYG2 high until shutdown and preserve the existing PA/OCP profile.
-This timing is host-tested and awaits physical C153 confirmation.
+The delay values are host-tested and still await physical C153 measurement.
+A normal async receive session was live-confirmed on C153 on 2026-10-02:
+startup/shutdown readbacks passed, `lora_session checks=2 failures=0
+cleanup=ok`, and one controlled packet was received. Remaining hardware work
+is tracked in the
+[NYC ledger](../../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
 
 1. **LoRa Sweeper (`lora_scan`)**:
    - Sweeps across all 104 US915 channels (902.125 MHz to 927.875 MHz).
@@ -258,7 +263,9 @@ This timing is host-tested and awaits physical C153 confirmation.
      packet detection.
    - Emits `simple-debug: lora_scan slot=... freq=... rssi=... packets=...`
      telemetry at the completion of each pass over CDC.
-   - Touch anywhere on the panel to stop sweeping (`[ STOP SCAN ]`).
+   - Touch anywhere on the panel to stop sweeping (`[ STOP SCAN ]`). GPIO4's
+     active-low falling edge is latched across radio polls so a short tap is
+     not lost.
 
 2. **LoRa Transceiver (`lora`)**:
    - Touch `[ TX PING ]` for a bench-safe test transmission: 915.0 MHz,
@@ -266,10 +273,12 @@ This timing is host-tested and awaits physical C153 confirmation.
      airtime, with immediate return to Standby RC and power-down. Emits
      `lora_tx` telemetry over CDC.
    - Touch `[ LISTEN RX ]` for an extended packet sniffer window (up to 60 s).
-     Listens on 906.875 MHz (US915 slot 19) or secondary channel using
-     SF11 / BW 250 kHz / CR 4/5 / Sync Word `0x24B4`. Emits an 80 ms tone
+     While listening, the button changes to `[ STOP RX ]`; tap it to end the
+     window early. The same GPIO4 falling-edge latch handles this stop.
+     Starts on 917.625 MHz and alternates to 906.875 MHz using SF11 / BW
+     250 kHz / CR 4/5 / Sync Word `0x24B4`. Emits an 80 ms tone
      and logs `lora_rx freq=... rssi=... snr=... len=... preview=...` over
-     CDC upon receiving a packet. Touch or buttons abort early.
+     CDC upon receiving a packet. Buttons also abort early.
 
 ## NFC verification workflow (`c153`)
 

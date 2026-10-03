@@ -123,7 +123,7 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite`. Do not commit dumps |
 | `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched |
 | `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` |
-| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:` |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01; `C153` / 2026-10-02 | C153 custom image produced CDC heartbeat and LoRa RX/control/session records |
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
 | `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
@@ -131,8 +131,9 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
 `--probe`, `backup-factory-firmware`, confirm `--capture`,
-`monitor`, restore `--capture`, and `flash-app` are **Live
-tested** on Lite. `build-fw` and `encode-assets` are host-only.
+restore `--capture`, and `flash-app` are **Live tested** on Lite.
+`monitor` is live-tested on Lite and C153. `build-fw` and
+`encode-assets` are host-only.
 Flash size is 16 MB; the live table matches official factory
 demo firmware
 ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))

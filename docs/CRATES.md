@@ -29,7 +29,7 @@ IP2315 crates.
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
 | ST25R3916 | in-tree [`st25r3916`](../crates/st25r3916). [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here** | MCU-agnostic `embedded-hal` driver crate in `crates/st25r3916`. I2C `0x50`, `I2C_EN=VDD`. ISO14443-A initiator (WUPA/REQA, anticollision CL1/CL2, SAK read), ISO/IEC 14443-4 (ISO-DEP / T=CL) activation and APDU half-duplex block protocol with chaining/WTX, smart card application discovery (FIDO CTAP, PIV, OpenPGP), target/card emulation profiles (NFC-A, NFC-F, NFCIP-1), PT_Memory layout, and Type 2/4A / NDEF protocol framing. Re-exported with board nets in `m5stack-papermono::nfc`. Confirmed live on C153. [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md) |
-| SX1262 die | `lora-phy` and `lora-modulation` at [revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179) | **pass-with-wrapper** | Generic [`sx1262-phy`](../crates/sx1262-phy) delegates modem operations and errata workarounds to upstream, adding async transport, diagnostic commands and explicit lifecycle/TX guards. New session policy awaits physical C153 validation. [Upstream comparison](#sx1262-upstream-comparison) |
+| SX1262 die | `lora-phy` and `lora-modulation` at [revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179) | **pass-with-wrapper** | Generic [`sx1262-phy`](../crates/sx1262-phy) delegates modem operations and errata workarounds to upstream, adding async transport, diagnostic commands and explicit lifecycle/TX guards. A normal C153 async RX session has confirmed startup/shutdown readbacks and one controlled packet; fault recovery, sustained sessions, timing and TX power remain open. [Upstream comparison](#sx1262-upstream-comparison) |
 | Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). Confirmed live on C153. [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md) |
 
 ## Rejected
@@ -141,5 +141,8 @@ programs the existing 300 ms completion budget into the hardware timer.
 Read failures and IRQ timeouts warn and trigger cleanup; no signal readings
 are invented after failures. Session verification starts at one; twenty or
 forty requires deliberate configuration and C153 hardware evidence.
-Settling, async timing, burst reception, RF power and antenna behavior still
-need C153 bench work. Historical hardware results do not validate this policy.
+One controlled packet was received on the current C153 async RX path on
+2026-10-02, with normal lifecycle readbacks passing. Settling and async timing,
+burst reception, failure recovery, RF output power and source conflicts still
+need C153 bench work. See the current [measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md)
+and [NYC items](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-lora-session-recovery).

@@ -133,6 +133,25 @@ verification totals and cleanup status. `lora_metrics` preserves fractional
 packet readings alongside the existing whole-unit records. These records become
 live measurements when captured on a physical board named by SKU.
 
+### C153 async receive capture (2026-10-02)
+
+The current `embassy-debug` image completed one normal receive session on
+PaperMono (`C153`). Startup reported PYG2 output mode, push-pull drive, latch,
+and sampled level high; shutdown reported output mode/drive retained with
+latch/sample low. `lora_session` reported two checks, zero failures, and clean
+cleanup. During the session it received one 18-byte packet at 917.625 MHz with
+`rssi=-72 dBm`, `snr=7 dB`; the logged preview endpoints were `0x48` and `0x54`,
+matching the first and fourth bytes of the one-shot Heltec payload. Fractional
+telemetry reported RSSI `-144` half-dBm and SNR `30` quarter-dB. The bridge
+reported TX complete, not timed out, 18 bytes, at a requested `-9 dBm`.
+
+This confirms one current async RX path and its normal startup/shutdown digital
+readbacks on this unit. It does not measure radiated TX power or confirm the
+current reset delays, BUSY/NSS timing, fault recovery, sustained-session
+behavior, or the C153 local ping's three-check log. The firmware's subsequent
+GPIO4 falling-edge stop change was not flashed or physically tested in this
+session; see the remaining [NYC items](not-yet-confirmed.md#nyc-lora-session-recovery).
+
 ## Module variants and PA settings
 
 The official [Stamp product comparison](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262)

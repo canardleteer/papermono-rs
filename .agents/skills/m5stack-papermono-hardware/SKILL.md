@@ -423,10 +423,13 @@ drive, latch and sampled level. Initial pre-TX verification cadence is
 one; twenty or forty requires deliberate configuration and C153 evidence.
 Failures invalidate readiness, warn on serial and trigger cleanup.
 
-This software policy has host tests. Its new readback and cadence claims
-remain unconfirmed on physical C153; historical RX/TX measurements do
-not validate them. Digital confirmation cannot validate antenna impedance
-or the RF path. DIO2 RF switching is a separate function. See the
+This software policy has host tests. One normal async receive session on
+physical `C153` (2026-10-02) confirmed the startup/high and shutdown/low
+digital readbacks and received one controlled 18-byte packet; details are in
+[measure.md](references/measure.md). That does not validate the local ping's
+three-check record, failure recovery, sustained sessions, rail/reset timing,
+or actual TX power. Digital confirmation cannot validate antenna impedance
+or output power. DIO2 RF switching is a separate function. See the
 [session control reference](resources/stamp-lora-1262.md#session-control-and-confirmation).
 
 Use the cached SX1262 Rev 2.2 as command authority. Record alternate
@@ -441,8 +444,9 @@ The generic chip wrapper uses awaited SPI devices and cooperative BUSY delays.
 Board pin/rail policy stays in `RadioHooks`; firmware composes NSS and retains
 it for cancellation recovery. TX requires a nonzero hardware timer. The default
 BUSY delay budget is 100 ms with one-ms polls, plus a one-us NSS settling delay;
-scheduler latency is additional. These software choices still need C153 timing
-and burst-reception measurements. Command/register sources, calibration bands
-and fractional metric encodings are recorded in
-[stamp-lora-1262.md](resources/stamp-lora-1262.md). Historical hardware results
-do not confirm this async path. C153-Lite radio outputs remain undriven.
+scheduler latency is additional. One normal C153 receive session has confirmed
+packet reception on the async path; timing, burst reception, timed-RX cleanup,
+and failure recovery still need measurements. Command/register sources,
+calibration bands and fractional metric encodings are recorded in
+[stamp-lora-1262.md](resources/stamp-lora-1262.md). C153-Lite radio outputs
+remain undriven.

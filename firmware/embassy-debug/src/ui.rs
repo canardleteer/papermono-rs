@@ -118,7 +118,7 @@ pub async fn run(
     mut panel: Panel,
     #[allow(unused_mut)] mut btn_a: Input<'static>,
     #[allow(unused_mut)] mut btn_b: Input<'static>,
-    tp: Input<'static>,
+    #[allow(unused_mut)] mut tp: Input<'static>,
     busy: Input<'static>,
     mut lpwr: LowPower<'static>,
 ) {
@@ -198,7 +198,7 @@ pub async fn run(
                             planes,
                             &btn_a,
                             &btn_b,
-                            &tp,
+                            &mut tp,
                             &mut lamp,
                             &mut vol,
                             ctx,
@@ -269,7 +269,7 @@ pub async fn run(
                     planes,
                     &btn_a,
                     &btn_b,
-                    &tp,
+                    &mut tp,
                     &mut lamp,
                     &mut vol,
                     ctx,
@@ -498,7 +498,7 @@ async fn wait_nav(
     planes: &mut Planes,
     btn_a: &Input<'static>,
     btn_b: &Input<'static>,
-    tp: &Input<'static>,
+    tp: &mut Input<'static>,
     lamp: &mut LampSlide,
     vol: &mut VolumeSlide,
     ctx: NavContext,
@@ -793,6 +793,12 @@ async fn wait_nav(
                             Timer::after(Duration::from_millis(20)).await;
                         }
 
+                        // The scanner takes over this UI task between channel
+                        // polls, so latch a short GPIO4 touch edge while the
+                        // screen still shows [ STOP SCAN ].
+                        tp.clear_interrupt();
+                        tp.listen(esp_hal::gpio::Event::FallingEdge);
+
                         // Run continuous scan sweeps across the 104 channels:
                         while crate::lora::run_scan_sweep(i2c, btn_a, btn_b, tp).await {
                             draw::render(
@@ -805,10 +811,17 @@ async fn wait_nav(
                             panel
                                 .paint_mono_fast(i2c, &planes.bw, &planes.red, busy)
                                 .await;
-                            if btn_a.is_low() || btn_b.is_low() || tp.is_low() {
+                            if btn_a.is_low()
+                                || btn_b.is_low()
+                                || tp.is_low()
+                                || tp.is_interrupt_set()
+                            {
                                 break;
                             }
                         }
+
+                        tp.unlisten();
+                        tp.clear_interrupt();
 
                         crate::lora::set_scanning(false);
 

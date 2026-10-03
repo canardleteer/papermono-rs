@@ -173,10 +173,12 @@ including RX, TX, standby and channel changes. Board `RadioHooks` owns
 reset, rail and antenna sequencing. Startup enables the rail, waits 200 ms,
 asserts reset for 100 ms with antenna high, then releases reset and waits
 200 ms before BUSY readiness. These tutorial-derived timings are host-tested
-and await physical C153 confirmation. Generic `sx1262-phy` wraps revision-pinned
+and their actual delays still await measurement. A normal C153 RX session on
+2026-10-02 confirmed startup/shutdown readbacks and one packet; fault recovery,
+sustained operation and TX output remain open. Generic `sx1262-phy` wraps revision-pinned
 `lora-phy` async modem operations at reviewed revision b47cbdf. `RadioContext`
 borrows system I2C for each control/readback call. Confirmation fields and source
 encodings:
 [Stamp LoRa-1262 session controls](../resources/stamp-lora-1262.md#session-control-and-confirmation).
-New physical confirmation remains open under
-[nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).
+Remaining physical work is split across
+[NYC rows](../resources/not-yet-confirmed.md#nyc-lora-session-recovery).

@@ -164,7 +164,10 @@ in `resumeReceive`. The older [M5PaperMono-UserDemo LoRa HAL](https://github.com
 Historical [C153 reception](measure.md) used HIGH too. These are
 different layers of evidence; successful reception alone does not
 characterize the switch, fitted module revision or RF impedance.
-The RX polarity conflict is unresolved. Keep the repository session
+One controlled packet was received on C153 with the runtime HIGH policy on
+2026-10-02. This confirms that path on that unit; it does not test the LOW
+example, establish module-wide behavior or characterize antenna impedance.
+The RX polarity conflict remains unresolved. Keep the repository session
 policy HIGH across RX, TX, standby and channel changes until shutdown.
 
 The tutorial's transmitter requests `kTxPowerDbm = 22` through
@@ -174,6 +177,7 @@ calibration or a basis for changing our diagnostic PA/OCP settings.
 The retained profile still needs C153 RF-output characterization;
 see [PA profile comparison](#sx1262-pa-profile-comparison).
 
-Board measurements remain open under
-[nyc-lora-session-confirmation](../resources/not-yet-confirmed.md#nyc-lora-session-confirmation).
-No physical panel or radio confirmation was performed for this source review.
+Normal C153 RX control and one-way reception are recorded in
+[measure.md](measure.md). Remaining board work is tracked under
+[NYC rows](../resources/not-yet-confirmed.md#nyc-lora-session-recovery). The
+source comparison itself was reviewed on 2026-10-01, before that live test.

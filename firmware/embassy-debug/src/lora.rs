@@ -824,9 +824,11 @@ pub async fn transmit_ping(_i2c: &mut crate::ioe::SysI2c) -> Option<papermono_lo
 }
 
 /// Listens for incoming LoRa packets on the sniffer frequency for up to 60 seconds,
-/// or until a stop request from a button press or screen tap. Records measured
-/// ambient noise when quiet; returns an error on chip/control failure, with CDC
-/// warning and cleanup. Stop requests are observed between awaited sequences.
+/// or until a stop request from a button press or a latched falling edge on the
+/// active-low FT6336G interrupt (`GPIO4`). Records measured ambient noise when
+/// quiet; returns an error on chip/control failure, with CDC warning and cleanup.
+/// Stop requests are observed between awaited sequences; the touch edge is
+/// latched by ESP-HAL so a short tap is not lost between radio polls.
 ///
 /// # Hardware Sequencing
 /// 1. Engages antenna via M5IOE1 `PYG2`, powers module via M5PM1 `G2`, and releases reset.
@@ -844,7 +846,7 @@ pub async fn listen_rx(
     i2c: &mut ioe::SysI2c,
     btn_a: &esp_hal::gpio::Input<'static>,
     btn_b: &esp_hal::gpio::Input<'static>,
-    tp: &esp_hal::gpio::Input<'static>,
+    tp: &mut esp_hal::gpio::Input<'static>,
 ) -> Result<Option<papermono_log::LoraRxSample>, ()> {
     let mut lock = LORA_HW.lock().await;
     let hw = lock.as_mut().ok_or(())?;
@@ -915,11 +917,20 @@ pub async fn listen_rx(
         Timer::after(Duration::from_millis(20)).await;
     }
 
+    // The UI task awaits this bounded session, so it cannot poll FT6336G touch
+    // coordinates while LoRa owns the radio. Latch the active-low GPIO4 edge
+    // instead; this needs no system-I2C transaction during reception.
+    tp.clear_interrupt();
+    tp.listen(esp_hal::gpio::Event::FallingEdge);
+
     // 5. Polling window (up to 60 seconds: 1200 x 50 ms):
     let mut received = None;
     let mut preview_buf = [0; 4];
     for _ in 0..1200 {
         Timer::after(Duration::from_millis(50)).await;
+        if btn_a.is_low() || btn_b.is_low() || tp.is_low() || tp.is_interrupt_set() {
+            break;
+        }
         match sx.poll_receive(&mut preview_buf).await {
             Ok(ReceivePoll::Packet { len, status, .. }) => {
                 received = Some((len, status));
@@ -927,6 +938,8 @@ pub async fn listen_rx(
             }
             Ok(ReceivePoll::Pending | ReceivePoll::Rejected { .. }) => {}
             Ok(ReceivePoll::Timeout { .. }) | Err(_) => {
+                tp.unlisten();
+                tp.clear_interrupt();
                 report_failure(
                     &sx,
                     papermono_log::LoraPhase::Startup,
@@ -936,10 +949,9 @@ pub async fn listen_rx(
                 return Err(());
             }
         }
-        if btn_a.is_low() || btn_b.is_low() || tp.is_low() {
-            break;
-        }
     }
+    tp.unlisten();
+    tp.clear_interrupt();
 
     if let Some((len, pkt_status)) = received {
         crate::beep::tone(80);
@@ -995,7 +1007,7 @@ pub async fn listen_rx(
     _i2c: &mut crate::ioe::SysI2c,
     _btn_a: &esp_hal::gpio::Input<'static>,
     _btn_b: &esp_hal::gpio::Input<'static>,
-    _tp: &esp_hal::gpio::Input<'static>,
+    _tp: &mut esp_hal::gpio::Input<'static>,
 ) -> Result<Option<papermono_log::LoraRxSample>, ()> {
     Err(())
 }
@@ -1091,6 +1103,7 @@ pub async fn run_scan_sweep(
             || btn_a.is_low()
             || btn_b.is_low()
             || tp.is_low()
+            || tp.is_interrupt_set()
         {
             stopped = true;
             break;
