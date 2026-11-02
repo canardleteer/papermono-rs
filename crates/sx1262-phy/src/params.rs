@@ -26,9 +26,15 @@ where
     BUSY: embedded_hal::digital::InputPin,
     DELAY: embedded_hal_async::delay::DelayNs,
 {
-    /// Configures upstream modulation and its bandwidth workaround. LDRO is
-    /// computed by lora-modulation for every supported symbol duration, then
-    /// explicitly propagated into upstream's command parameters.
+    /// Validates modulation with published `lora-phy`, then writes catalog
+    /// `sx1262` Rev 2.2 §13.4.5.2 “LoRa Modulation Parameters” locally so LDRO
+    /// follows `lora-modulation` for narrow bandwidths too. Upstream's fields
+    /// are private and its LDRO calculation covers only selected bandwidths.
+    ///
+    /// Applies §15.1.2 “Workaround” with a masked register update. A failed or
+    /// cancelled command or workaround invalidates the whole session; successful
+    /// intermediate transfers cannot restore readiness. Transport errors retain
+    /// their original type. No antenna, PA, OCP or board sequencing changes occur.
     pub async fn configure_lora_modulation(
         &mut self,
         params: &BaseBandModulationParams,
@@ -40,17 +46,39 @@ where
         let frequency = self.frequency_hz.unwrap_or(960_000_000);
         let mut fault = None;
         let saved = self.begin_io();
-        let result = {
-            let mut radio = self.backend(&mut fault);
-            match radio.create_modulation_params(params.sf, params.bw, params.cr, frequency) {
-                Ok(mut modulation) => {
-                    modulation.low_data_rate_optimize = u8::from(calculated.ldro);
-                    radio.set_modulation_params(&modulation).await
-                }
-                Err(error) => Err(error),
-            }
-        };
-        self.end_io(saved, backend::finish(result, fault))?;
+        let result = async {
+            // Preserve upstream's SF/BW/CR and frequency validation without
+            // relying on private fields in the published modulation object.
+            self.backend(&mut fault)
+                .create_modulation_params(params.sf, params.bw, params.cr, frequency)
+                .map_err(SxError::Upstream)?;
+            let bandwidth = bandwidth_encoding(params.bw);
+            let coding_rate = match params.cr {
+                CodingRate::_4_5 => LORA_CR_4_5,
+                CodingRate::_4_6 => LORA_CR_4_6,
+                CodingRate::_4_7 => LORA_CR_4_7,
+                CodingRate::_4_8 => LORA_CR_4_8,
+            };
+            let ldro = if calculated.ldro {
+                LORA_LDRO_ON
+            } else {
+                LORA_LDRO_OFF
+            };
+            self.write_cmd(
+                CMD_SET_MODULATION_PARAMS,
+                &[params.sf.factor() as u8, bandwidth, coding_rate, ldro],
+            )
+            .await?;
+            let tx_modulation = self.read_reg(REG_TX_MODULATION).await?;
+            let updated = if params.bw == Bandwidth::_500KHz {
+                tx_modulation & !TX_MODULATION_BW_MASK
+            } else {
+                tx_modulation | TX_MODULATION_BW_MASK
+            };
+            self.write_reg(REG_TX_MODULATION, updated).await
+        }
+        .await;
+        self.end_io(saved, result)?;
         self.modulation = Some(calculated);
         Ok(())
     }
@@ -122,6 +150,23 @@ where
     /// Last explicitly calibrated band; reset/startup discards this cache.
     pub const fn calibration_band(&self) -> Option<CalibrationBand> {
         self.calibration_band
+    }
+}
+
+/// Chip bandwidth encodings from catalog `sx1262` Rev 2.2 §13.4.5.2
+/// “LoRa Modulation Parameters”, Table 13-48; enum order is not a wire encoding.
+const fn bandwidth_encoding(bandwidth: Bandwidth) -> u8 {
+    match bandwidth {
+        Bandwidth::_7KHz => LORA_BW_7_KHZ,
+        Bandwidth::_10KHz => LORA_BW_10_KHZ,
+        Bandwidth::_15KHz => LORA_BW_15_KHZ,
+        Bandwidth::_20KHz => LORA_BW_20_KHZ,
+        Bandwidth::_31KHz => LORA_BW_31_KHZ,
+        Bandwidth::_41KHz => LORA_BW_41_KHZ,
+        Bandwidth::_62KHz => LORA_BW_62_KHZ,
+        Bandwidth::_125KHz => LORA_BW_125_KHZ,
+        Bandwidth::_250KHz => LORA_BW_250_KHZ,
+        Bandwidth::_500KHz => LORA_BW_500_KHZ,
     }
 }
 

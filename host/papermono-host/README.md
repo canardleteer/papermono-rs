@@ -4,6 +4,10 @@ Programmatic host API for M5Stack PaperMono and PaperMono-Lite USB
 detect, factory backup / confirm / restore, and CDC monitor
 (modem lines off; `--reset` does not recapture on Lite).
 
+Requires Rust 1.95 or newer (`espflash` 4.7). Snapshot hash strings and
+USB session lock contention/inheritance remain compatible with earlier
+versions.
+
 `cargo xtask` is the clap front-end. Callers pass a `Layout`
 (developer-data / backups root), not a hardcoded repo path.
 
@@ -20,7 +24,7 @@ snapshot `factory` partition only (Lite: `0x10000`).
 [udev/99-papermono-usb.rules](udev/99-papermono-usb.rules) to
 `/etc/udev/rules.d/`, reload udev, and replug. Operator steps:
 the papermono-rs skill
-[xtask.md](../../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
+[xtask.md](https://github.com/canardleteer/papermono-rs/blob/main/.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
 
 License: MIT
 

@@ -54,6 +54,10 @@ All host-side device interaction runs exclusively through `cargo xtask`.
 
 ## The workspace (host, no special toolchain)
 
+Use Rust 1.95 or newer for host tools. Board/chip crates keep a Rust 1.88
+minimum. The selected releases and crypto revision pins are recorded in
+[dependencies.md](dependencies.md).
+
 ```shell
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
@@ -72,10 +76,14 @@ audits.
 `firmware/simple-debug` and `firmware/embassy-debug` target
 `xtensa-esp32s3-none-elf`, requiring the Espressif toolchain fork. While
 `simple-debug` employs blocking `esp-hal` primitives, `embassy-debug` runs the
-async Embassy runtime. Build commands execute from the repository root:
+async Embassy runtime. Simple firmware needs an Espressif compiler based
+on Rust 1.95 or newer; Embassy firmware needs 1.97 or newer. After
+installation, `rustc +esp --version` should report at least 1.97 when
+building both examples. Build commands execute from the repository root:
 
 ```shell
 cargo install espup --locked
+cargo install espflash --version 4.7.0 --locked
 espup install
 . $HOME/export-esp.sh
 ```

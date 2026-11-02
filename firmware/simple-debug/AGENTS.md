@@ -1,6 +1,8 @@
 # simple-debug-fw
 
-Blocking `esp-hal` proof-of-life image. Workspace member, **not** a
+Blocking `esp-hal` 1.2.2 proof-of-life image. Requires an Espressif compiler
+based on Rust 1.95 or newer; the Embassy image needs 1.97. See
+[dependencies.md](../../docs/dependencies.md). Workspace member, **not** a
 default-member: host `cargo test` must not compile this package.
 
 First SKU: PaperMono-Lite via `m5stack-papermono-lite`.

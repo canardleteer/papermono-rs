@@ -51,6 +51,21 @@ Packing (one flash, many safe probes) is a root rule:
 [AGENTS.md](../AGENTS.md#pack-one-flash). Do not treat this
 file as the only copy.
 
+## Compiler and crypto stack
+
+Simple firmware requires Rust 1.95; Embassy firmware requires 1.97.
+Use the published ESP HAL 1.2.2 / RTOS 0.4.0 family. `esp-radio`
+1.0.0-beta.1 is the approved release exception. TrouBLE and Embassy crypto
+are pinned by full commit hashes in the manifest; see
+[dependencies.md](../docs/dependencies.md).
+
+`radio` alone enables the software AES-128 ECB, AES-128 CMAC and P-256
+ECDH drivers and one ChaCha12 RNG registration. Seed before BLE startup
+from HAL `Trng` with `TrngSource`, then drop the TRNG and its temporary
+ADC entropy source before starting wireless hardware. Unseeded crypto RNG
+access must panic explicitly. Keep bonds in RAM and preserve CDC/GATT/UI
+behavior. The shared glue is tested by `xtask/tests/radio_crypto.rs`.
+
 ## LoRa sessions
 
 The C153 path uses `sx1262-phy` via BSP re-exports and `RadioHooks`.
@@ -61,7 +76,7 @@ control changes between packets, standby or channel changes.
 Startup follows the current PaperMono LoRa tutorial's rail-first
 200 ms wait, 100 ms reset assertion and 200 ms after release, then
 BUSY readiness. These timings have host mock coverage; C153 physical
-confirmation of the delay values remains open. A normal current-image C153
+confirmation of the delay values remains open. A normal C153
 receive session on 2026-10-02 confirmed startup/high and shutdown/low antenna
 readbacks, `checks=2 failures=0 cleanup=ok`, and one received packet; it does
 not confirm reset timing, failure recovery, or TX behavior. See the hardware

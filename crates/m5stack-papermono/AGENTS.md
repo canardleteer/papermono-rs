@@ -52,7 +52,10 @@ PaperMono-Lite (`C153-Lite`) baseline:
 ## LoRa caller hooks
 
 `lora` re-exports `sx1262-phy`. Keep PaperMono nets and presets here;
-the generic crate delegates modem operations to revision-pinned `lora-phy`.
+the generic crate delegates modem operations to published `lora-phy` 3.0.1.
+Modulation and its masked bandwidth workaround are programmed locally after
+upstream validation, using `lora-modulation` 0.1.5 for LDRO. Board nets and
+sequencing stay here. See [CRATES.md](../../docs/CRATES.md).
 `RadioHooks` takes a short `RadioContext` with borrowed I2C, discovered
 expander address and upstream async DelayNs. Startup enables the rail,
 waits 200 ms, asserts reset and enables antenna, holds reset 100 ms,

@@ -108,6 +108,10 @@ lines. After `flash-app`, short-press red. Do not use
 
 ## Tool verification ledger
 
+Dated live entries below describe earlier releases. The 2026-11-01
+[dependency upgrade](dependencies.md) is host-verified; no new
+backup, restore, flash or monitor session was run for that stack.
+
 Implemented is not proven. Agents: read the same table in
 [xtask.md](../.agents/skills/papermono-rs/references/xtask.md#tool-verification-ledger)
 before a live command.
@@ -117,7 +121,7 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 
 | Command | Status | SKU / date | Note |
 | --- | --- | --- | --- |
-| `ci` | Host-only tested | host / 2026-08-31 | fmt, clippy, test, rumdl, machete, audit |
+| `ci` | Host-only tested | host / 2026-11-01 | 243 tests per host feature configuration; all 16 firmware checks; fmt, rumdl, machete; zero audit vulnerabilities |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run and download: `303a:1001` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | ESP32-S3 v0.2, 40 MHz, 16 MB |
 | `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite`. Do not commit dumps |
@@ -126,8 +130,8 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 | `monitor` | Live tested | `C153-Lite` / 2026-09-01; `C153` / 2026-10-02 | C153 custom image produced CDC heartbeat and LoRa RX/control/session records |
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
-| `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
-| `encode-assets` | Host-only tested | host / 2026-09-02 | Rasterize and pack SVG line art into 1bpp bitmaps |
+| `build-fw` | Host-only tested | host / 2026-11-01 | Both images default/pruned Lite; Embassy all features and radio-disabled; linked and packed with espflash 4.7 |
+| `encode-assets` | Host-only tested | host / 2026-11-01 | Temporary-directory harness preserves bitmap/inverse/checksum; build script rejects stale, missing or incorrectly sized assets |
 | `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
 `--probe`, `backup-factory-firmware`, confirm `--capture`,

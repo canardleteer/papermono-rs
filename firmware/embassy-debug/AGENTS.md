@@ -93,6 +93,19 @@ feedback on button navigation and touchscreen hits. Active channel
 survey runs continuously until touching `[ STOP SURVEY ]`
 (transitions through `[ STOPPING... ]` to complete).
 
+## Dependency and entropy contract
+
+This image requires an Espressif compiler based on Rust 1.97. The
+[dependency stack](../../docs/dependencies.md) records the published ESP
+family, the approved radio beta and the full TrouBLE/crypto revision pins.
+Only `radio` enables crypto: `csprng` registers one ChaCha12 RNG and links
+the AES-128 ECB/CMAC and P-256 ECDH software drivers. Seed it from an
+enabled HAL TRNG, then release both the TRNG and temporary ADC source
+before BLE or Wi-Fi initialization. Unseeded calls fail explicitly.
+Bonds remain RAM-only; passkeys, CDC events and GATT retain their behavior.
+Host tests and link checks do not revalidate pairing/coexistence on either
+SKU; dated results below precede this dependency upgrade.
+
 ## LoRa lifecycle evidence
 
 C153 diagnostics use one explicit startup/shutdown pair per ping,

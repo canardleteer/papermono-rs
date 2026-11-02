@@ -1,20 +1,21 @@
 # sx1262-phy
 
 An SX1262 `no_std` driver with async `SpiDevice`, BUSY input, caller-supplied
-async delay, and lifecycle/antenna-readiness hooks. Both `lora-phy` and
-`lora-modulation` are pinned to reviewed
-[revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179),
-with default and LoRaWAN features disabled. Rust 1.88 is required for
-upstream let-chains; registry publication is deferred.
+async delay, and lifecycle/antenna-readiness hooks. Uses published
+[`lora-phy` 3.0.1](https://docs.rs/lora-phy/3.0.1/lora_phy/) and
+[`lora-modulation` 0.1.5](https://docs.rs/lora-modulation/0.1.5/lora_modulation/),
+with default and LoRaWAN features disabled. Requires Rust 1.88; registry
+publication remains disabled pending separate package review.
 Borrowed upstream backends supply modem configuration, frequency, standby,
-FIFO writes, and bandwidth/IQ workarounds. Local commands retain diagnostics,
+FIFO writes, and the IQ workaround. Local commands retain diagnostics,
 PA/OCP selection, calibration caching, managed RX and guarded timed TX.
 
 Command references use Semtech SX1261/2 Rev 2.2, Dec 2024 (catalog
 `sx1262`), §8.3.1 “BUSY Control Line” and §13 “Commands Interface”.
-Upstream modem configuration also applies the §15.1 “Modulation Quality
-with 500 kHz LoRa Bandwidth” and §15.4 “Optimizing the Inverted IQ
-Operation” workarounds.
+After upstream parameter validation, local modulation writes use
+§13.4.5.2 “LoRa Modulation Parameters” and the masked §15.1.2 “Workaround”
+under “Modulation Quality with 500kHz LoRa Bandwidth”. Upstream still
+applies §15.4.2 “Workaround” for inverted IQ.
 
 ## Caller responsibilities
 
@@ -146,7 +147,9 @@ Upstream [issue 350](https://github.com/lora-rs/lora-rs/issues/350) describes
 why command processing futures need care around cancellation.
 
 `BaseBandModulationParams::new` computes LDRO from symbol duration. The wrapper
-passes that value to upstream and rejects inconsistent manual overrides.
+writes that value locally without accessing private upstream fields and
+rejects inconsistent manual overrides. Upstream SF/BW/CR and frequency
+validation is retained, including the low-frequency bandwidth restriction.
 Modulation must precede packet configuration. SF5/SF6 preambles are raised to
 twelve symbols. `lora_airtime_us` includes optional CRC and 16-bit preambles,
 uses u64 arithmetic, and follows
@@ -176,5 +179,8 @@ failures, parameter bounds, chip readback and upstream modem workarounds.
 Pending mocks also cover yielding, cancellation, BUSY delay budgets, original
 transport/upstream errors, NSS recovery, IRQ acknowledgement, timed-RX cleanup,
 FIFO wrapping, fractional metrics, LDRO and airtime boundaries. These tests
-establish software behavior. Settling, async timing, burst reception, RF power
+establish software behavior. The modulation matrix covers all eight SFs,
+ten bandwidths and four coding rates, preserving workaround bits; command,
+read, write and cancellation failures block TX until lifecycle recovery.
+Settling, async timing, burst reception, RF power
 and antenna performance require C153 hardware evidence.

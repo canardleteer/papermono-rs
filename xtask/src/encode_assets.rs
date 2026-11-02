@@ -7,7 +7,6 @@ use image::{imageops, GrayImage, Luma};
 use papermono_host::Error;
 use resvg::tiny_skia::{Color, Pixmap, Transform};
 use resvg::usvg::{Options, Tree};
-use sha2::{Digest, Sha256};
 
 const WIDTH: u32 = 360;
 const HEIGHT: u32 = 240;
@@ -168,11 +167,58 @@ pub fn run(repo_root: &Path) -> Result<(), Error> {
         .save(&inv_png_path)
         .map_err(|e| Error::Device(format!("failed to save {}: {e}", inv_png_path.display())))?;
 
-    let svg_hash = format!("{:x}", Sha256::digest(&svg_bytes));
+    let svg_hash = papermono_host::dump::sha256_hex(&svg_bytes);
     fs::write(&sha_path, format!("{svg_hash}\n"))
         .map_err(|e| Error::Device(format!("failed to write {}: {e}", sha_path.display())))?;
 
     println!("encoded 1bpp assets in {}", assets_dir.display());
     println!("sha256: {svg_hash}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoding_in_temporary_directory_preserves_ferris_bytes_and_checksum() {
+        let dir = tempfile::tempdir().unwrap();
+        let assets = dir.path().join("firmware/embassy-debug/assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(
+            assets.join("ferris-happy-line-art.svg"),
+            include_bytes!("../../firmware/embassy-debug/assets/ferris-happy-line-art.svg"),
+        )
+        .unwrap();
+        run(dir.path()).unwrap();
+        assert_eq!(
+            fs::read(assets.join("ferris.1bpp")).unwrap(),
+            include_bytes!("../../firmware/embassy-debug/assets/ferris.1bpp")
+        );
+        assert_eq!(
+            fs::read(assets.join("ferris-inv.1bpp")).unwrap(),
+            include_bytes!("../../firmware/embassy-debug/assets/ferris-inv.1bpp")
+        );
+        assert_eq!(
+            fs::read_to_string(assets.join("ferris-happy-line-art.svg.sha256")).unwrap(),
+            include_str!("../../firmware/embassy-debug/assets/ferris-happy-line-art.svg.sha256")
+        );
+        let preview = image::open(assets.join("ferris.png")).unwrap();
+        assert_eq!((preview.width(), preview.height()), (WIDTH, HEIGHT));
+    }
+
+    #[test]
+    fn missing_or_blank_source_cannot_update_the_checksum() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(run(dir.path()).is_err());
+        let assets = dir.path().join("firmware/embassy-debug/assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(
+            assets.join("ferris-happy-line-art.svg"),
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>"#,
+        )
+        .unwrap();
+        assert!(run(dir.path()).is_err());
+        assert!(!assets.join("ferris-happy-line-art.svg.sha256").exists());
+    }
 }

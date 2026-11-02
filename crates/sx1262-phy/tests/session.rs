@@ -482,11 +482,170 @@ fn chip_readback_parameter_bounds_and_upstream_workarounds() {
     assert!(frames.contains(&vec![CMD_SET_RF_FREQUENCY, 0x39, 0x30, 0, 0]));
     assert!(frames.contains(&vec![CMD_SET_MODULATION_PARAMS, 7, 4, 1, 0]));
     assert!(frames.contains(&vec![CMD_SET_PACKET_PARAMS, 0, 8, 0, 16, 1, 0]));
-    // Semtech Rev2.2 §15.1 and §15.4, performed by the upstream driver.
+    // Semtech Rev2.2 §15.1 is local; upstream handles §15.4's IQ workaround.
     assert!(frames.contains(&vec![CMD_WRITE_REGISTER, 0x08, 0x89, 4]));
     assert!(frames.contains(&vec![CMD_WRITE_REGISTER, 0x07, 0x36, 4]));
     assert_eq!(encode_sync_word(0x12), SYNC_WORD_PRIVATE);
     assert_eq!(RadioStatus::from_byte(0x24).chip_mode, ChipMode::StbyRc);
+}
+
+#[test]
+fn modulation_matrix_matches_datasheet_and_symbol_duration_with_masked_workaround() {
+    // Independent wire values from sx1262 Rev 2.2 §13.4.5.2 Tables 13-47/48/49.
+    let spreading_factors = [
+        (SpreadingFactor::_5, 5),
+        (SpreadingFactor::_6, 6),
+        (SpreadingFactor::_7, 7),
+        (SpreadingFactor::_8, 8),
+        (SpreadingFactor::_9, 9),
+        (SpreadingFactor::_10, 10),
+        (SpreadingFactor::_11, 11),
+        (SpreadingFactor::_12, 12),
+    ];
+    let bandwidths = [
+        (Bandwidth::_7KHz, 0x00),
+        (Bandwidth::_10KHz, 0x08),
+        (Bandwidth::_15KHz, 0x01),
+        (Bandwidth::_20KHz, 0x09),
+        (Bandwidth::_31KHz, 0x02),
+        (Bandwidth::_41KHz, 0x0A),
+        (Bandwidth::_62KHz, 0x03),
+        (Bandwidth::_125KHz, 0x04),
+        (Bandwidth::_250KHz, 0x05),
+        (Bandwidth::_500KHz, 0x06),
+    ];
+    let coding_rates = [
+        (CodingRate::_4_5, 1),
+        (CodingRate::_4_6, 2),
+        (CodingRate::_4_7, 3),
+        (CodingRate::_4_8, 4),
+    ];
+    let (mut sx, wire) = radio(AlwaysConnected);
+    run(sx.startup(&mut ())).unwrap();
+    run(sx.set_rf_frequency(915_000_000)).unwrap();
+    for (sf, sf_wire) in spreading_factors {
+        for (bw, bw_wire) in bandwidths {
+            for (cr, cr_wire) in coding_rates {
+                // Exercise both possible original workaround-bit values as well
+                // as all unrelated bits, including restoration after 500 kHz.
+                for original in [0xA3, 0xFF] {
+                    wire.borrow_mut().frames.clear();
+                    wire.borrow_mut().returned = vec![original];
+                    run(sx.configure_lora_modulation(&BaseBandModulationParams::new(sf, bw, cr)))
+                        .unwrap();
+                    let ldro =
+                        u8::from((1_u64 << sf_wire) * 1_000_000 >= u64::from(bw.hz()) * 16_384);
+                    let updated = if bw_wire == 6 {
+                        original & !4
+                    } else {
+                        original | 4
+                    };
+                    assert_eq!(
+                        wire.borrow().frames,
+                        [
+                            vec![0x8B, sf_wire, bw_wire, cr_wire, ldro],
+                            vec![0x1D, 0x08, 0x89, 0],
+                            vec![0x0D, 0x08, 0x89, updated],
+                        ]
+                    );
+                    assert_eq!(sx.session_state(), SessionState::Active);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn modulation_validation_and_each_transport_failure_block_tx() {
+    for command in [
+        CMD_SET_MODULATION_PARAMS,
+        CMD_READ_REGISTER,
+        CMD_WRITE_REGISTER,
+    ] {
+        let (mut sx, wire) = radio(AlwaysConnected);
+        run(sx.startup(&mut ())).unwrap();
+        sx.set_verification_interval(std::num::NonZeroU32::new(40).unwrap());
+        wire.borrow_mut().fail_command = Some(command);
+        assert_eq!(
+            run(sx.configure_lora_modulation(&BaseBandModulationParams::new(
+                SpreadingFactor::_11,
+                Bandwidth::_62KHz,
+                CodingRate::_4_8
+            ))),
+            Err(SxError::Spi(embedded_hal_bus::spi::DeviceError::Spi(
+                spi::ErrorKind::Overrun
+            )))
+        );
+        assert_eq!(sx.session_state(), SessionState::NeedsShutdown);
+        assert_eq!(sx.verification_interval().get(), 1);
+        assert!(!wire.borrow().selected);
+        assert_eq!(
+            run(sx.set_tx(&mut (), 1)),
+            Err(SessionError::RecoveryRequired)
+        );
+        wire.borrow_mut().fail_command = None;
+        run(sx.shutdown(&mut ())).unwrap();
+        run(sx.startup(&mut ())).unwrap();
+        run(sx.set_tx(&mut (), 1)).unwrap();
+    }
+    let (mut sx, wire) = radio(AlwaysConnected);
+    run(sx.set_rf_frequency(300_000_000)).unwrap();
+    wire.borrow_mut().frames.clear();
+    assert!(matches!(
+        run(sx.configure_lora_modulation(&BaseBandModulationParams::new(
+            SpreadingFactor::_7,
+            Bandwidth::_500KHz,
+            CodingRate::_4_5
+        ))),
+        Err(SxError::Upstream(_))
+    ));
+    assert!(wire.borrow().frames.is_empty());
+    let mut invalid =
+        BaseBandModulationParams::new(SpreadingFactor::_11, Bandwidth::_62KHz, CodingRate::_4_5);
+    invalid.ldro = false;
+    assert_eq!(
+        run(sx.configure_lora_modulation(&invalid)),
+        Err(SxError::InvalidParam)
+    );
+    assert!(wire.borrow().frames.is_empty());
+}
+
+#[test]
+fn cancellation_between_modulation_and_workaround_requires_shutdown() {
+    for completed_commands in [1, 2] {
+        let (mut sx, wire) = radio(AlwaysConnected);
+        run(sx.startup(&mut ())).unwrap();
+        sx.set_verification_interval(std::num::NonZeroU32::new(40).unwrap());
+        let modulation = BaseBandModulationParams::new(
+            SpreadingFactor::_7,
+            Bandwidth::_500KHz,
+            CodingRate::_4_5,
+        );
+        {
+            let mut future = std::pin::pin!(sx.configure_lora_modulation(&modulation));
+            let mut cx = Context::from_waker(Waker::noop());
+            // Stop during the post-NSS settling delay after a completed
+            // transfer, so there is no outstanding transfer to confuse recovery.
+            for _ in 0..100 {
+                assert!(future.as_mut().poll(&mut cx).is_pending());
+                if wire.borrow().frames.len() == completed_commands {
+                    break;
+                }
+            }
+            assert_eq!(wire.borrow().frames.len(), completed_commands);
+        }
+        assert!(!wire.borrow().selected);
+        assert_eq!(sx.session_state(), SessionState::NeedsShutdown);
+        assert_eq!(sx.verification_interval().get(), 1);
+        assert_eq!(
+            run(sx.set_tx(&mut (), 1)),
+            Err(SessionError::RecoveryRequired)
+        );
+        run(sx.shutdown(&mut ())).unwrap();
+        run(sx.startup(&mut ())).unwrap();
+        run(sx.configure_lora_modulation(&modulation)).unwrap();
+        run(sx.set_tx(&mut (), 1)).unwrap();
+    }
 }
 
 #[test]

@@ -46,6 +46,8 @@
 mod beep;
 mod board;
 mod cdc;
+#[cfg(feature = "radio")]
+mod csprng;
 #[cfg(feature = "panel")]
 mod draw;
 mod heartbeat;
@@ -139,6 +141,24 @@ const _: () = {
 async fn main(spawner: Spawner) -> ! {
     // Initialize MCU clock distribution and power controllers.
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // esp-hal's bare Rng is only pseudo-random while wireless is off. Temporarily
+    // enable its documented SAR ADC entropy source to seed BLE's software RNG.
+    // No board GPIO or system I2C bus participates in this internal ADC operation.
+    #[cfg(feature = "radio")]
+    {
+        use esp_hal::rng::{Trng, TrngSource};
+
+        let source = TrngSource::new(peripherals.RNG, peripherals.ADC1);
+        let trng = Trng::try_new().expect("ADC entropy source must enable TRNG");
+        let mut seed = [0; 32];
+        trng.read(&mut seed);
+        csprng::seed(seed);
+        // Release the TRNG user first, then restore the ADC before either BLE
+        // or Wi-Fi starts. Keeping the ADC entropy source active conflicts with RF.
+        drop(trng);
+        drop(source);
+    }
 
     // When wireless radio scanning is active, initialize heap allocators required by esp-radio.
     #[cfg(feature = "radio")]

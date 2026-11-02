@@ -25,8 +25,8 @@ The crate is `#![no_std]` and fully testable on the host compiler.
 
 ## LoRa sessions
 
-`lora` re-exports the generic `sx1262-phy` API, backed by the revision-pinned
-`lora-phy` SX126x driver at reviewed revision b47cbdf. PaperMono pins,
+`lora` re-exports the generic `sx1262-phy` API, backed by published
+`lora-phy` 3.0.1 and `lora-modulation` 0.1.5. PaperMono pins,
 presets and `RadioHooks` remain in this BSP. `RadioContext` lends system I2C
 and an asynchronous delay
 for each startup, TX confirmation or shutdown operation; the wrapper

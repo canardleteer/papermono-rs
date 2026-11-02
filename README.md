@@ -12,12 +12,15 @@ The board contract and a safety-first host CLI (`cargo xtask`)
 are here. Board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
 `m5stack-papermono` (`C153`, NFC + LoRa).
-The generic [`sx1262-phy`](crates/sx1262-phy) wraps the revision-pinned
-`lora-phy` driver with awaited chip I/O and explicit lifecycle and TX-readiness
+The generic [`sx1262-phy`](crates/sx1262-phy) wraps published
+`lora-phy` 3.0.1 with awaited chip I/O and explicit lifecycle and TX-readiness
 hooks.
 `simple-debug-fw` and `embassy-debug-fw` are workspace members,
 not default-members.
-Board/chip crates require Rust 1.88 because pinned lora-rs uses let-chains.
+Board/chip crates require Rust 1.88; host tools and simple firmware require
+1.95, and Embassy firmware requires an Espressif compiler based on Rust 1.97.
+The [dependency stack](docs/dependencies.md) records releases, crypto pins,
+the approved radio beta, and host verification commands.
 
 - Host tools are: `cargo xtask` over `host/papermono-host`.
 - **Read [docs/SAFETY.md](docs/SAFETY.md) before flashing or
@@ -82,10 +85,10 @@ The default firmware detects board hardware at startup and operates PaperMono
      the ping has a 300 ms hardware TX limit. Failed reads show a radio error
      instead of a substitute signal reading.
 3. **Compile-Time Pruning**: For users desiring minimal binary footprint or
-   strictly verified Lite-only builds, passing
+   Lite-only builds, passing
    `--no-default-features --features lite` completely compiles out all
    `C153` radio driver crates and dependencies at compile time, reducing
-   flash consumption by ~34 KB.
+   flash consumption. See [verified build sizes](docs/dependencies.md#verification-record).
 
 ## Firmware Examples
 

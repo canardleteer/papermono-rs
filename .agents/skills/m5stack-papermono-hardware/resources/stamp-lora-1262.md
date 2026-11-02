@@ -118,7 +118,10 @@ registry publication remain separate.
 | `GPIO_DRV_L`, bit 1 = 0 | PYG2 push-pull drive | Same M5IOE1 sections |
 | `GPIO_O_L`, bit 1 | PYG2 output latch | Same M5IOE1 sections |
 | `GPIO_I_L`, bit 1 | PYG2 sampled level | Same M5IOE1 sections |
-| `TxModulation`, 0x0889 bit 2 | Clear for 500 kHz LoRa BW, set otherwise; delegated to upstream | `sx1262` §15.1.2 “Workaround” |
+| `REG_TX_MODULATION` 0x0889, `TX_MODULATION_BW_MASK` bit 2 | Local masked update: clear for 500 kHz LoRa BW, set otherwise | `sx1262` §15.1.2 “Workaround” |
+| `LORA_BW_7_KHZ` / `LORA_BW_10_KHZ` / `LORA_BW_15_KHZ` / `LORA_BW_20_KHZ` / `LORA_BW_31_KHZ` / `LORA_BW_41_KHZ` / `LORA_BW_62_KHZ` | 0x00 / 0x08 / 0x01 / 0x09 / 0x02 / 0x0A / 0x03 (7.81 / 10.42 / 15.63 / 20.83 / 31.25 / 41.67 / 62.50 kHz) | `sx1262` §13.4.5.2 “LoRa Modulation Parameters”, Table 13-48 |
+| `LORA_BW_125_KHZ` / `LORA_BW_250_KHZ` / `LORA_BW_500_KHZ` | 0x04 / 0x05 / 0x06 | Same section and table |
+| `SpreadingFactor::_5`…`SpreadingFactor::_12` (`LORA_SF7`…`LORA_SF12` constants), `LORA_CR_4_5`…`LORA_CR_4_8`, `LORA_LDRO_OFF` / `ON` | SF 5…12; CR 0x01…0x04; LDRO 0x00 / 0x01 from `lora-modulation` symbol duration | `sx1262` §13.4.5.2 “LoRa Modulation Parameters”, Tables 13-47/49/50 |
 | IQ polarity, 0x0736 bit 2 | Clear for inverted IQ, set for standard IQ; delegated to upstream | `sx1262` §15.4.2 “Workaround” |
 | `REG_TX_CLAMP_CONFIG`, 0x08D8, `TX_CLAMP_MASK` 0x1E | Set PA-clamp threshold bits while preserving unrelated bits | `sx1262` §12.1 “Registers”, §15.2.2 “Workaround” |
 | `REG_RTC_CONTROL`, 0x0902 = 0 | Stop RTC after timed reception, including early stop | `sx1262` §15.3.2 “Workaround” |
@@ -135,7 +138,8 @@ live measurements when captured on a physical board named by SKU.
 
 ### C153 async receive capture (2026-10-02)
 
-The current `embassy-debug` image completed one normal receive session on
+The `embassy-debug` image used on 2026-10-02 completed one normal receive
+session on
 PaperMono (`C153`). Startup reported PYG2 output mode, push-pull drive, latch,
 and sampled level high; shutdown reported output mode/drive retained with
 latch/sample low. `lora_session` reported two checks, zero failures, and clean
@@ -172,10 +176,12 @@ See
 
 ## Async chip-operation evidence
 
-`lora-phy` and `lora-modulation` are pinned to reviewed
-[revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179),
-with default/LoRaWAN features disabled. The wrapper propagates LDRO computed
-from symbol duration into upstream parameters. Its widened airtime calculation
+Published `lora-phy` 3.0.1 and `lora-modulation` 0.1.5 have default/LoRaWAN
+features disabled. After upstream validation, the wrapper programs modulation
+locally per `sx1262` Rev 2.2 §13.4.5.2 “LoRa Modulation Parameters”, using
+LDRO from symbol duration without accessing private upstream fields. The
+masked TX bandwidth workaround follows §15.1.2 “Workaround”. Its widened
+airtime calculation
 covers CRC selection, 16-bit preambles and SF5/SF6 rules from
 [Semtech's reference implementation](https://github.com/Lora-net/sx126x_driver/blob/a10c5dfdf89788c6ac805e9fe98889de44175aa2/src/sx126x.c#L1084).
 

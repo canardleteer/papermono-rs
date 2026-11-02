@@ -2,6 +2,9 @@
 
 Board contract for the M5Stack PaperMono and PaperMono-Lite.
 Host tools live under `host/papermono-host/` and `xtask/`.
+Board/chip crates keep Rust 1.88; host tools and simple firmware require
+1.95; Embassy firmware requires 1.97. Dependency releases, approved pins
+and host-only validation: [docs/dependencies.md](docs/dependencies.md).
 Board crates live under `crates/`. Firmware images:
 `simple-debug-fw` and `embassy-debug-fw` are workspace members,
 not default-members.
@@ -126,7 +129,7 @@ mutually exclusive. WPA2 only (no WPA3 in the `esp-radio` blob).
 
 ## LoRa lifecycle and verification
 
-`sx1262-phy` wraps revision-pinned `lora-phy` chip operations; preserve Semtech
+`sx1262-phy` wraps published `lora-phy` 3.0.1 chip operations; preserve Semtech
 catalog `sx1262` section citations when adapting them. Board nets,
 presets and `RadioHooks` stay in `m5stack-papermono::lora`. System I2C
 is borrowed for startup, shutdown and scheduled verification only.
@@ -142,7 +145,7 @@ cooperative BUSY polling. Await command sequences to completion; interrupted
 sequences require NSS recovery and
 shutdown/startup. Every TX requires a nonzero hardware timeout. Digital
 evidence does not validate the RF path. C153-Lite radio outputs remain
-undriven. One current C153 receive session confirmed normal startup/shutdown
+undriven. One C153 receive session on 2026-10-02 confirmed normal startup/shutdown
 readbacks and one packet; it does not close failure recovery, sustained
 sessions, reset timing, or TX power. Record scope in the hardware
 [measurement ledger](.agents/skills/m5stack-papermono-hardware/references/measure.md).

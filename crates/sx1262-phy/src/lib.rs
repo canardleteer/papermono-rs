@@ -220,6 +220,22 @@ pub const LORA_SF12: u8 = 0x0C;
 /// LoRa signal bandwidth: 125 kHz (`0x04`).
 pub const LORA_BW_125_KHZ: u8 = 0x04;
 
+/// 7.81 kHz bandwidth; catalog `sx1262` Rev 2.2 §13.4.5.2
+/// “LoRa Modulation Parameters”, Table 13-48.
+pub const LORA_BW_7_KHZ: u8 = 0x00;
+/// 10.42 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_10_KHZ: u8 = 0x08;
+/// 15.63 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_15_KHZ: u8 = 0x01;
+/// 20.83 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_20_KHZ: u8 = 0x09;
+/// 31.25 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_31_KHZ: u8 = 0x02;
+/// 41.67 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_41_KHZ: u8 = 0x0A;
+/// 62.50 kHz bandwidth; `sx1262` §13.4.5.2, Table 13-48.
+pub const LORA_BW_62_KHZ: u8 = 0x03;
+
 /// LoRa signal bandwidth: 250 kHz (`0x05`).
 pub const LORA_BW_250_KHZ: u8 = 0x05;
 
@@ -243,6 +259,13 @@ pub const LORA_LDRO_OFF: u8 = 0x00;
 
 /// LoRa Low Data Rate Optimization: enabled (`0x01`).
 pub const LORA_LDRO_ON: u8 = 0x01;
+
+/// TX modulation workaround register; catalog `sx1262` Rev 2.2 §15.1.2
+/// “Workaround” under “Modulation Quality with 500kHz LoRa Bandwidth”.
+pub const REG_TX_MODULATION: u16 = 0x0889;
+/// Clear for 500 kHz LoRa, set for other LoRa bandwidths; `sx1262` §15.1.2
+/// “Workaround”. Preserve every other register bit on read/modify/write.
+pub const TX_MODULATION_BW_MASK: u8 = 1 << 2;
 
 /// LoRa packet header type: variable / explicit header (`0x00`).
 pub const LORA_HEADER_VARIABLE: u8 = 0x00;

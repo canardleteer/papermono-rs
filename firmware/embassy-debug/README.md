@@ -7,6 +7,11 @@ image=embassy-debug`. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
 (wire prefix `simple-debug:`).
 
+Use an Espressif compiler based on Rust 1.97 or newer
+(`rustc +esp --version`). The [dependency stack](../../docs/dependencies.md)
+records the ESP releases and BLE crypto pins. Prior live results are dated
+in the hardware ledger; this dependency upgrade has host verification only.
+
 On the unit:
 
 - Cold boot paints a 1-bit Ferris splash and `papermono-rs`

@@ -175,8 +175,10 @@ asserts reset for 100 ms with antenna high, then releases reset and waits
 200 ms before BUSY readiness. These tutorial-derived timings are host-tested
 and their actual delays still await measurement. A normal C153 RX session on
 2026-10-02 confirmed startup/shutdown readbacks and one packet; fault recovery,
-sustained operation and TX output remain open. Generic `sx1262-phy` wraps revision-pinned
-`lora-phy` async modem operations at reviewed revision b47cbdf. `RadioContext`
+sustained operation and TX output remain open. Generic `sx1262-phy` wraps published
+`lora-phy` 3.0.1 and `lora-modulation` 0.1.5. The stable adaptation validates
+parameters upstream, then programs modulation and its masked bandwidth
+workaround locally; board nets and sequencing are unchanged. `RadioContext`
 borrows system I2C for each control/readback call. Confirmation fields and source
 encodings:
 [Stamp LoRa-1262 session controls](../resources/stamp-lora-1262.md#session-control-and-confirmation).

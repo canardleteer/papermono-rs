@@ -15,6 +15,10 @@ simple-debug: hb t=12 btn_a=1 btn_b=0
 simple-debug: edge t_ms=1250 btn_a=1->0
 ```
 
+Use an Espressif compiler based on Rust 1.95 or newer
+(`rustc +esp --version`); use 1.97 or newer if also building Embassy.
+See the [dependency stack](../../docs/dependencies.md).
+
 On the unit:
 
 - Repeating `hello` / `git` / `gpio` every 10 s, and a 1 Hz

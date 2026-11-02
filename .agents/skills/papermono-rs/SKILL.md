@@ -18,6 +18,13 @@ wiring, enclosure, and datasheets are
 Read that skill first for pins and rails. Do not mix a stack’s APIs
 into the pin map.
 
+The selected dependency stack and reproducible host checks live in
+[dependencies.md](../../../docs/dependencies.md). Board/chip crates retain
+Rust 1.88; host tools and simple firmware require 1.95, Embassy firmware
+1.97. The ESP family uses published releases with the approved radio beta;
+TrouBLE and Embassy crypto use full commit pins. Dated live results below
+precede the 2026-11-01 host-only upgrade.
+
 This repository is **host-verified by default**. Landing xtask source
 is not permission to open a port. Do not open USB-Serial/JTAG unless
 the human **explicitly asked to run** a live command on a device in
@@ -156,9 +163,12 @@ Do not `idf.py flash` it from this repo.
 
 ## SX1262 sessions
 
-The generic `sx1262-phy` wraps revision-pinned `lora-phy` operations and uses
-`lora-modulation` types. Both are pinned to reviewed lora-rs revision b47cbdf
-with default/LoRaWAN features disabled; registry publication is deferred.
+The generic `sx1262-phy` wraps published `lora-phy` 3.0.1 operations and uses
+`lora-modulation` 0.1.5 types with default/LoRaWAN features disabled.
+Registry publication remains disabled pending separate package review.
+Retain upstream parameter validation; program modulation locally with
+computed LDRO and a masked TX bandwidth workaround, per catalog `sx1262`
+Rev 2.2 §13.4.5.2 “LoRa Modulation Parameters” and §15.1.2 “Workaround”.
 Every chip-I/O method awaits async `SpiDevice` and cooperative BUSY polling.
 Firmware composes NSS with `ExclusiveDevice`, awaits sequences to completion,
 and restores NSS before shutdown/startup recovery after cancellation.

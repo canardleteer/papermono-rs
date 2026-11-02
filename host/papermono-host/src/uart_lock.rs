@@ -7,10 +7,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Output};
 
-use fs4::fs_std::FileExt;
-use sha2::{Digest, Sha256};
-
 use crate::Error;
+use fs4::{FileExt, TryLockError};
 
 /// Environment variable [`UartSession::prepare_command`] sets on children.
 pub const UART_LOCK_ENV: &str = "PAPERMONO_UART_LOCK";
@@ -51,17 +49,19 @@ fn acquire(
         .create(true)
         .truncate(false)
         .open(&path)?;
-    match file.try_lock_exclusive() {
-        Ok(true) => {
+    match FileExt::try_lock(&file) {
+        Ok(()) => {
             write_holder(&file, command)?;
             Ok(UartSession {
                 path,
                 _file: Some(file),
             })
         }
-        Ok(false) if can_join(&path, inherit) => Ok(UartSession { path, _file: None }),
-        Ok(false) => Err(busy_from(&path)),
-        Err(error) => Err(Error::from(error)),
+        Err(TryLockError::WouldBlock) if can_join(&path, inherit) => {
+            Ok(UartSession { path, _file: None })
+        }
+        Err(TryLockError::WouldBlock) => Err(busy_from(&path)),
+        Err(TryLockError::Error(error)) => Err(Error::from(error)),
     }
 }
 
@@ -107,8 +107,7 @@ fn lock_stem(port: &str) -> String {
             return format!("{}-{}", meta.dev(), meta.ino());
         }
     }
-    let digest = Sha256::digest(port.as_bytes());
-    format!("{digest:x}")
+    crate::identity::sha256_text(port)
 }
 
 fn write_holder(file: &File, command: &str) -> io::Result<()> {
@@ -220,5 +219,56 @@ mod tests {
         )
         .unwrap();
         assert!(!child.owns_flock());
+        drop(child);
+        assert!(matches!(
+            acquire(&lock_dir, port, "other", None),
+            Err(Error::UartBusy { .. })
+        ));
+        drop(parent);
+        assert!(acquire(&lock_dir, port, "released", None)
+            .unwrap()
+            .owns_flock());
+    }
+
+    #[test]
+    fn inheritance_requires_matching_path_and_ancestor_holder() {
+        let dir = tempfile::tempdir().unwrap();
+        let port = "missing-port-for-lock-test";
+        let parent = acquire(dir.path(), port, "parent", None).unwrap();
+        assert!(matches!(
+            acquire(
+                dir.path(),
+                port,
+                "child",
+                Some(&dir.path().join("other.lock"))
+            ),
+            Err(Error::UartBusy { .. })
+        ));
+        fs::write(parent.lock_path(), "pid=4294967295\ncommand=unrelated\n").unwrap();
+        assert!(matches!(
+            acquire(dir.path(), port, "child", Some(parent.lock_path())),
+            Err(Error::UartBusy { .. })
+        ));
+    }
+
+    #[test]
+    fn missing_port_lock_name_retains_lowercase_sha256_encoding() {
+        assert_eq!(
+            lock_stem("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        for (text, expected) in [
+            (
+                "",
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                "abc",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ),
+        ] {
+            assert_eq!(crate::identity::sha256_text(text), expected);
+            assert_eq!(crate::dump::sha256_hex(text.as_bytes()), expected);
+        }
     }
 }

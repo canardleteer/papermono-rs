@@ -440,6 +440,14 @@ module controls must not replace PaperMono's own wiring references.
 
 ## Async SX1262 commands
 
+The repository now uses published `lora-phy` 3.0.1 / `lora-modulation`
+0.1.5. Modulation is validated upstream, then programmed locally with LDRO
+from symbol duration and a masked TX bandwidth workaround. See the
+[encoding map](resources/stamp-lora-1262.md#session-control-and-confirmation).
+The [2026-11-01 dependency upgrade](../../../docs/dependencies.md) has
+host verification only; dated live results in this skill precede that stack.
+The software crypto change does not close BLE, coexistence or RF measurements.
+
 The generic chip wrapper uses awaited SPI devices and cooperative BUSY delays.
 Board pin/rail policy stays in `RadioHooks`; firmware composes NSS and retains
 it for cancellation recovery. TX requires a nonzero hardware timer. The default

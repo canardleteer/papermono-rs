@@ -50,7 +50,7 @@ They are not a second HAL over `esp-hal`.
 
 ## SX1262 lifecycle boundary
 
-`sx1262-phy` wraps revision-pinned `lora-phy` chip operations and exposes
+`sx1262-phy` wraps published `lora-phy` 3.0.1 chip operations and exposes
 board-neutral caller hooks. Keep pins, power rails, antenna controls and
 operating presets in the BSP. Hooks borrow context for one operation;
 keep synchronization outside the chip crate. Startup/shutdown are
@@ -64,7 +64,10 @@ cancellation invalidates readiness and requires restoring NSS, shutdown and
 startup before further TX. Preserve original device, BUSY and upstream errors.
 Managed receive polling rejects corrupt packets before FIFO reads and clears
 observed IRQ bits. Keep fractional metrics and timed-RX RTC cleanup explicit.
-Registry publication stays deferred while upstream dependencies are git-pinned.
+Registry publication remains disabled pending a separate package review.
+After upstream parameter validation, modulation and the masked bandwidth
+workaround are programmed locally so LDRO follows `lora-modulation` 0.1.5
+without accessing private upstream fields. See [CRATES.md](CRATES.md).
 
 ## Testing rules
 

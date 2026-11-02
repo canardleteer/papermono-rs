@@ -31,6 +31,15 @@ Observed silicon:
 
 ## Host toolchain (`cargo xtask`)
 
+Host tools and simple firmware require Rust 1.95; Embassy firmware needs
+an Espressif compiler based on 1.97. Selected published releases, the
+approved radio beta, full TrouBLE/Embassy crypto pins, RNG seeding order
+and reproducible checks are in
+[dependencies.md](../../../../docs/dependencies.md). `radio` alone enables
+the AES-128 ECB/CMAC and P-256 ECDH software driver registrations. Seed the
+ChaCha12 Embassy RNG from HAL TRNG with its ADC source enabled, then drop
+the TRNG and source before wireless starts. Unseeded calls fail explicitly.
+
 USB-C is Espressif USB-Serial/JTAG (`303a:1001`), not a QinHeng
 CH343. Download is a power-button hold (~2 s until the red LED
 blinks). `cargo xtask` refuses `1a86:55d3` **before** opening a
@@ -45,6 +54,7 @@ Do not open a port unless a human asked.
 
 ```shell
 cargo install espup --locked
+cargo install espflash --version 4.7.0 --locked
 espup install
 # then source the script `espup` printed (example: . $HOME/export-esp.sh)
 ```
@@ -118,10 +128,10 @@ cards on Lite:
 The default C153 Embassy image enables `radio`. Cards: BLE
 passkey (`PaperMono`), Wi-Fi channel survey, WPA2 SoftAP
 (`PaperMono-AP` / `mono2026`, `192.168.4.1`, DHCP + JSON
-HTTP). Survey ↔ SoftAP mutually exclusive. Soft status
-redraws use OTP Partial past the nominal 18-partial budget. This
-differs from the product-page advice near 10 partials and remains
-a documented implementation discrepancy. Agent workflows:
+HTTP). Survey ↔ SoftAP mutually exclusive. Same-card status and orientation
+redraws use OTP Partial only within the shared ten-partial budget; the next
+monochrome update uses MonoFull when due or without a mono baseline.
+The old same-card exemption has been removed. Agent workflows:
 [firmware/embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md).
 Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
 (**Radio**). Silicon: hardware
@@ -129,17 +139,19 @@ Crate verdicts: [`docs/CRATES.md`](../../../../docs/CRATES.md)
 
 Opt-in `--features orient`: BMI270 page rotation (sticky-rs
 policy). Lite axis map: USB-C down = −X (see sensors.md).
-Same-card remaps soft-Partial; nav arms on button release
-with 3-sample IMU hysteresis
+Same-card remaps honor the ten-partial refresh budget; navigation uses
+A release / B press edges with 3-sample IMU hysteresis
 ([embassy-debug/AGENTS.md](../../../../firmware/embassy-debug/AGENTS.md)).
 
 ## SX1262 wrapper and diagnostics
 
-`sx1262-phy` is a host-testable `no_std` wrapper around `lora-phy` and
-`lora-modulation` at reviewed
-[revision b47cbdf](https://github.com/lora-rs/lora-rs/tree/b47cbdf8d3935e9bfe44c4d407bbad087fcfc179).
-Default/LoRaWAN features are disabled; publication is deferred. The workspace
-minimum is Rust 1.88 because the pinned upstream uses let-chains. Chip I/O
+`sx1262-phy` is a host-testable `no_std` wrapper around published
+`lora-phy` 3.0.1 and `lora-modulation` 0.1.5. Default/LoRaWAN features are
+disabled; publication remains disabled pending separate package review.
+Board/chip crates keep Rust 1.88. After upstream validation, modulation and
+the masked bandwidth workaround are programmed locally with calculated LDRO,
+without private upstream fields. Catalog `sx1262` Rev 2.2 §13.4.5.2
+“LoRa Modulation Parameters” and §15.1.2 “Workaround” are authoritative. Chip I/O
 awaits async `SpiDevice`, BUSY input and caller-supplied async delay.
 `release` returns those resources and hooks without I/O; shutdown is explicit.
 Repeated active startup preserves configuration and counters. Firmware keeps
