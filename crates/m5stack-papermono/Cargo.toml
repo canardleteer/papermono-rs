@@ -13,7 +13,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+sx1262-phy = { path = "../sx1262-phy", version = "0.1.0" }
 embedded-hal.workspace = true
+embedded-hal-async = "1.0.0"
 m5stack-papermono-lite = { path = "../m5stack-papermono-lite", version = "0.1.0" }
 st25r3916 = { path = "../st25r3916", version = "0.1.0" }
 

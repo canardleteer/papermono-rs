@@ -58,10 +58,10 @@ Panel call site is `display::OtpRefresh` only:
 | Card / step | Sequence |
 | --- | --- |
 | Tones | `GrayFull` |
-| Splash / shapes / legend / bluetooth / wifi_survey / wifi_ap | `paint_mono_fast` (`soft` on same-card Bluetooth / Wi-Fi / Legend status redraws **and** same-card orientation remaps → stay on `Partial`; card change honors partial budget → `MonoFull`) |
+| Monochrome cards, including same-card status and orientation updates | `paint_mono_fast`: `MonoFull` if `display::mono_full_due`, otherwise `Partial` |
 | Enter targets | `MonoFull` |
-| Marks | `Partial` |
-| After `PARTIALS_BEFORE_FULL` (18) | next **non-soft** mono is `MonoFull` |
+| Marks | `Partial`, preceded by a full white clear if baseline/budget requires it |
+| After shared `PARTIALS_BEFORE_FULL` (10) | next monochrome update uses `MonoFull`, including same-card redraws |
 
 Deep sleep after each refresh; M5IOE1 `EPD_RST` to wake; no
 SW reset on partial wake. Do not stamp `epd_*` or `otp_fast`.
@@ -92,6 +92,43 @@ PCM only when `mic` is on. GPIO42 passive buzzer provides click
 feedback on button navigation and touchscreen hits. Active channel
 survey runs continuously until touching `[ STOP SURVEY ]`
 (transitions through `[ STOPPING... ]` to complete).
+
+## Dependency and entropy contract
+
+This image requires an Espressif compiler based on Rust 1.97. The
+[dependency stack](../../docs/dependencies.md) records the published ESP
+family, the approved radio beta and the full TrouBLE/crypto revision pins.
+Only `radio` enables crypto: `csprng` registers one ChaCha12 RNG and links
+the AES-128 ECB/CMAC and P-256 ECDH software drivers. Seed it from an
+enabled HAL TRNG, then release both the TRNG and temporary ADC source
+before BLE or Wi-Fi initialization. Unseeded calls fail explicitly.
+Bonds remain RAM-only; passkeys, CDC events and GATT retain their behavior.
+Host tests and link checks do not revalidate pairing/coexistence on either
+SKU; dated results below precede this dependency upgrade.
+
+## LoRa lifecycle evidence
+
+C153 diagnostics use one explicit startup/shutdown pair per ping,
+receive window or sweep. Board hooks confirm `PYG2` mode, drive, latch
+and sample at startup and shutdown; every TX also confirms at interval
+one. Antenna control stays high until shutdown. Verification errors
+block TX and trigger cleanup, retaining warning evidence on both cards.
+Failed or interrupted cleanup is remembered across diagnostic wrappers;
+a later operation confirms shutdown before attempting another startup.
+Serial `lora_control` has phase, cadence and expected/observed fields;
+`lora_session` reports attempts, checks, failures and cleanup status.
+Chip I/O uses awaited SPI3 and cooperative BUSY polls. The shared mutex stores
+SPI3 in idle Blocking mode because esp-hal Async is not Send; a firmware
+lease converts it to Async for awaited transfers and restores the idle slot on
+Drop.
+`ExclusiveDevice` composes borrowed NSS and raises it before remembered
+shutdown recovery. Await command sequences; user stops occur between them.
+Ping has a nonzero 300 ms hardware TX limit and reports timeout/read failures.
+Managed RX handles CRC/header rejection, observed-bit acknowledgement, FIFO
+wrapping and RTC cleanup. Failed reads never supply invented signal values.
+Fractional packet readings use `lora_metrics`; existing CDC lines remain stable.
+Do not raise the interval to twenty or forty without deliberate
+configuration and C153 evidence. RF validation needs hardware measurements.
 
 ## Carousel Order Guidance
 
@@ -186,11 +223,11 @@ do not echo those on the wire.
 `FONT_10X20` at `x = 40` (~10 px/glyph) → stay at about **40
 glyphs** or they clip the right edge.
 
-**Soft refresh:** same-card Bluetooth / Wi-Fi / Legend redraws
-and same-card orientation remaps use
-`paint_mono_fast(..., soft = true)` so they stay on OTP
-`Partial` past `PARTIALS_BEFORE_FULL` instead of flashing
-`MonoFull`. Card change honors the budget.
+**Refresh budget:** same-card Bluetooth / Wi-Fi / Legend redraws and
+orientation remaps use `paint_mono_fast` with the shared ten-partial
+budget. `display::mono_full_due` requires `MonoFull` on the next update
+when due; the firmware has no same-card exemption. Ghosting at this
+cadence remains unconfirmed on either SKU.
 
 1. **Channel survey**: Human opens the `wifi_survey` card and taps
    `[ START SURVEY ]`. CDC prints `wifi_survey count=… ch1=… ch6=… ch11=…`.
@@ -200,7 +237,7 @@ and same-card orientation remaps use
    `[ START HOTSPOT ]`. Glass shows SSID, segmented password, URL, client
    count, and HTTP request count. CDC prints `wifi_ap state=active …`.
 3. **Host-agent SoftAP check** (when the human asks for a live test and a
-   spare host Wi-Fi adapter is available, e.g. `wlx9cefd5f6363b`):
+   spare host Wi-Fi adapter is available, such as a USB Wi-Fi adapter):
    - Monitor CDC (`cargo xtask monitor`) for `wifi_ap` / `wifi_http`.
    - Scan: `nmcli dev wifi list ifname IFACE`.
    - Connect: `nmcli dev wifi connect PaperMono-AP password mono2026 ifname IFACE`.
@@ -211,12 +248,23 @@ and same-card orientation remaps use
 
 Lite SoftAP host-verified 2026-09-04:
 [measure.md](../../.agents/skills/m5stack-papermono-hardware/references/measure.md).
-`C153` still open.
+C153 radio survey and NFC/LoRa are confirmed. Other radio
+behavior is tracked per SKU in the measurement ledger.
 
 ## LoRa verification workflow (`c153`)
 
 On `C153`, the Stamp LoRa-1262 (Semtech SX1262) transceiver is
 exercised via two interactive cards:
+
+Both use the BSP's rail-first startup: wait 200 ms before reset,
+assert it for 100 ms, release it and wait 200 ms before BUSY readiness.
+Keep PYG2 high until shutdown and preserve the existing PA/OCP profile.
+The delay values are host-tested and still await physical C153 measurement.
+A normal async receive session was live-confirmed on C153 on 2026-10-02:
+startup/shutdown readbacks passed, `lora_session checks=2 failures=0
+cleanup=ok`, and one controlled packet was received. Remaining hardware work
+is tracked in the
+[NYC ledger](../../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md).
 
 1. **LoRa Sweeper (`lora_scan`)**:
    - Sweeps across all 104 US915 channels (902.125 MHz to 927.875 MHz).
@@ -228,7 +276,9 @@ exercised via two interactive cards:
      packet detection.
    - Emits `simple-debug: lora_scan slot=... freq=... rssi=... packets=...`
      telemetry at the completion of each pass over CDC.
-   - Touch anywhere on the panel to stop sweeping (`[ STOP SCAN ]`).
+   - Touch anywhere on the panel to stop sweeping (`[ STOP SCAN ]`). GPIO4's
+     active-low falling edge is latched across radio polls so a short tap is
+     not lost.
 
 2. **LoRa Transceiver (`lora`)**:
    - Touch `[ TX PING ]` for a bench-safe test transmission: 915.0 MHz,
@@ -236,10 +286,12 @@ exercised via two interactive cards:
      airtime, with immediate return to Standby RC and power-down. Emits
      `lora_tx` telemetry over CDC.
    - Touch `[ LISTEN RX ]` for an extended packet sniffer window (up to 60 s).
-     Listens on 906.875 MHz (US915 slot 19) or secondary channel using
-     SF11 / BW 250 kHz / CR 4/5 / Sync Word `0x24B4`. Emits an 80 ms tone
+     While listening, the button changes to `[ STOP RX ]`; tap it to end the
+     window early. The same GPIO4 falling-edge latch handles this stop.
+     Starts on 917.625 MHz and alternates to 906.875 MHz using SF11 / BW
+     250 kHz / CR 4/5 / Sync Word `0x24B4`. Emits an 80 ms tone
      and logs `lora_rx freq=... rssi=... snr=... len=... preview=...` over
-     CDC upon receiving a packet. Touch or buttons abort early.
+     CDC upon receiving a packet. Buttons also abort early.
 
 ## NFC verification workflow (`c153`)
 
@@ -274,7 +326,8 @@ Default Cargo feature. Sticky-rs policy ported to BMI270:
 - CDC `imu pose=… x=… y=… z=…` every 5 s and on page change.
 - Axis→pose (Lite 2026-09-04): −X `Portrait0`, +X `Portrait180`,
   +Y `Landscape0`, −Y `Landscape180`. `C153` still unconfirmed.
-- Same-card remaps are **soft** `Partial` (no `MonoFull` budget hit).
+- Same-card remaps honor the shared budget: `Partial` while allowed,
+  then `MonoFull` after ten partials or without a mono baseline.
 - Bring-up: Bosch standard **8 KiB** `bmi270_config_file` with
   `INIT_ADDR_*` chunking; `INTERNAL_STATUS` is `0x21`. Do **not**
   use the maximum-FIFO config blob (wrong variant; XYZ stay zero).
@@ -292,7 +345,7 @@ Button monitoring runs concurrently during long EPD paints
 (`paint_with_buttons` via `select`), queuing navigation events so rapid clicks
 are never dropped. Button A short-press fires on release (distinguishing
 long-press sleep); Button B fires immediately on press-down (falling edge).
-Audible key clicks sound on every valid button press. Soft orientation / radio
+Audible key clicks sound on every valid button press. Orientation / radio
 refreshes run after button handling so a same-tick press wins.
 
 ## Firmware examples as tutorial code

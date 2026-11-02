@@ -21,8 +21,8 @@ Additional rules for this workspace:
 - **No MCU dependency in a chip driver.** `m5pm1`, `m5ioe1`, and
   `ssd1677-otp` depend on `embedded-hal` only. ESP32-S3 types belong
   in the board crate or firmware.
-- **Never lock a bus internally.** Take `SpiBus` / `I2c` and let the
-  caller compose sharing.
+- **Never lock a bus internally.** Take `SpiBus`, async `SpiDevice` or `I2c`
+  and let the caller compose sharing.
 - **`#![no_std]`, `#![forbid(unsafe_code)]`, `#![warn(missing_docs)]`.**
   Enforced through workspace lints.
 - **Cite the datasheet in rustdoc** for every register, opcode, and
@@ -43,15 +43,36 @@ See [SAFETY.md](SAFETY.md).
 - `ssd1677-otp`: `OtpRefresh::Partial` requires a mono baseline.
   `GrayFull` invalidates it. After gray, `MonoFull` before any
   `Partial`.
-- M5PM1 `SYS_CMD` shutdown is an explicit method, not a raw poke.
+- M5PM1 `SYS_CMD` shutdown has an explicit method.
 
 Keep the board crates thin: pins, SKU nets, transforms, sequencing.
 They are not a second HAL over `esp-hal`.
 
+## SX1262 lifecycle boundary
+
+`sx1262-phy` wraps published `lora-phy` 3.0.1 chip operations and exposes
+board-neutral caller hooks. Keep pins, power rails, antenna controls and
+operating presets in the BSP. Hooks borrow context for one operation;
+keep synchronization outside the chip crate. Startup/shutdown are
+explicit. Packet, standby and frequency operations never control module
+lifetime. Guard every TX path, including raw `SetTx`; deny by default.
+Return buses, pins and hooks on release, with shutdown documented as
+an explicit preceding operation. Chip I/O is async `SpiDevice` plus BUSY
+and caller-supplied async delay; NSS belongs to the caller's device wrapper.
+Every TX needs a nonzero hardware timeout. Await chip sequences to completion:
+cancellation invalidates readiness and requires restoring NSS, shutdown and
+startup before further TX. Preserve original device, BUSY and upstream errors.
+Managed receive polling rejects corrupt packets before FIFO reads and clears
+observed IRQ bits. Keep fractional metrics and timed-RX RTC cleanup explicit.
+Registry publication remains disabled pending a separate package review.
+After upstream parameter validation, modulation and the masked bandwidth
+workaround are programmed locally so LDRO follows `lora-modulation` 0.1.5
+without accessing private upstream fields. See [CRATES.md](CRATES.md).
+
 ## Testing rules
 
 - Register-level tests are `embedded-hal-mock` transaction scripts
-  derived from datasheet tables, not from observed traffic.
+  derived from datasheet tables.
 - Sequencing tests assert **order and polarity**.
 - Geometry and packing are pure functions with exact byte counts.
 - Prefer a failing test that encodes a datasheet claim over a

@@ -54,6 +54,10 @@ All host-side device interaction runs exclusively through `cargo xtask`.
 
 ## The workspace (host, no special toolchain)
 
+Use Rust 1.95 or newer for host tools. Board/chip crates keep a Rust 1.88
+minimum. The selected releases and crypto revision pins are recorded in
+[dependencies.md](dependencies.md).
+
 ```shell
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
@@ -72,10 +76,14 @@ audits.
 `firmware/simple-debug` and `firmware/embassy-debug` target
 `xtensa-esp32s3-none-elf`, requiring the Espressif toolchain fork. While
 `simple-debug` employs blocking `esp-hal` primitives, `embassy-debug` runs the
-async Embassy runtime. Build commands execute from the repository root:
+async Embassy runtime. Simple firmware needs an Espressif compiler based
+on Rust 1.95 or newer; Embassy firmware needs 1.97 or newer. After
+installation, `rustc +esp --version` should report at least 1.97 when
+building both examples. Build commands execute from the repository root:
 
 ```shell
 cargo install espup --locked
+cargo install espflash --version 4.7.0 --locked
 espup install
 . $HOME/export-esp.sh
 ```
@@ -104,26 +112,30 @@ cargo xtask backup-factory-firmware --as-original
 cargo xtask backup-factory-firmware --name my-unit
 ```
 
-`flash-app` checks for an existing original or named capture before proceeding.
-If multiple Espressif devices are connected, specify the target port with
-`ESPFLASH_PORT`.
+`flash-app` checks for an original or named capture bound to this device before
+proceeding. If you copied an original snapshot from another workspace, `--force`
+can bypass that identity check only when every local original matches the live
+flash size and agrees on factory offset and size. It still writes only the
+`factory` partition and validates the image. Do not combine `--force` with
+`--capture`. If multiple Espressif devices
+are connected, specify the target port with `ESPFLASH_PORT`.
 
 ### Path A — without Embassy (`simple-debug`)
 
 `simple-debug` provides proof-of-life verification using blocking `esp-hal`
 routines. It streams a heartbeat and button events over the CDC interface
-while keeping the display inactive. The core firmware serves as a clean Lite
-baseline by default; passing `--features c153` activates Full-model identity
-and compile-time pin verification.
+while keeping the display inactive. The firmware defaults to `C153`; build
+`C153-Lite` with `--no-default-features --features lite`. Both profiles verify
+pins at compile time.
 
 ```shell
 . $HOME/export-esp.sh
 
-# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
+# Build the default PaperMono (C153) image:
 cargo xtask build-fw simple-debug
 
-# Or build with PaperMono Full SKU (C153) features:
-cargo xtask build-fw simple-debug --features c153
+# Or build PaperMono-Lite (C153-Lite):
+cargo xtask build-fw simple-debug --no-default-features --features lite
 
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/simple-debug.bin \
@@ -148,18 +160,18 @@ presenting a Ferris splash on boot and allowing navigation across test cards
 with hardware buttons. Frontlight brightness and buzzer volume adjust via edge
 swipes, and touch buttons provide immediate visual highlight feedback.
 
-The core firmware operates as a Lite baseline by default. Adding `--features c153`
-activates PaperMono Full SKU (`C153`) board identity and discovery diagnostics
-for the ST25R3916 NFC controller and Stamp LoRa-1262 (SX1262) transceiver.
+The firmware defaults to PaperMono (`C153`), including ST25R3916 NFC and Stamp
+LoRa-1262 (SX1262) support. Build PaperMono-Lite (`C153-Lite`) with
+`--no-default-features --features lite` to compile those drivers out.
 
 ```shell
 . $HOME/export-esp.sh
 
-# Build for PaperMono-Lite (or Full hardware with Lite baseline features):
+# Build the default PaperMono (C153) image:
 cargo xtask build-fw embassy-debug
 
-# Or build with PaperMono Full SKU (C153) features:
-cargo xtask build-fw embassy-debug --features c153
+# Or build PaperMono-Lite (C153-Lite):
+cargo xtask build-fw embassy-debug --no-default-features --features lite
 
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
@@ -187,7 +199,7 @@ Common configuration issues:
 | `rustc 1.x is not supported … esp-hal` | The installed toolchain is outdated. Run `espup update` |
 | `linker 'xtensa-esp32s3-elf-gcc' not found` | The environment file was not sourced. Run `. $HOME/export-esp.sh` |
 | `QinHeng` / `1a86:55d3` refused | The connected device is not an Espressif native USB node |
-| `flash-app` wants a matching snapshot | An original or snapshot capture must be saved for this device first |
+| `flash-app` wants a matching snapshot | Use a matching snapshot, or `--force` for a copied original only when all local originals match live flash size and agree on factory geometry |
 | Flash succeeded, glass / CDC unchanged | The target remained in bootloader mode; short-press the power button |
 | `monitor` silent on stock factory demo | Official factory demo firmware ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo)) does not output `simple-debug:` text lines |
 | `monitor` cannot claim usbfs | Confirm udev rules are active and your user belongs to dialout |
@@ -230,7 +242,7 @@ wireless cards.
 Discovery preparation for PaperMono (`C153`) is active on the
 `feat/papermono-discovery` branch. Safe host-tested driver primitives for
 ST25R3916 NFC and Stamp LoRa-1262 (SX1262) are implemented. The factory backup
-of the physical `C153` hardware (`id-e3e5915e`) confirmed identical 16 MB
+of the physical `C153` hardware confirmed identical 16 MB
 flash size, stock partition table geometry, and factory demo version
 (`c78f6c5-dirty`) matching the PaperMono-Lite baseline.
 
@@ -270,7 +282,32 @@ detailed flag specifications located in the project documentation.
 
 ## Hardware documentation
 
-Comprehensive hardware details reside in the hardware documentation collection,
+Hardware details reside in the hardware documentation collection,
 detailing power topologies, display timings, digitizer mappings, SKU
 variations, and verified component measurements. Datasheet citations and
 peripheral registers are referenced in [DATASHEETS.md](DATASHEETS.md).
+
+## Read LoRa session results on PaperMono
+
+1. **Open the LoRa card.** After starting the Embassy image, short-press
+   BUTTON B to reach `lora`. Tap `[ TX PING ]` for one configured packet
+   or `[ LISTEN RX ]` for the receive window. While listening, the control
+   reads `[ STOP RX ]`; tap it to stop early. PaperMono-Lite skips these
+   cards because its radio hardware is absent.
+2. **Read the result.** A successful ping reports `lora_tx status=ok` and
+   `lora_session n=1 attempts=1 checks=3 failures=0 cleanup=ok` on serial.
+   A received packet reports `lora_rx freq=... rssi=... snr=... len=...`
+   and a `lora_session` with two checks. `lora_control` shows high antenna
+   control during startup and pre-TX, then low during shutdown. Mode and
+   drive both read `1`.
+3. **Respond to a failed confirmation.** If the card shows
+   `RADIO ERROR - CHECK SERIAL`, read the warning's phase and reason.
+   A mismatch or bus error blocks transmission and starts cleanup.
+   A later tap starts a new session; it must confirm readiness before
+   transmission can resume. Control readback does not establish RF-path
+   performance.
+
+A normal async receive session on PaperMono (`C153`) was live-tested on
+2026-10-02: one controlled 18-byte packet arrived at 917.625 MHz, and startup
+and shutdown readbacks passed. The recorded sample is in the
+[hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).

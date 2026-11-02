@@ -2,6 +2,9 @@
 
 Board contract for the M5Stack PaperMono and PaperMono-Lite.
 Host tools live under `host/papermono-host/` and `xtask/`.
+Board/chip crates keep Rust 1.88; host tools and simple firmware require
+1.95; Embassy firmware requires 1.97. Dependency releases, approved pins
+and host-only validation: [docs/dependencies.md](docs/dependencies.md).
 Board crates live under `crates/`. Firmware images:
 `simple-debug-fw` and `embassy-debug-fw` are workspace members,
 not default-members.
@@ -10,8 +13,9 @@ not default-members.
 
 1. **OTP waveforms first.** Do not invent an MCU `0x32` LUT.
    Custom external waveforms must stay DC-balanced. After about
-   ten partial refreshes, do a full refresh. Uninterrupted
-   partials can damage the panel.
+   ten partial refreshes, do a full refresh. The next monochrome
+   update after ten partials must use `MonoFull`, including same-card
+   redraws. Uninterrupted partials can damage the panel.
 2. **Park IP2315 off the system I2C bus** except for the charge
    transaction (M5IOE1 `PYG11_PWM3`). Leaving it mounted can hang
    the bus, especially at low VBAT.
@@ -122,6 +126,29 @@ available, agents may run the host SoftAP check in
 [firmware/embassy-debug/AGENTS.md](firmware/embassy-debug/AGENTS.md)
 (scan / connect / curl / CDC `wifi_http`). Survey and SoftAP are
 mutually exclusive. WPA2 only (no WPA3 in the `esp-radio` blob).
+
+## LoRa lifecycle and verification
+
+`sx1262-phy` wraps published `lora-phy` 3.0.1 chip operations; preserve Semtech
+catalog `sx1262` section citations when adapting them. Board nets,
+presets and `RadioHooks` stay in `m5stack-papermono::lora`. System I2C
+is borrowed for startup, shutdown and scheduled verification only.
+
+Start and stop modules explicitly. Keep PaperMono `PYG2` high across
+RX, TX, standby and channel changes until shutdown. Confirm output mode,
+push-pull drive, latch and sampled level on startup and shutdown.
+Initial TX verification interval is one; twenty or forty requires an
+explicit configuration change backed by C153 hardware evidence.
+Failures block TX, invalidate readiness, restore interval one, emit a
+serial warning and trigger cleanup. Chip I/O uses async `SpiDevice` and
+cooperative BUSY polling. Await command sequences to completion; interrupted
+sequences require NSS recovery and
+shutdown/startup. Every TX requires a nonzero hardware timeout. Digital
+evidence does not validate the RF path. C153-Lite radio outputs remain
+undriven. One C153 receive session on 2026-10-02 confirmed normal startup/shutdown
+readbacks and one packet; it does not close failure recovery, sustained
+sessions, reset timing, or TX power. Record scope in the hardware
+[measurement ledger](.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## Keep skills updated
 
@@ -254,6 +281,7 @@ xtask catalog a human sees, update the matching row in the
 | [crates/m5pm1/README.md](crates/m5pm1/README.md) | crates.io | PMIC registers + PWM0 |
 | [crates/m5ioe1/README.md](crates/m5ioe1/README.md) | crates.io | expander + IP2315 gate |
 | [crates/st25r3916/README.md](crates/st25r3916/README.md) | crates.io | ST25R3916 NFC driver |
+| [crates/sx1262-phy/README.md](crates/sx1262-phy/README.md) | crates.io | upstream SX1262 wrapper, lifecycle hooks and TX guard |
 | [crates/m5stack-papermono-lite/README.md](crates/m5stack-papermono-lite/README.md) | crates.io | Lite / shared pin-map role |
 | [crates/m5stack-papermono/README.md](crates/m5stack-papermono/README.md) | crates.io | C153 radio add-on role |
 | [host/papermono-host/README.md](host/papermono-host/README.md) | humans | host library, udev, flash contract |
@@ -308,7 +336,8 @@ results under M5GFX modes, reference only
 PaperMono (`C153`) discovery is tracked on branch
 `feat/papermono-discovery`. The board crate (`m5stack-papermono`) provides
 safe discovery primitives and register constants for ST25R3916 NFC and Stamp
-LoRa-1262 (SX1262). Physical `C153` factory backup (`id-e3e5915e`) confirmed
-16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware. Both
-`simple-debug-fw` and `embassy-debug-fw` support both models: Lite baseline by
-default, and Full SKU with `--features c153` for packed NFC and LoRa discovery.
+LoRa-1262 (SX1262). Physical `C153` factory backup confirmed
+16 MB flash, stock partitions, and ESP-IDF v5.5.1 demo firmware.
+Both firmware packages default to `C153`. Build `C153-Lite` with
+`--no-default-features --features lite`; the default Embassy image includes
+NFC and LoRa discovery.

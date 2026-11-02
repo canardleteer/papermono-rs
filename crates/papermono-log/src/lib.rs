@@ -94,11 +94,19 @@ pub const NFC_CAPACITY: usize = 48;
 /// Bytes reserved for a LoRa status line (`lora ack=1 raw=02 mode=2 cmd=1`).
 pub const LORA_CAPACITY: usize = 64;
 
+/// Capacity for control evidence with maximum u64 counters.
+pub const LORA_CONTROL_CAPACITY: usize = 256;
+/// Capacity for a session summary with maximum u64 counters.
+pub const LORA_SESSION_CAPACITY: usize = 192;
+
 /// Bytes reserved for a LoRa transmission result line (`lora_tx freq=...`).
 pub const LORA_TX_CAPACITY: usize = 96;
 
 /// Bytes reserved for a LoRa packet reception report line (`lora_rx freq=...`).
 pub const LORA_RX_CAPACITY: usize = 96;
+
+/// Capacity for lossless LoRa metrics with maximum field widths.
+pub const LORA_METRICS_CAPACITY: usize = 128;
 
 /// Bytes reserved for a LoRa channel scan report line (`lora_scan slot=...`).
 pub const LORA_SCAN_CAPACITY: usize = 96;
@@ -164,8 +172,8 @@ pub const MILLIS_PER_SEC: u32 = 1000;
 pub const HELLO_PERIOD_MS: u32 = HELLO_PERIOD_S * MILLIS_PER_SEC;
 
 const _: () = {
-    assert!(HEARTBEAT_PERIOD_MS % POLL_PERIOD_MS == 0);
-    assert!(HELLO_PERIOD_MS % HEARTBEAT_PERIOD_MS == 0);
+    assert!(HEARTBEAT_PERIOD_MS.is_multiple_of(POLL_PERIOD_MS));
+    assert!(HELLO_PERIOD_MS.is_multiple_of(HEARTBEAT_PERIOD_MS));
 };
 
 /// Why a format into a caller buffer failed.
@@ -305,6 +313,102 @@ pub struct NfcAppSample {
     pub ver_minor: u8,
 }
 
+/// Phase of a LoRa control confirmation or control failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoraPhase {
+    /// Startup confirmation after power/reset sequencing.
+    Startup,
+    /// Fresh confirmation before a scheduled TX attempt.
+    BeforeTx,
+    /// Disabled-state confirmation after shutdown.
+    Shutdown,
+}
+
+impl LoraPhase {
+    /// Stable serial token for this phase.
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Startup => "startup",
+            Self::BeforeTx => "tx",
+            Self::Shutdown => "shutdown",
+        }
+    }
+}
+
+/// Failure reason in a LoRa control diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoraFailure {
+    /// Confirmed expected digital state.
+    None,
+    /// System I2C readback unavailable.
+    Bus,
+    /// Mode, drive, latch or sample disagrees.
+    Mismatch,
+    /// Power/reset control operation failed.
+    Control,
+    /// Chip SPI, GPIO, parameter or BUSY operation failed.
+    Chip,
+    /// Hardware IRQ timeout or the diagnostic completion budget elapsed.
+    Timeout,
+    /// TX permission denied.
+    Denied,
+}
+
+impl LoraFailure {
+    /// Stable serial token for this reason.
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Bus => "bus",
+            Self::Mismatch => "mismatch",
+            Self::Control => "control",
+            Self::Chip => "chip",
+            Self::Timeout => "timeout",
+            Self::Denied => "denied",
+        }
+    }
+}
+
+/// Digital antenna-control confirmation. `None` fields mean unavailable evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraControlSample {
+    /// Lifecycle or TX phase.
+    pub phase: LoraPhase,
+    /// Number of attempts between fresh confirmations.
+    pub interval: u32,
+    /// TX attempts in the session so far.
+    pub attempts: u64,
+    /// Verification calls in the session so far.
+    pub checks: u64,
+    /// Expected antenna-control signal level.
+    pub expected_high: bool,
+    /// Output mode evidence.
+    pub output: Option<bool>,
+    /// Push-pull drive evidence.
+    pub push_pull: Option<bool>,
+    /// Output latch evidence.
+    pub latch: Option<bool>,
+    /// GPIO sampled level evidence.
+    pub level: Option<bool>,
+    /// Failure reason; these fields cannot validate the RF path.
+    pub failure: LoraFailure,
+}
+
+/// Summary emitted after LoRa shutdown or startup rollback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraSessionSample {
+    /// Attempt cadence used by the session.
+    pub interval: u32,
+    /// TX guard attempts.
+    pub attempts: u64,
+    /// Verification calls, including lifecycle confirmations.
+    pub checks: u64,
+    /// Denials and failed confirmations.
+    pub failures: u64,
+    /// Whether cleanup completed with disabled-state confirmation.
+    pub cleanup_ok: bool,
+}
+
 /// Stamp LoRa-1262 (SX1262) packet transmission result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LoraTxSample {
@@ -337,6 +441,20 @@ pub struct LoraRxSample {
     pub first_byte: u8,
     /// Last byte of payload preview.
     pub last_byte: u8,
+}
+
+/// Lossless LoRa readings: integers scaled by two for RSSI and four for SNR.
+/// Existing lora_rx and lora_scan lines retain their whole-unit wire formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoraMetricsSample {
+    /// Frequency in thousands of hertz.
+    pub freq_khz: u32,
+    /// Packet RSSI multiplied by two, in half-dBm units.
+    pub rssi_half_dbm: i16,
+    /// Signed SNR multiplied by four, in quarter-dB units.
+    pub snr_quarter_db: i8,
+    /// Signal RSSI multiplied by two, in half-dBm units.
+    pub signal_rssi_half_dbm: i16,
 }
 
 /// Stamp LoRa-1262 (SX1262) US915 channel scan activity report.
@@ -785,6 +903,47 @@ pub fn format_nfc_app<'a>(
     )
 }
 
+/// Serial evidence token; unknown values must not be printed as low.
+fn evidence_token(value: Option<bool>) -> &'static str {
+    match value {
+        Some(true) => "1",
+        Some(false) => "0",
+        None => "unknown",
+    }
+}
+
+/// Formats digital antenna evidence and an explicit warning on any failure.
+pub fn format_lora_control<'a>(
+    sample: &LoraControlSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(buf, format_args!(
+        "{}: lora_control phase={} n={} attempts={} checks={} expected={} mode={} drive={} latch={} observed={} reason={} warning={}",
+        LOG_PREFIX, sample.phase.token(), sample.interval, sample.attempts, sample.checks,
+        u8::from(sample.expected_high), evidence_token(sample.output), evidence_token(sample.push_pull),
+        evidence_token(sample.latch), evidence_token(sample.level), sample.failure.token(),
+        u8::from(sample.failure != LoraFailure::None)))
+}
+
+/// Formats session totals after explicit cleanup, without device identifiers.
+pub fn format_lora_session<'a>(
+    sample: &LoraSessionSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+            "{}: lora_session n={} attempts={} checks={} failures={} cleanup={}",
+            LOG_PREFIX,
+            sample.interval,
+            sample.attempts,
+            sample.checks,
+            sample.failures,
+            if sample.cleanup_ok { "ok" } else { "failed" }
+        ),
+    )
+}
+
 /// Writes `lora_tx` transmission result without a trailing newline.
 pub fn format_lora_tx<'a>(
     sample: &LoraTxSample,
@@ -804,6 +963,21 @@ pub fn format_lora_tx<'a>(
             sample.time_ms,
             status_str,
         ),
+    )
+}
+
+/// Writes lossless lora_metrics readings without a trailing newline.
+/// Unit suffixes name the integer scale; returns a buffer error if too small.
+pub fn format_lora_metrics<'a>(
+    sample: &LoraMetricsSample,
+    buf: &'a mut [u8],
+) -> Result<&'a str, FormatError> {
+    write_into(
+        buf,
+        format_args!(
+        "{}: lora_metrics freq={}.{:03} rssi_half_dbm={} snr_quarter_db={} signal_rssi_half_dbm={}",
+        LOG_PREFIX, sample.freq_khz / 1_000, sample.freq_khz % 1_000,
+        sample.rssi_half_dbm, sample.snr_quarter_db, sample.signal_rssi_half_dbm),
     )
 }
 

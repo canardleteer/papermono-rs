@@ -12,8 +12,15 @@ The board contract and a safety-first host CLI (`cargo xtask`)
 are here. Board crates:
 `m5stack-papermono-lite` (`C153-Lite`, shared map) and
 `m5stack-papermono` (`C153`, NFC + LoRa).
+The generic [`sx1262-phy`](crates/sx1262-phy) wraps published
+`lora-phy` 3.0.1 with awaited chip I/O and explicit lifecycle and TX-readiness
+hooks.
 `simple-debug-fw` and `embassy-debug-fw` are workspace members,
 not default-members.
+Board/chip crates require Rust 1.88; host tools and simple firmware require
+1.95, and Embassy firmware requires an Espressif compiler based on Rust 1.97.
+The [dependency stack](docs/dependencies.md) records releases, crypto pins,
+the approved radio beta, and host verification commands.
 
 - Host tools are: `cargo xtask` over `host/papermono-host`.
 - **Read [docs/SAFETY.md](docs/SAFETY.md) before flashing or
@@ -47,8 +54,7 @@ before treating a command as verified on target hardware.
 
 ### PaperMono + PaperMono-Lite Setup
 
-The firmware ecosystem provides a unified, safe-by-default architecture
-that auto-detects board hardware at startup and operates both PaperMono
+The default firmware detects board hardware at startup and operates PaperMono
 (`C153`) and PaperMono-Lite (`C153-Lite`):
 
 1. **Unified Default Binary**: The default firmware image includes full
@@ -70,14 +76,19 @@ that auto-detects board hardware at startup and operates both PaperMono
    - The ST25R3916 NFC field is energized only during deliberate
      user-initiated polling and is powered down immediately when idle.
    - The SX1262 LoRa module operates with internal LDO regulation, hardware
-     over-current protection (OCP 60 mA), +14 dBm bench-safe TX power, and
+     over-current protection (OCP 60 mA), the retained +14 power command, and
      an active antenna switch (`PYG2`) engaged only when the transceiver is
-     powered.
+     powered. Startup, shutdown and every packet TX confirm antenna
+     output mode, push-pull drive, latch and sampled level. Failed checks
+     block TX and show a radio error on the cards. These digital checks
+     do not measure RF-path performance. Chip transfers and BUSY waits yield;
+     the ping has a 300 ms hardware TX limit. Failed reads show a radio error
+     instead of a substitute signal reading.
 3. **Compile-Time Pruning**: For users desiring minimal binary footprint or
-   strictly verified Lite-only builds, passing
+   Lite-only builds, passing
    `--no-default-features --features lite` completely compiles out all
    `C153` radio driver crates and dependencies at compile time, reducing
-   flash consumption by ~34 KB.
+   flash consumption. See [verified build sizes](docs/dependencies.md#verification-record).
 
 ## Firmware Examples
 
@@ -101,6 +112,10 @@ that auto-detects board hardware at startup and operates both PaperMono
 - [embassy-rs](./firmware/embassy-debug)
   - [quick install](./docs/getting-started.md#path-b--with-embassy-embassy-debug)
 
+The Embassy image uses panel OTP waveforms. After ten partial updates, the
+next monochrome redraw performs a full clearing refresh, including updates
+on the same card.
+
 ## cargo xtask
 
 From the repo root (`cargo xtask <subcommand>`).
@@ -117,7 +132,7 @@ QinHeng `1a86:55d3` is refused. Download is a power-button hold
 | `backup-factory-firmware` | live dump yes; `--import` no | Named capture or `--as-original` under `developer-data/backups/`. Alias `backup-firmware` |
 | `confirm-factory-firmware` | yes | Compare live flash to that unit's original, or `--capture SLUG` |
 | `restore-factory-firmware` | yes | write-bin that unit's original or `--capture` (`--yes`). Never a full-chip erase |
-| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs matching original or `--capture`. Does not compile |
+| `flash-app` | yes | write-bin `--image FILE` into snapshot `factory` only. Needs `--yes`; `--force` bypasses original identity only when all originals match live flash size and agree on factory geometry. Does not compile |
 | `vet-idle-log` | no | Host-only idle grammar on a `monitor` capture |
 | `build-fw` | no | Host-only. `cargo +esp` + `save-image` for `simple-debug` or `embassy-debug` (`--features c153`, `--all-features`) |
 | `ci` | no | Host-only CI gate (fmt, host clippy/test, firmware clippy, rumdl, machete, audit) |

@@ -9,7 +9,9 @@ bring-up + sticky-style `classify` (Lite: USB-C down = −X),
 `RefreshMode` (HTML `epd_*` catalog), FT M5GFX
 `decode_m5gfx` (not a FocalTech map), lamp gutter, and
 GPIO42 LEDC window. Firmware call site is
-`display::OtpRefresh`. No `esp-hal`. No LUT. No NFC. No
+`display::OtpRefresh`; `display::mono_full_due` requires a mono full
+refresh after ten partials or when the baseline is missing, including
+same-card redraws. No `esp-hal`. No LUT. No NFC. No
 LoRa. Hardware skill `touch.md` / `display.md` /
 `sensors.md`.
 

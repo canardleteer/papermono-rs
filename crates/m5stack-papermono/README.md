@@ -1,6 +1,6 @@
 # m5stack-papermono
 
-Board support for the full M5Stack PaperMono (`C153`) device.
+Board support for the M5Stack PaperMono (`C153`) device.
 
 Documentation:
 [PaperMono SCH V0.6.2 Schematic](https://m5stack-doc.oss-cn-shenzhen.aliyuncs.com/1267/PaperMono_SCH_V0.6.2_20260522.pdf)
@@ -22,3 +22,36 @@ model (`C153`):
   frame demodulation.
 
 The crate is `#![no_std]` and fully testable on the host compiler.
+
+## LoRa sessions
+
+`lora` re-exports the generic `sx1262-phy` API, backed by published
+`lora-phy` 3.0.1 and `lora-modulation` 0.1.5. PaperMono pins,
+presets and `RadioHooks` remain in this BSP. `RadioContext` lends system I2C
+and an asynchronous delay
+for each startup, TX confirmation or shutdown operation; the wrapper
+holds no system-bus borrow between calls.
+
+Use `Sx1262::with_hooks(device, busy, delay, RadioHooks::default())`, then
+explicit `startup`, chip configuration, packet operations and `shutdown`.
+Keep that same wrapper active for sustained operation. Antenna control
+stays high across RX, TX, standby and channel changes until shutdown.
+`release` returns the SPI device, BUSY, delay and hooks without powering down.
+
+Startup and shutdown confirm output mode, push-pull drive, latch and
+sampled level. Fresh confirmation precedes each TX at the initial
+interval of one. A denial, mismatch or readback error blocks TX and
+requires shutdown/startup recovery. Digital readback confirms the
+control signal; it cannot measure the RF path. DIO2 switching is a
+separate SX1262 function. Startup follows the current official
+[M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora):
+enable the rail, wait 200 ms, assert reset for 100 ms with antenna control
+high, then release reset and wait 200 ms before BUSY readiness.
+Host mocks check ordering, delays and readback; physical settling and RF
+validation remain open on `C153`.
+
+Chip operations await async `SpiDevice`, BUSY and caller-supplied delay.
+Firmware owns NSS composition and recovery. Cancellation invalidates readiness;
+restore NSS and complete shutdown/startup before another TX. The generic
+wrapper requires a nonzero hardware TX timeout and returns the SPI device,
+BUSY, delay and hooks on release without I/O. Registry publication is deferred.

@@ -4,6 +4,10 @@ Programmatic host API for M5Stack PaperMono and PaperMono-Lite USB
 detect, factory backup / confirm / restore, and CDC monitor
 (modem lines off; `--reset` does not recapture on Lite).
 
+Requires Rust 1.95 or newer (`espflash` 4.7). Snapshot hash strings and
+USB session lock contention/inheritance remain compatible with earlier
+versions.
+
 `cargo xtask` is the clap front-end. Callers pass a `Layout`
 (developer-data / backups root), not a hardcoded repo path.
 
@@ -20,6 +24,14 @@ snapshot `factory` partition only (Lite: `0x10000`).
 [udev/99-papermono-usb.rules](udev/99-papermono-usb.rules) to
 `/etc/udev/rules.d/`, reload udev, and replug. Operator steps:
 the papermono-rs skill
-[xtask.md](../../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
+[xtask.md](https://github.com/canardleteer/papermono-rs/blob/main/.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor).
 
 License: MIT
+
+LoRa session logs include `lora_control` digital antenna evidence and
+`lora_session` verification totals. The host classifies both record kinds;
+unknown readback remains `unknown`, and failed checks carry `warning=1`.
+
+The CDC parser also recognizes `lora_metrics` records with scaled integer
+half-dBm RSSI and quarter-dB SNR. Existing `lora_rx` and `lora_scan` reports
+retain their whole-unit formats.

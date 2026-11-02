@@ -2,10 +2,10 @@
 //!
 //! # Architecture & Purpose
 //! This firmware serves as an advanced, asynchronous reference application for
-//! the M5Stack PaperMono-Lite (`C153-Lite`) and PaperMono (`C153`). Core functionality
-//! is shared across both models, operating as a clean Lite baseline by default.
-//! Compiling with `--features c153` activates the PaperMono (`C153`) board identity
-//! and discovery diagnostics for NFC and LoRa peripherals. Demonstrating principles from
+//! the M5Stack PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`). Core functionality
+//! is shared across both models. The default feature set targets C153 and includes
+//! NFC and LoRa discovery; compile with `--no-default-features --features lite`
+//! to build a pruned C153-Lite image. Demonstrating principles from
 //! *The Embassy Book*, *The Rust on ESP Book*, and *The Embedded Rust Book*:
 //!
 //! - **Asynchronous Cooperative Multitasking**: Built on the `embassy-executor`
@@ -46,6 +46,8 @@
 mod beep;
 mod board;
 mod cdc;
+#[cfg(feature = "radio")]
+mod csprng;
 #[cfg(feature = "panel")]
 mod draw;
 mod heartbeat;
@@ -139,6 +141,24 @@ const _: () = {
 async fn main(spawner: Spawner) -> ! {
     // Initialize MCU clock distribution and power controllers.
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    // esp-hal's bare Rng is only pseudo-random while wireless is off. Temporarily
+    // enable its documented SAR ADC entropy source to seed BLE's software RNG.
+    // No board GPIO or system I2C bus participates in this internal ADC operation.
+    #[cfg(feature = "radio")]
+    {
+        use esp_hal::rng::{Trng, TrngSource};
+
+        let source = TrngSource::new(peripherals.RNG, peripherals.ADC1);
+        let trng = Trng::try_new().expect("ADC entropy source must enable TRNG");
+        let mut seed = [0; 32];
+        trng.read(&mut seed);
+        csprng::seed(seed);
+        // Release the TRNG user first, then restore the ADC before either BLE
+        // or Wi-Fi starts. Keeping the ADC entropy source active conflicts with RF.
+        drop(trng);
+        drop(source);
+    }
 
     // When wireless radio scanning is active, initialize heap allocators required by esp-radio.
     #[cfg(feature = "radio")]

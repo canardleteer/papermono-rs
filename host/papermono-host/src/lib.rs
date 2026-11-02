@@ -101,16 +101,21 @@ pub fn restore(
 }
 
 /// Write-bin a custom `save-image` payload into snapshot `factory`.
+///
+/// `force` permits a copied-original fallback when identity does not match,
+/// but only if all local originals match the live flash size and agree on a
+/// safe factory offset and size. It cannot be combined with `capture`.
 pub fn flash_app(
     layout: &Layout,
     port: Option<String>,
     image: &Path,
     yes: bool,
     capture: Option<&str>,
+    force: bool,
 ) -> Result<(), Error> {
     let port = detect::resolve_papermono_port(port)?;
     let _uart = uart_lock::try_acquire(&port, "flash-app")?;
-    flash_app::flash_app(&RealDevice, layout, &port, image, yes, capture)
+    flash_app::flash_app(&RealDevice, layout, &port, image, yes, capture, force)
 }
 
 /// Copy USB-Serial/JTAG to stdout (and optionally a file).

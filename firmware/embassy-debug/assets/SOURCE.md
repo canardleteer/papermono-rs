@@ -20,7 +20,14 @@ States). That is a CC0-style public-domain dedication.
 
 `ferris.1bpp` is 360×240 packed 1 bit-per-pixel (8
 pixels/byte, MSB-first, `1` = ink). `cargo xtask encode-assets`
-crops ink and scales to 360×240 pixels before generating the output files:
+crops ink and scales to 360×240 pixels before generating the output files.
+The source checksum is 64 lowercase hexadecimal SHA-256 characters plus a
+newline. The firmware build rejects a changed source checksum, missing
+files, or an incorrectly sized bitmap. A temporary-directory regression
+checks the bitmap bytes, inverse, previews and checksum with the selected
+renderer releases.
+
+Generated and source files:
 
 | File | Role |
 | --- | --- |

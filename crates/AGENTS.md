@@ -10,9 +10,34 @@ only). Rules: [docs/API-RULES.md](../docs/API-RULES.md).
 | `ssd1677-otp/` | — | Panel OTP sequences. No MCU LUT |
 | `m5pm1/` | — | PMIC registers, PWM0, ADC, battery %, red LED |
 | `m5ioe1/` | — | Expander banks + IP2315 gate typestate |
+| `sx1262-phy/` | — | SX1262 upstream wrapper, diagnostic commands, lifecycle and TX guard |
 | `st25r3916/` | — | ST25R3916 NFC transceiver driver (initiator, ISO-DEP, smart card probing, target profiles, PT_Memory, framing) |
 | `m5stack-papermono-lite/` | `C153-Lite` | Shared pin map (both SKUs) + `BoardModel` enum and profile |
 | `m5stack-papermono/` | `C153` | Re-exports Lite; adds NFC + LoRa |
+
+`sx1262-phy/` is the generic SX1262 wrapper around published `lora-phy` 3.0.1
+and `lora-modulation` 0.1.5. Board-neutral hooks receive borrowed context.
+Default hooks deny TX; raw `SetTx` requires the same session guard.
+All chip I/O awaits async `SpiDevice` and caller-supplied delay. Default
+features and LoRaWAN stay disabled. Retain upstream parameter validation;
+program modulation locally with computed LDRO and a masked TX bandwidth
+workaround, per catalog `sx1262` Rev 2.2 §13.4.5.2 “LoRa Modulation
+Parameters” and §15.1.2 “Workaround”.
+Keep NSS composition outside the crate. Cancelled sequences invalidate
+readiness; restore NSS, then shutdown/startup before TX. Both typed/raw TX
+require a nonzero chip timeout. Registry publication remains disabled pending
+separate package review.
+Board/chip crates retain Rust 1.88.
+BSP pins, power sequencing and antenna confirmation remain in
+`m5stack-papermono::lora`.
+
+C153 startup follows the current M5Stack PaperMono LoRa tutorial:
+rail enabled, 200 ms settling, reset asserted for 100 ms, then 200 ms
+after release. Antenna control stays high until shutdown. A normal C153 async
+RX session on 2026-10-02 confirmed startup/shutdown readbacks and received one
+controlled packet. Host mocks check sequencing and durations; the actual delay
+values and TX RF output remain open in the hardware
+[measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## SKU split
 
@@ -26,6 +51,8 @@ Put new code where the hardware is:
   `m5stack-papermono-lite` (or a chip-driver crate both SKUs
   use). Panel call site is `display::OtpRefresh`.
   `display::RefreshMode` is the HTML `epd_*` catalog only.
+  `display::mono_full_due` enforces a missing mono baseline or ten
+  accumulated partials; same-card redraws have no exemption.
 - NFC / LoRa pins and bring-up: `m5stack-papermono` only. A
   C153 firmware package depends on that crate when the image
   actually uses a radio.

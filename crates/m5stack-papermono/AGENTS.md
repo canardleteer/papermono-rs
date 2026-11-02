@@ -1,6 +1,6 @@
 # m5stack-papermono
 
-Board support for the full M5Stack PaperMono (`C153`) device.
+Board support for the M5Stack PaperMono (`C153`) device.
 Workspace member, default-member for host builds. Re-exports
 `m5stack-papermono-lite`, then NFC (`nfc`) and LoRa (`lora`).
 
@@ -48,6 +48,29 @@ PaperMono-Lite (`C153-Lite`) baseline:
      antenna) housing the Semtech SX1262 transceiver.
    - **Safety contract**: Keep transmitter in standby/idle; do not emit
      continuous RF carrier. Check `BUSY` before every transaction.
+
+## LoRa caller hooks
+
+`lora` re-exports `sx1262-phy`. Keep PaperMono nets and presets here;
+the generic crate delegates modem operations to published `lora-phy` 3.0.1.
+Modulation and its masked bandwidth workaround are programmed locally after
+upstream validation, using `lora-modulation` 0.1.5 for LDRO. Board nets and
+sequencing stay here. See [CRATES.md](../../docs/CRATES.md).
+`RadioHooks` takes a short `RadioContext` with borrowed I2C, discovered
+expander address and upstream async DelayNs. Startup enables the rail,
+waits 200 ms, asserts reset and enables antenna, holds reset 100 ms,
+then releases reset and waits 200 ms before BUSY readiness. Timing
+follows the current M5Stack PaperMono LoRa tutorial; C153 physical
+confirmation remains open. Shutdown
+asserts reset, lowers antenna and disables the rail; attempt remaining
+steps on errors. Confirm mode, push-pull drive, latch and sampled level
+at both boundaries and before TX at interval one. Keep antenna high
+throughout packet/standby/channel operations. Digital readback confirms
+the control net. RF-path validation and new
+physical confirmation remain open for C153. The async chip wrapper accepts
+`SpiDevice`, BUSY and delay. Firmware composes NSS with `ExclusiveDevice`
+and retains it for recovery. Never race command sequences against cancellation;
+all TX paths use a nonzero hardware timeout.
 
 ## Agent Documentation Standards
 

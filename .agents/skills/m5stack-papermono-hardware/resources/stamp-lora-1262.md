@@ -39,7 +39,8 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
    functionality (`MTCK`, `MTDO`, `MTDI`) on the ESP32-S3. Firmware must
    configure them as general-purpose GPIOs / SPI signals before issuing
    transactions.
-2. **BUSY Line Timing**: Per Semtech SX1262 Section 13.5.1, the MCU must verify
+2. **BUSY Line Timing**: Per catalog `sx1262` §8.3.1 “BUSY Control Line”,
+   the MCU must verify
    that `SX_BUSY` is low before asserting `SX_NSS` for an SPI transaction.
    `GPIO21` does not have an internal pull resistor on the ESP32-S3.
 3. **Power-Gated Domain**: The module is powered from `3V3_L2_LoRa`. To safely
@@ -53,10 +54,14 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
    this line controls an RF switch that gates the built-in FPC antenna to
    the module's RF front-end: `PYG2` MUST be driven HIGH to connect the
    antenna (driving it LOW disconnects the antenna, severely attenuating
-   signals). In addition, SX1262 `DIO2` must be configured as the internal
+   signals). SX1262 `DIO2` must also be configured as the internal
    RF switch control (`set_dio2_as_rf_switch_ctrl(true)`), TCXO powered at
    3.0 V via DIO3 (`set_dio3_as_tcxo_ctrl`), and internal regulator set to
    `REGULATOR_LDO`.
+   The current M5Stack LoRa tutorial instead sets PYG2 LOW for RX.
+   That conflicts with the historical HIGH reception evidence and
+   retained session policy; [the source inventory](../references/sources.md#papermono-lora-antenna-and-power-conflicts)
+   keeps the RX polarity unresolved pending C153 RF measurements.
 6. **Confirmed Live Verification**:
    Hardware verified live on PaperMono (`C153`) (2026-09-05):
    - SPI interface, status queries (`0xC0` → `0xAA` `STBY_RC`), and power
@@ -67,3 +72,132 @@ The module interfaces with the ESP32-S3, M5PM1 PMIC, and M5IOE1 expander:
      Sync Word `0x24B4`) at -107 dBm RSSI, -16 dB SNR, confirming the
      complete RF receive chain through the built-in FPC antenna.
    - Continuous 104-channel US915 sweeper with double-duty scanning.
+
+   These historical results do not validate the current reset timing,
+   lifecycle readback policy, fitted module revision or actual TX power.
+
+## Session control and confirmation
+
+Software policy for PaperMono (`C153`): enable `LoRa_EN`, wait
+`RAIL_SETTLE_MS` (200 ms), assert `SX_NRST` and drive `SX_ANT_SW` high,
+hold reset for `RESET_HOLD_MS` (100 ms), release reset and wait
+`BOOT_SETTLE_MS` (200 ms), then check BUSY readiness. The rail-first reset
+sequence follows the current [M5Stack PaperMono LoRa tutorial](https://docs.m5stack.com/en/arduino/papermono/lora)
+`enableLoRaHardware`, reviewed 2026-10-01. Host mocks check operation
+order and durations; electrical settling still needs C153 confirmation.
+Confirm antenna output mode, push-pull drive, high latch and sampled high
+before marking the session ready. Shutdown invalidates readiness first,
+asserts reset, lowers antenna control, disables the rail, then confirms
+low latch and sampled low. Remaining cleanup steps run after failures.
+The older official [M5PaperMono-UserDemo LoRa HAL](https://github.com/m5stack/M5PaperMono-UserDemo/blob/c1099107271d31a0678d661a896e2b04dbb331ea/main/hal/hal_lora.cpp)
+(reviewed firmware V1.2, 2026-08-10) raises the rail, sets antenna-high
+and reset-low, waits 100 ms before release, then 20 ms afterward.
+Keep that dated sequence as comparison, rather than treating it as
+the current tutorial's timing or a measurement of the new lifecycle.
+
+Keep `SX_ANT_SW` high across RX, TX, standby and frequency changes.
+The current tutorial's LOW-during-RX example remains a documented
+source conflict, not a change to this session policy.
+Short diagnostics stop after their operation; sustained sessions retain
+the same wrapper and counters across operations. System I2C is borrowed
+only during control/verification. Firmware uses initial cadence one,
+with fresh checks before every TX. Startup/shutdown checks always run.
+Twenty/forty requires a deliberate configuration change and evidence.
+Denial, mismatch or unavailable readback blocks TX, restores cadence one,
+warns on serial and requires shutdown/startup recovery.
+
+DIO2 controls the SX1262 RF switch according to catalog `sx1262` Rev 2.2
+§13.3.5 “SetDIO2AsRfSwitchCtrl”; `PYG2` is the board's separate antenna
+control. Readback confirms the digital control signal. RF connectivity
+and impedance require separate measurements. Physical RF validation and
+registry publication remain separate.
+
+| Evidence / encoding | Meaning | Official source |
+| --- | --- | --- |
+| `GPIO_M_L`, bit 1 = 1 | PYG2 configured as output | `m5ioe1` UM V1.4 Table 3 “Register Map”, “GPIO control (IO1–IO14)” |
+| `GPIO_DRV_L`, bit 1 = 0 | PYG2 push-pull drive | Same M5IOE1 sections |
+| `GPIO_O_L`, bit 1 | PYG2 output latch | Same M5IOE1 sections |
+| `GPIO_I_L`, bit 1 | PYG2 sampled level | Same M5IOE1 sections |
+| `REG_TX_MODULATION` 0x0889, `TX_MODULATION_BW_MASK` bit 2 | Local masked update: clear for 500 kHz LoRa BW, set otherwise | `sx1262` §15.1.2 “Workaround” |
+| `LORA_BW_7_KHZ` / `LORA_BW_10_KHZ` / `LORA_BW_15_KHZ` / `LORA_BW_20_KHZ` / `LORA_BW_31_KHZ` / `LORA_BW_41_KHZ` / `LORA_BW_62_KHZ` | 0x00 / 0x08 / 0x01 / 0x09 / 0x02 / 0x0A / 0x03 (7.81 / 10.42 / 15.63 / 20.83 / 31.25 / 41.67 / 62.50 kHz) | `sx1262` §13.4.5.2 “LoRa Modulation Parameters”, Table 13-48 |
+| `LORA_BW_125_KHZ` / `LORA_BW_250_KHZ` / `LORA_BW_500_KHZ` | 0x04 / 0x05 / 0x06 | Same section and table |
+| `SpreadingFactor::_5`…`SpreadingFactor::_12` (`LORA_SF7`…`LORA_SF12` constants), `LORA_CR_4_5`…`LORA_CR_4_8`, `LORA_LDRO_OFF` / `ON` | SF 5…12; CR 0x01…0x04; LDRO 0x00 / 0x01 from `lora-modulation` symbol duration | `sx1262` §13.4.5.2 “LoRa Modulation Parameters”, Tables 13-47/49/50 |
+| IQ polarity, 0x0736 bit 2 | Clear for inverted IQ, set for standard IQ; delegated to upstream | `sx1262` §15.4.2 “Workaround” |
+| `REG_TX_CLAMP_CONFIG`, 0x08D8, `TX_CLAMP_MASK` 0x1E | Set PA-clamp threshold bits while preserving unrelated bits | `sx1262` §12.1 “Registers”, §15.2.2 “Workaround” |
+| `REG_RTC_CONTROL`, 0x0902 = 0 | Stop RTC after timed reception, including early stop | `sx1262` §15.3.2 “Workaround” |
+| `REG_RTC_EVENT_CLEAR`, 0x0944, `RTC_EVENT_CLEAR_MASK` 0x02 | Set timeout-event clear bit while preserving unrelated bits | Same section |
+| `CalibrationBand` endpoints 0x6B/0x6F, 0x75/0x81, 0xC1/0xC5, 0xD7/0xDB, 0xE1/0xE9 | Cache 430–440, 470–510, 779–787, 863–870, 902–928 MHz bands; reset on startup | `sx1262` §9.2.1 “Image Calibration for Specific Frequency Bands”, Table 9-2 |
+| Packet RSSI = negative byte; SNR = signed byte | RSSI in half-dBm, SNR in quarter-dB; whole-unit accessors truncate toward zero | `sx1262` §13.5.3 “GetPacketStatus” |
+| Instant RSSI = negative byte | Half-dBm; whole-unit accessor truncates toward zero | `sx1262` §13.5.4 “GetRssiInst” |
+
+Serial `lora_control` records phase, cadence, attempts/checks, expected
+level, mode/drive/latch/sample and failure reason. `lora_session` records
+verification totals and cleanup status. `lora_metrics` preserves fractional
+packet readings alongside the existing whole-unit records. These records become
+live measurements when captured on a physical board named by SKU.
+
+### C153 async receive capture (2026-10-02)
+
+The `embassy-debug` image used on 2026-10-02 completed one normal receive
+session on
+PaperMono (`C153`). Startup reported PYG2 output mode, push-pull drive, latch,
+and sampled level high; shutdown reported output mode/drive retained with
+latch/sample low. `lora_session` reported two checks, zero failures, and clean
+cleanup. During the session it received one 18-byte packet at 917.625 MHz with
+`rssi=-72 dBm`, `snr=7 dB`; the logged preview endpoints were `0x48` and `0x54`,
+matching the first and fourth bytes of the one-shot Heltec payload. Fractional
+telemetry reported RSSI `-144` half-dBm and SNR `30` quarter-dB. The bridge
+reported TX complete, not timed out, 18 bytes, at a requested `-9 dBm`.
+
+This confirms one current async RX path and its normal startup/shutdown digital
+readbacks on this unit. It does not measure radiated TX power or confirm the
+current reset delays, BUSY/NSS timing, fault recovery, sustained-session
+behavior, or the C153 local ping's three-check log. The firmware's subsequent
+GPIO4 falling-edge stop change was not flashed or physically tested in this
+session; see the remaining [NYC items](not-yet-confirmed.md#nyc-lora-session-recovery).
+
+## Module variants and PA settings
+
+The official [Stamp product comparison](https://docs.m5stack.com/en/stamp/Stamp_LoRa-1262)
+identifies S014 with its RF pad connected; S014-I and S014-IF route the
+antenna to IPEX-4 and leave that pad unconnected. Only S014-IF includes
+the 12-pin FPC connector. These connectors describe module variants;
+they do not establish which module revision is fitted to a physical C153.
+Use PaperMono's wiring for its PYG2 control.
+
+The historical “+14 dBm” diagnostic uses command +14, PA duty cycle 2
+and hpMax 3. This is retained, but differs from the cached datasheet's
+optimal +14 reference row. Actual output power requires measurement.
+The current PaperMono LoRa tutorial also requests 22 dBm but labels
+its TX display 16 dBm; that unresolved example mismatch does not
+justify changing the retained PA/OCP profile.
+See
+[PA source comparison and document revisions](../references/sources.md#sx1262-pa-profile-comparison).
+
+## Async chip-operation evidence
+
+Published `lora-phy` 3.0.1 and `lora-modulation` 0.1.5 have default/LoRaWAN
+features disabled. After upstream validation, the wrapper programs modulation
+locally per `sx1262` Rev 2.2 §13.4.5.2 “LoRa Modulation Parameters”, using
+LDRO from symbol duration without accessing private upstream fields. The
+masked TX bandwidth workaround follows §15.1.2 “Workaround”. Its widened
+airtime calculation
+covers CRC selection, 16-bit preambles and SF5/SF6 rules from
+[Semtech's reference implementation](https://github.com/Lora-net/sx126x_driver/blob/a10c5dfdf89788c6ac805e9fe98889de44175aa2/src/sx126x.c#L1084).
+
+Every SPI transaction checks BUSY first, waits one microsecond after NSS
+rises, then checks BUSY again, following `sx1262` §8.3.1 “BUSY Control Line”.
+The initial BUSY delay budget is 100 ms with one-ms cooperative polls;
+scheduler latency is additional. Firmware awaits sequences to completion.
+An interrupted sequence requires caller NSS recovery and shutdown/startup
+before TX, as motivated by upstream
+[cancellation discussion](https://github.com/lora-rs/lora-rs/issues/350).
+Managed RX acknowledges observed IRQ bits, rejects CRC/header failures before
+FIFO access and cleans up RTC after timed reception or early stop. Snapshots
+cannot distinguish repeated arrivals of the same sticky IRQ bit.
+
+Host tests establish intent and software sequencing. C153 bench work remains
+open for NSS settling, async timing, reception bursts, antenna behavior and
+RF power. The existing 3.0 V TCXO, PA/OCP command profile, explicit shutdown
+and verification interval one remain. A +14 power command is not measured
+RF output. No new physical confirmation is recorded here.

@@ -11,7 +11,7 @@
 //! 2. **Periodic Full Waveform Refresh**: Electrophoretic microcapsules accumulate residual
 //!    charges during partial updates. To preserve display contrast and prevent burn-in/ghosting,
 //!    this driver mandates a full refresh cycle ([`display::OtpRefresh::MonoFull`]) every
-//!    [`PARTIALS_BEFORE_FULL`] (18) partial updates.
+//!    [`display::PARTIALS_BEFORE_FULL`] (10) partial updates, including same-card redraws.
 //! 3. **Deep Sleep Between Updates**: After every update sequence, the panel is placed
 //!    into hardware Deep Sleep Mode 1 (`0x10`) to deactivate high-voltage charge pumps.
 //! 4. **Hardware BUSY Line Synchronization**: The SSD1677 `BUSY` signal (`GPIO18`) goes high
@@ -87,13 +87,6 @@ const MODE_PARTIAL: u8 = 3;
 
 /// Yield the Embassy executor every N rows during blocking RAM transfers.
 const YIELD_EVERY_ROWS: u16 = 16;
-
-/// Cumulative partial updates allowed before mandating a full clearing refresh.
-///
-/// Uninterrupted partials can damage the panel; vendor guidance is roughly
-/// ten. This image uses 18 (3× the prior budget of 6) so B&W card walks flash
-/// `MonoFull` less often. Soft same-card redraws still skip this budget.
-const PARTIALS_BEFORE_FULL: u8 = 18;
 
 /// Retrieves the most recent panel refresh telemetry stamp for periodic reporting.
 pub fn last() -> Option<PanelStamp> {
@@ -217,27 +210,22 @@ impl Panel {
 
     /// Renders a monochromatic frame using OTP waveforms.
     ///
-    /// - When no mono baseline exists (`mono_ready` is false), always runs
-    ///   [`Self::refresh_mono_full`].
-    /// - When `soft` is true (same-card status/telemetry redraw: Bluetooth PIN,
-    ///   Wi-Fi survey/hotspot counters, Legend battery; or same-card orientation
-    ///   remap), prefers [`Self::refresh_partial_official`] even after the
-    ///   partial budget so a black-and-white→black-and-white update does not
-    ///   flash a full mono wipe.
-    ///   The next non-soft paint (card navigation) still takes a mono full refresh once
-    ///   [`PARTIALS_BEFORE_FULL`] is reached, preserving the DC-balance contract.
-    /// - When `soft` is false (card change), runs a full mono refresh after
-    ///   [`PARTIALS_BEFORE_FULL`] partials since the last full.
+    /// Uses [`display::mono_full_due`] to select a full refresh when no mono
+    /// baseline exists or ten partial updates have accumulated. Same-card
+    /// telemetry and orientation redraws obey the same budget as navigation.
+    /// Writes both caller-owned planes over SPI2, synchronizes on EPD BUSY,
+    /// and wakes/sleeps the panel via M5IOE1 EPD_RST on system I2C. Embassy
+    /// timer waits yield while the panel drives its OTP waveform. SPI/I2C
+    /// errors retain the diagnostic driver's existing best-effort handling;
+    /// this policy does not establish physical ghosting or panel-life results.
     pub async fn paint_mono_fast(
         &mut self,
         i2c: &mut SysI2c,
         bw: &[u8],
         red: &[u8],
         busy: &Input<'static>,
-        soft: bool,
     ) {
-        let budget_exhausted = PARTIALS_BEFORE_FULL > 0 && self.partials >= PARTIALS_BEFORE_FULL;
-        if !self.mono_ready || (!soft && budget_exhausted) {
+        if display::mono_full_due(self.mono_ready, self.partials) {
             self.refresh_mono_full(i2c, Some((bw, red)), busy).await;
             return;
         }
@@ -372,12 +360,17 @@ impl Panel {
     }
 
     /// Draws a target mark in monochromatic RAM and triggers an OTP partial refresh.
+    ///
+    /// Clears with `MonoFull` first if the baseline is missing or the shared
+    /// partial budget is due; previous marks are discarded by that clear.
+    /// Uses SPI2, EPD BUSY, and system-I2C EPD_RST with the same cooperative
+    /// waits and best-effort error handling as [`Self::paint_mono_fast`].
     pub async fn paint(&mut self, i2c: &mut SysI2c, mark: Mark, busy: &Input<'static>) {
         if matches!(mark, Mark::Blank) {
             self.refresh_mono_full(i2c, None, busy).await;
             return;
         }
-        if !self.mono_ready {
+        if display::mono_full_due(self.mono_ready, self.partials) {
             self.refresh_mono_full(i2c, None, busy).await;
         }
         self.wake_for_partial(i2c, busy).await;
@@ -403,11 +396,11 @@ impl Panel {
         self.note_partial();
     }
 
+    /// Counts an OTP partial toward the next update's shared full-refresh budget.
+    /// Pure bookkeeping: no bus access or errors; saturation prevents wraparound.
     fn note_partial(&mut self) {
-        // Count partials toward the DC-balance full-refresh budget. Clearing
-        // `mono_ready` is deferred to [`Self::paint_mono_fast`] for non-soft
-        // paints so live Bluetooth / Wi-Fi / Legend status redraws can stay on
-        // OTP Partial instead of flashing MonoFull mid-card.
+        // Keep the RAM baseline valid; the next update checks both the baseline
+        // and accumulated partials, including same-card telemetry redraws.
         self.partials = self.partials.saturating_add(1);
     }
 }

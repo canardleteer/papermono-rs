@@ -360,3 +360,33 @@ pub fn lora_scan(sample: &papermono_log::LoraScanSample) {
         emit(line);
     }
 }
+
+/// Emits antenna mode/drive/latch/sample evidence from a borrowed I2C check.
+/// The stack buffer holds one complete record; format errors suppress the line.
+#[cfg(feature = "c153")]
+pub fn lora_control(sample: &papermono_log::LoraControlSample) {
+    let mut buf = [0; papermono_log::LORA_CONTROL_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_control(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits counters and disabled-state cleanup confirmation after one radio session.
+/// No bus is accessed here; telemetry formatting uses a bounded stack buffer.
+#[cfg(feature = "c153")]
+pub fn lora_session(sample: &papermono_log::LoraSessionSample) {
+    let mut buf = [0; papermono_log::LORA_SESSION_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_session(sample, &mut buf) {
+        emit(line);
+    }
+}
+
+/// Emits fractional LoRa readings alongside the existing whole-unit RX record.
+/// A fixed stack buffer bounds CDC formatting; formatting failure emits no line.
+#[cfg(feature = "c153")]
+pub fn lora_metrics(sample: &papermono_log::LoraMetricsSample) {
+    let mut buf = [0; papermono_log::LORA_METRICS_CAPACITY];
+    if let Ok(line) = papermono_log::format_lora_metrics(sample, &mut buf) {
+        esp_println::println!("{}", line);
+    }
+}

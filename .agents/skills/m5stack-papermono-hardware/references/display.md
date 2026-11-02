@@ -45,19 +45,23 @@ titles stay on `RefreshMode` as a catalog only.
 | 4-gray card | `OtpRefresh::GrayFull` (`0xD7`) |
 | Rebuild mono after gray, or a full clear | `OtpRefresh::MonoFull` (`0xF8` then `0x14`, both planes) |
 | Fast flip after a mono baseline | `OtpRefresh::Partial` (`0xFF`, RAM 1 only) |
-| After N partials (card change) | one `MonoFull` (embassy-debug `PARTIALS_BEFORE_FULL` = 18) |
-| Same-card status redraw | stay on `Partial` (`paint_mono_fast(..., soft = true)`); do not flash `MonoFull` mid-update |
+| After ten partials | next monochrome update uses `MonoFull`; shared `PARTIALS_BEFORE_FULL` = 10 |
+| Same-card status or orientation redraw | `Partial` while the baseline is valid and the budget remains; otherwise `MonoFull` |
 
-**Soft vs hard mono (embassy-debug, Lite 2026-09-04):** Legend
-battery, Bluetooth passkey, Wi-Fi survey, SoftAP status redraws,
-and same-card **orientation** remaps pass `soft = true` so they
-keep `Partial` even after the usual partial budget. Card
-navigation and sleep paint pass `soft = false` and still take
-`MonoFull` when the budget is due. Soft paints still increment
-the partial counter; they only skip the forced full on that
-redraw. Do not treat soft as permission for uninterrupted
-continuous partials forever — navigation still clears the
-budget.
+The shared board-crate `display::mono_full_due(mono_ready, partials)`
+requires `MonoFull` when the mono baseline is absent or ten partials
+have accumulated. Embassy-debug uses this host-tested policy for
+navigation, sleep notices, same-card status updates and orientation
+remaps. Target marks receive a full white clear first when due.
+Every partial increments the counter; each full refresh resets it.
+There is no same-card exemption.
+
+This follows the current M5Stack product-page recommendation
+([PaperMono](https://docs.m5stack.com/en/core/PaperMono),
+[PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite),
+reviewed 2026-10-01). Ghosting and panel-life behavior at this
+cadence remain unmeasured for both SKUs:
+[nyc-partial-ghost](../resources/not-yet-confirmed.md#nyc-partial-ghost).
 
 Do **not** upload `0x32`. Do **not** send `Partial` after
 `GrayFull` until `MonoFull`. Do **not** send a second bare
@@ -69,7 +73,7 @@ are **abandoned**.
 
 ## Refresh trials (Lite, 2026-09-01)
 
-Recorded as successes and failures. `C153` unmeasured.
+Recorded as successes and failures on Lite; C153 refresh behavior is unmeasured.
 Silicon table: [measure.md](measure.md).
 
 ### Successes
@@ -144,11 +148,10 @@ X-decrement `0x02` and `0xD7`.
 - `Partial` after `GrayFull` without `MonoFull` is
   **abandoned** (Ferris stayed until overdrawn).
 - `MonoFull` both planes white: glass went **white**.
-- After about eighteen partials, one `MonoFull` on the next
-  **non-soft** mono paint. Same-card Legend / Bluetooth /
-  Wi-Fi status redraws and same-card orientation remaps may
-  stay on `Partial` past that budget (`soft = true`). Official
-  HTML still says about ten
+- Historical firmware used an eighteen-partial budget with a
+  same-card exemption. The current host-tested policy requires
+  `MonoFull` on the next monochrome update after ten partials,
+  including same-card redraws. This change has no new glass evidence
   ([nyc-partial-ghost](../resources/not-yet-confirmed.md#nyc-partial-ghost)).
 
 ## IMU-driven UI rotation

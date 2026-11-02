@@ -15,6 +15,11 @@ dependency on `esp-hal`. Because the package compiles under `#![no_std]`
 without architecture-specific HAL primitives, unit tests run directly on
 host tooling.
 
+`display::mono_full_due` provides the shared OTP refresh policy: a missing
+monochrome baseline or ten accumulated partial updates requires a full
+monochrome refresh on the next update, including same-card redraws.
+The decision is host-tested; physical ghosting confirmation remains open.
+
 Peripheral register details reside in companion chip crates such as `m5pm1`,
 `m5ioe1`, and `ssd1677-otp`. Radio components like NFC and LoRa are absent on
 the Lite model and are provided by the sibling `m5stack-papermono` crate.

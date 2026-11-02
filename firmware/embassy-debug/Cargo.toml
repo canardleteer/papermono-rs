@@ -2,19 +2,20 @@
 name = "embassy-debug-fw"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.97"
 publish = false
-description = "PaperMono Embassy debug image (Lite baseline, or Full with --features c153). Flash only via cargo xtask flash-app after a matching snapshot exists."
+description = "PaperMono Embassy debug image (C153 default, or C153-Lite with --no-default-features --features lite). Flash only via cargo xtask flash-app after a matching snapshot exists."
 license = "MIT"
 
 # Workspace member, not a default-member: host `cargo test` skips this
-# package. Build with `cargo xtask build-fw embassy-debug` (or
-# `cargo xtask build-fw embassy-debug --features c153`).
+# package. Build with `cargo xtask build-fw embassy-debug` (C153 default, or
+# `--no-default-features --features lite` for C153-Lite).
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
 [features]
 default = ["c153", "touch", "panel", "sleep", "radio", "orient"]
-# PaperMono Full SKU C153 hardware: ST25R3916 NFC identity & Stamp LoRa-1262 discovery
-c153 = ["dep:m5stack-papermono"]
+# PaperMono SKU C153 hardware: ST25R3916 NFC identity & Stamp LoRa-1262 discovery
+c153 = ["dep:m5stack-papermono", "dep:embedded-hal-bus", "dep:embedded-hal", "dep:embedded-hal-async"]
 # Compile-time pruned Lite-only profile (excludes C153 radio drivers, leaves radio pins unassigned).
 lite = ["touch", "panel", "sleep", "radio", "orient"]
 # System I2C: M5PM1 / M5IOE1 / FT6336G INT. Park IP2315. C153-Lite NFC NAK.
@@ -37,7 +38,9 @@ radio = [
   "dep:esp-radio",
   "dep:embassy-futures",
   "dep:trouble-host",
-  "dep:bt-hci",
+  "dep:embassy-crypto",
+  "dep:embassy-crypto-rustcrypto",
+  "dep:rand_chacha",
   "dep:embassy-net",
   "dep:edge-dhcp",
   "dep:edge-nal",
@@ -48,31 +51,32 @@ radio = [
 ]
 
 [dependencies]
-esp-hal = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-hal = { version = "1.2.2", features = [
   "esp32s3",
   "unstable",
 ] }
-esp-println = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", default-features = false, features = [
+esp-println = { version = "0.18.0", default-features = false, features = [
   "esp32s3",
   "jtag-serial",
   "critical-section",
 ] }
-esp-backtrace = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-backtrace = { version = "0.20.0", features = [
   "esp32s3",
   "panic-handler",
   "println",
 ] }
-esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-bootloader-esp-idf = { version = "0.6.0", features = [
   "esp32s3",
 ] }
-esp-rtos = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-rtos = { version = "0.4.0", features = [
   "embassy",
   "esp32s3",
 ] }
-esp-alloc = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", optional = true, features = [
+esp-alloc = { version = "0.11.0", optional = true, features = [
   "esp32s3",
 ] }
-esp-radio = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", optional = true, features = [
+# Published beta: stable esp-radio 0.18 targets the older esp-hal 1.1 family.
+esp-radio = { version = "1.0.0-beta.1", optional = true, features = [
   "esp32s3",
   "unstable",
   "wifi",
@@ -81,10 +85,11 @@ esp-radio = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-r
 ] }
 
 embassy-executor = "0.10.0"
-embassy-time = "0.5.0"
+embassy-time = "0.5.1"
 embassy-sync = "0.8.0"
-embassy-futures = { version = "0.1", optional = true }
-trouble-host = { version = "0.7.0", optional = true, default-features = false, features = [
+embassy-futures = { version = "0.1.2", optional = true }
+# Security uses Embassy's current driver API instead of the retired crypto chain.
+trouble-host = { git = "https://github.com/embassy-rs/trouble", rev = "866ee711c14f9d4011ca7079c5c4af0f64a1f1bb", optional = true, default-features = false, features = [
   "default-packet-pool-mtu-255",
   "peripheral",
   "gatt",
@@ -93,8 +98,14 @@ trouble-host = { version = "0.7.0", optional = true, default-features = false, f
   "derive",
   "central",
 ] }
-bt-hci = { version = "0.9.0", optional = true }
-embassy-net = { version = "0.9.0", optional = true, features = [
+embassy-crypto = { git = "https://github.com/embassy-rs/embassy.git", rev = "bd35bd7a7d19147c8bcae9c2eda99b25e597294c", optional = true, default-features = false }
+embassy-crypto-rustcrypto = { git = "https://github.com/embassy-rs/embassy.git", rev = "bd35bd7a7d19147c8bcae9c2eda99b25e597294c", optional = true, default-features = false, features = [
+  "embassy-crypto-aes128-ecb",
+  "embassy-crypto-aes128-cmac",
+  "embassy-crypto-p256-ecdh",
+] }
+rand_chacha = { version = "0.10.0", optional = true, default-features = false }
+embassy-net = { version = "0.9.1", optional = true, features = [
   "dhcpv4",
   "medium-ethernet",
   "tcp",
@@ -103,14 +114,17 @@ embassy-net = { version = "0.9.0", optional = true, features = [
 edge-dhcp = { version = "0.8.0", optional = true }
 edge-nal = { version = "0.7.0", optional = true }
 edge-nal-embassy = { version = "0.9.0", optional = true }
-embedded-io-async = { version = "0.7", optional = true }
+embedded-io-async = { version = "0.7.0", optional = true }
 
 m5stack-papermono-lite = { path = "../../crates/m5stack-papermono-lite" }
 m5stack-papermono = { path = "../../crates/m5stack-papermono", optional = true }
 papermono-log = { path = "../../crates/papermono-log" }
+embedded-hal = { workspace = true, optional = true }
+embedded-hal-async = { version = "1.0.0", optional = true }
+embedded-hal-bus = { version = "0.3.0", optional = true, features = ["async"] }
 embedded-graphics = "0.8.2"
 static_cell = "2.1.1"
 
 [build-dependencies]
-sha2 = "0.10.9"
+sha2 = "0.11.1"
 

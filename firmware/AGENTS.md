@@ -51,6 +51,54 @@ Packing (one flash, many safe probes) is a root rule:
 [AGENTS.md](../AGENTS.md#pack-one-flash). Do not treat this
 file as the only copy.
 
+## Compiler and crypto stack
+
+Simple firmware requires Rust 1.95; Embassy firmware requires 1.97.
+Use the published ESP HAL 1.2.2 / RTOS 0.4.0 family. `esp-radio`
+1.0.0-beta.1 is the approved release exception. TrouBLE and Embassy crypto
+are pinned by full commit hashes in the manifest; see
+[dependencies.md](../docs/dependencies.md).
+
+`radio` alone enables the software AES-128 ECB, AES-128 CMAC and P-256
+ECDH drivers and one ChaCha12 RNG registration. Seed before BLE startup
+from HAL `Trng` with `TrngSource`, then drop the TRNG and its temporary
+ADC entropy source before starting wireless hardware. Unseeded crypto RNG
+access must panic explicitly. Keep bonds in RAM and preserve CDC/GATT/UI
+behavior. The shared glue is tested by `xtask/tests/radio_crypto.rs`.
+
+## LoRa sessions
+
+The C153 path uses `sx1262-phy` via BSP re-exports and `RadioHooks`.
+Lend system I2C only during startup, shutdown and scheduled TX checks.
+Keep the existing on-demand ping, receive-window and sweep lifetimes.
+One active wrapper also supports sustained operation without antenna
+control changes between packets, standby or channel changes.
+Startup follows the current PaperMono LoRa tutorial's rail-first
+200 ms wait, 100 ms reset assertion and 200 ms after release, then
+BUSY readiness. These timings have host mock coverage; C153 physical
+confirmation of the delay values remains open. A normal C153
+receive session on 2026-10-02 confirmed startup/high and shutdown/low antenna
+readbacks, `checks=2 failures=0 cleanup=ok`, and one received packet; it does
+not confirm reset timing, failure recovery, or TX behavior. See the hardware
+[measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
+
+Initial verification interval is one. Failures emit typed `lora_control`
+warnings, invalidate readiness and run cleanup; `lora_session` totals
+include lifecycle checks. Both radio cards surface errors. Chip transfers use
+async SPI and cooperative BUSY polling. Compose NSS with
+`embedded-hal-bus::ExclusiveDevice`; keep caller access for recovery after a
+cancelled transfer. Await each command sequence before observing stop requests.
+During RX and scanning, arm the active-low GPIO4 falling edge while the UI task
+is inside the radio operation; clear it after cleanup so a short `[ STOP RX ]`
+or `[ STOP SCAN ]` touch is not lost between polls. Do not add system-I2C touch
+reads while the radio is active.
+Ping programs its 300 ms completion budget into the chip TX timer. Managed
+RX rejects CRC/header failures before FIFO reads, acknowledges observed IRQs,
+and applies RTC cleanup after timed RX or early stop. Preserve fractional
+metrics in `lora_metrics`; operation errors warn and trigger cleanup. Preserve
+PA/OCP, channels, payload and runtime C153 detection; compile-time Lite prunes
+both SX1262 crates.
+
 ## Firmware examples as tutorial code
 
 Firmware under `firmware/` (`simple-debug-fw` and `embassy-debug-fw`)
@@ -110,10 +158,11 @@ that baseline. After gray, `MonoFull` before any `Partial`.
 until overdrawn; the `Partial` was fast. Successes and
 failures: hardware skill
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md#refresh-trials-lite-2026-09-01).
-After `PARTIALS_BEFORE_FULL` (18) partials, one `MonoFull`
-(`0` never). That cadence satisfies the official display safety
-contract (a full refresh after roughly ten partials to prevent DC
-imbalance). Do not send a second bare Mode 1.
+After shared `PARTIALS_BEFORE_FULL` (10) partials, the next monochrome
+update uses `MonoFull`, including same-card redraws. Use the shared
+`display::mono_full_due` helper; it also requires a full refresh when
+the mono baseline is missing. Physical ghosting confirmation remains
+open for both SKUs. Do not send a second bare Mode 1.
 
 `RefreshMode` is the official HTML **M5GFX LUT Refresh
 Speed** catalog only (PaperMono lab, reference only). Not a
@@ -121,16 +170,13 @@ timeout and not a `0x22` map.
 
 embassy-debug: tones use `GrayFull`. Splash / shapes /
 legend / bluetooth / wifi_survey / wifi_ap use
-`paint_mono_fast` (`MonoFull` then `Partial`). Same-card
-Legend / Bluetooth / Wi-Fi status redraws and same-card
-orientation remaps pass `soft = true` so they stay on
-`Partial` even after the budget (avoids flashing `MonoFull`
-on every PIN / client / survey update or hold flip). Card
-navigation passes `soft = false` and
-still takes `MonoFull` when `PARTIALS_BEFORE_FULL` (18) is
-due. Embassy-debug Prev/Next arm after both buttons release
+`paint_mono_fast` (`MonoFull` then `Partial` within the budget).
+Same-card status redraws, orientation remaps, navigation and sleep
+notices all honor the ten-partial budget; there is no `soft` argument.
+Embassy-debug Prev/Next arm after both buttons release
 (release edges) so a hold through Shapes paint does not require
 a second press. Target enter uses `enter_mono` (`MonoFull`). Marks use
-`Partial`. Deep sleep after each refresh; hardware reset to
-wake. No `otp_fast` stamp. Soft-refresh contract:
+`Partial`, preceded by a full white clear when the baseline or budget
+requires it. Deep sleep after each refresh; hardware reset to
+wake. No `otp_fast` stamp. Refresh contract:
 [display.md](../.agents/skills/m5stack-papermono-hardware/references/display.md).

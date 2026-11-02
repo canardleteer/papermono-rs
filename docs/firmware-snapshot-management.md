@@ -36,7 +36,7 @@ factory-reset image you can share.
   ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))
   `partitions.csv` matches **Lite stock** at `0x8000`. PIO
   `default_16MB.csv` is still a different table. `C153` is
-  [nyc-partition-table](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-partition-table).
+  [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md).
 
 ## Two snapshot kinds
 
@@ -85,6 +85,14 @@ Use `--capture SLUG` for a `--name` dump. Without it the tool
 looks under `original/` (still untested). Confirm does not
 rewrite the snapshot. Stdout names a unit-id; do not paste it.
 
+If an original was copied into this workspace from elsewhere,
+`flash-app --force` can skip original-to-unit identity matching.
+Use it only after checking the copied snapshot; it proceeds only
+when every local original matches the live flash size and has the
+same safe `factory` offset and size. It cannot be used with
+`--capture`, does not relax image validation, and still requires
+`--yes`.
+
 Run-mode listen (needs
 [usbfs udev](../.agents/skills/papermono-rs/references/xtask.md#usbfs-udev-for-monitor)):
 
@@ -100,6 +108,10 @@ lines. After `flash-app`, short-press red. Do not use
 
 ## Tool verification ledger
 
+Dated live entries below describe earlier releases. The 2026-11-01
+[dependency upgrade](dependencies.md) is host-verified; no new
+backup, restore, flash or monitor session was run for that stack.
+
 Implemented is not proven. Agents: read the same table in
 [xtask.md](../.agents/skills/papermono-rs/references/xtask.md#tool-verification-ledger)
 before a live command.
@@ -109,22 +121,23 @@ Status vocabulary: **Host-only tested**, **Live tested**,
 
 | Command | Status | SKU / date | Note |
 | --- | --- | --- | --- |
-| `ci` | Host-only tested | host / 2026-08-31 | fmt, clippy, test, rumdl, machete, audit |
+| `ci` | Host-only tested | host / 2026-11-01 | 243 tests per host feature configuration; all 16 firmware checks; fmt, rumdl, machete; zero audit vulnerabilities |
 | `detect-connected` | Live tested | `C153-Lite` / 2026-08-31 | Run and download: `303a:1001` |
 | `detect-connected --probe` | Live tested | `C153-Lite` / 2026-08-31 | ESP32-S3 v0.2, 40 MHz, 16 MB |
 | `backup-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--name stock-lite`. Do not commit dumps |
 | `confirm-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--capture stock-lite` matched |
 | `restore-factory-firmware` | Live tested | `C153-Lite` / 2026-09-01 | `--yes --capture stock-lite` |
-| `monitor` | Live tested | `C153-Lite` / 2026-09-01 | Stock silent. Custom images print `simple-debug:` |
+| `monitor` | Live tested | `C153-Lite` / 2026-09-01; `C153` / 2026-10-02 | C153 custom image produced CDC heartbeat and LoRa RX/control/session records |
 | `monitor --reset` | Live tested | `C153-Lite` / 2026-09-01 | Not a recapture path |
 | `vet-idle-log` | Host-only tested | host / 2026-09-01 | Parser in `papermono-log` |
-| `build-fw` | Host-only tested | host / 2026-09-01 | `simple-debug` or `embassy-debug` |
-| `encode-assets` | Host-only tested | host / 2026-09-02 | Rasterize and pack SVG line art into 1bpp bitmaps |
+| `build-fw` | Host-only tested | host / 2026-11-01 | Both images default/pruned Lite; Embassy all features and radio-disabled; linked and packed with espflash 4.7 |
+| `encode-assets` | Host-only tested | host / 2026-11-01 | Temporary-directory harness preserves bitmap/inverse/checksum; build script rejects stale, missing or incorrectly sized assets |
 | `flash-app` | Live tested | `C153-Lite` / 2026-09-01 | `factory` at `0x10000`. Short-press red |
 
 `--probe`, `backup-factory-firmware`, confirm `--capture`,
-`monitor`, restore `--capture`, and `flash-app` are **Live
-tested** on Lite. `build-fw` and `encode-assets` are host-only.
+restore `--capture`, and `flash-app` are **Live tested** on Lite.
+`monitor` is live-tested on Lite and C153. `build-fw` and
+`encode-assets` are host-only.
 Flash size is 16 MB; the live table matches official factory
 demo firmware
 ([M5PaperMono-UserDemo](https://github.com/m5stack/M5PaperMono-UserDemo))

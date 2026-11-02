@@ -2,7 +2,8 @@
 //! SCL [`crate::pins::SYS_I2C_SCL`]).
 //!
 //! Source: hardware skill pin-map (official pin tables / schematic).
-//! Do not assume 400 kHz until measured (`nyc-i2c-ack`).
+//! The advertised device roster is measured on both SKUs; bus-speed
+//! capability remains from named-part datasheets and vendor documentation.
 //!
 //! Park [`IP2315`] off this bus except the charge transaction
 //! (M5IOE1 [`crate::ioe1::IP2315_I2C_GATE`]). Leaving it mounted can
@@ -29,8 +30,10 @@ pub const M5IOE1_UM: u8 = 0x6F;
 pub const IP2315: u8 = 0x75;
 /// ST25R3916 leftover on Lite. Probe for NAK only. Do not init the chip.
 ///
-/// PaperMono (`C153`) address is `m5stack-papermono::nfc::ADDRESS`. Hardware skill
-/// Lite leftover: `0x50` must NAK. PaperMono (`C153`): `nyc-i2c-ack`.
+/// PaperMono (`C153`) address is `m5stack-papermono::nfc::ADDRESS`. The
+/// hardware skill records the measured C153 roster with this device ACKing
+/// when M5IOE1 `PYG4` enables NFC; on Lite this address remains a leftover
+/// probe and must NAK.
 pub const ST25R3916_LEFTOVER: u8 = 0x50;
 /// Catalog id `st25r3916`, Device_ID (read-only). Leftover probe only.
 ///

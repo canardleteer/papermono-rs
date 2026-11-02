@@ -153,6 +153,14 @@ Detect polarity:
 
 ## LoRa (`hal_lora.cpp`, `C153` only)
 
+This is the dated V1.2 HAL at the 2026-08-10 pin above. Its startup
+raises the rail, sets antenna HIGH/reset LOW, holds reset for 100 ms,
+then waits 20 ms after release. The current Arduino tutorial instead
+uses rail-first 200/100/200 ms timing and sets antenna LOW for RX;
+the antenna conflict remains unresolved. Keep this HAL as historical
+comparison; current policy and source qualifications live in
+[sources.md](sources.md#papermono-lora-startup-timing).
+
 GPIOs match the pin table (MOSI 38, MISO 40, SCK 39, NSS 41,
 DIO1 5, BUSY 21). Enable M5PM1 `GPIO_NUM_2`, reset
 `M5IOE1_PIN_10`, antenna switch `M5IOE1_PIN_2`. RadioLib
@@ -214,8 +222,8 @@ UserDemo CSV (intent in source; **Lite stock matches**):
 | factory | app/factory | `0x10000` | `0xF00000` |
 
 Lite capture 2026-09-01 parsed that table at `0x8000`
-([measure.md](measure.md)). `C153` still
-[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+([measure.md](measure.md)). C153 is also confirmed
+([measure.md](measure.md)).
 
 Lite factory app descriptor: project `PaperMono-UserDemo`,
 IDF `v5.5.1`, version `c78f6c5-dirty`, date Aug 6 2026 —

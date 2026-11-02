@@ -1,11 +1,16 @@
 # embassy-debug-fw
 
-Embassy staged image for PaperMono (`C153-Lite` baseline, or `C153`
-with `--features c153`). USB-Serial/JTAG prints the same
+Embassy staged image for PaperMono (`C153` default, or `C153-Lite` with
+`--no-default-features --features lite`). USB-Serial/JTAG prints the same
 `simple-debug:` lines as the proof-of-life image, with `hello
 image=embassy-debug`. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
 (wire prefix `simple-debug:`).
+
+Use an Espressif compiler based on Rust 1.97 or newer
+(`rustc +esp --version`). The [dependency stack](../../docs/dependencies.md)
+records the ESP releases and BLE crypto pins. Prior live results are dated
+in the hardware ledger; this dependency upgrade has host verification only.
 
 On the unit:
 
@@ -44,13 +49,20 @@ compile time, build with `--no-default-features --features lite`.
 The `mic` feature is opt-in.
 
 `orient` enables BMI270-driven page rotation (portrait / landscape
-and 180° flips). Cards redraw upright for the hold via soft
-OTP Partial; CDC prints `imu pose=` with raw XYZ. Lite axis map
+and 180° flips). Cards redraw upright for the hold using OTP partial
+refreshes. After ten partials, the next monochrome redraw performs a
+full clearing refresh, including status and orientation updates on the
+same card. The first monochrome redraw after tones also uses a full
+refresh. CDC prints `imu pose=` with raw XYZ. Lite axis map
 (2026-09-04): USB-C down = −X. Without `orient`, the UI stays
 USB-C-down portrait.
 
 First-time toolchain and snapshot:
 [docs/getting-started.md](../../docs/getting-started.md).
+
+On `C153`, each LoRa operation starts with about half a second of power
+settling and reset before the radio becomes ready. The antenna control
+stays enabled throughout the operation and is disabled at shutdown.
 
 ## Card walk and lamp
 
@@ -74,10 +86,10 @@ Hold the red power button about 2 s until it blinks
 
 ```shell
 . $HOME/export-esp.sh
-# PaperMono-Lite baseline:
+# PaperMono (`C153`) default:
 cargo xtask build-fw embassy-debug
-# Or PaperMono Full SKU (C153):
-cargo xtask build-fw embassy-debug --features c153
+# Or PaperMono-Lite (`C153-Lite`):
+cargo xtask build-fw embassy-debug --no-default-features --features lite
 cargo xtask flash-app \
   --image target/xtensa-esp32s3-none-elf/release-fw/embassy-debug.bin \
   --yes
@@ -112,7 +124,7 @@ embassy-debug`.
 
 Short-press BUTTON B. The glass walks forward: splash → lora_scan
 (tap `[ START SCAN ]` to sweep 104 US915 channels for energy and packets) →
-lora (tap `[ TX PING ]` for bench-safe 915 MHz burst or `[ LISTEN RX ]` for
+lora (tap `[ TX PING ]` for one 915 MHz burst or `[ LISTEN RX ]` for
 up to 60 s sniffer window) → nfc (tap `[ POLL TAG ]` for ISO14443-A UID
 reading and smart card authentication testing) → wifi hotspot (tap
 `[ START HOTSPOT ]` for SSID `PaperMono-AP`, password `mono2026`, URL
@@ -123,7 +135,35 @@ battery gauge) → shapes (procedural 3-degree Koch snowflake with
 benchmark) → tones → targets, then wrap. Survey and hotspot cannot run
 together: starting one stops the other. BUTTON A walks the other way.
 CDC prints `scene=`, `snowflake us=`, `wifi_survey`, `wifi_ap`,
-`wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, and `lora_scan`.
+`wifi_http`, `nfc_tag`, `nfc_app`, `lora_tx`, `lora_rx`, `lora_scan`,
+`lora_control`, `lora_session`, and `lora_metrics`.
+
+On PaperMono (`C153`), each ping, listen window or scan sweep starts and
+ends a radio session. Antenna control stays high throughout that
+operation. Serial `lora_control` records show output mode, push-pull
+drive, latch and sampled level, followed by a `lora_session` summary.
+A successful ping has startup, pre-TX and shutdown confirmations
+(`n=1`, three checks). RX and scan sessions have two lifecycle checks.
+If confirmation or cleanup fails, both radio cards display
+`RADIO ERROR - CHECK SERIAL`; the serial warning identifies the failed
+phase and available evidence. TX is blocked until a new session
+confirms shutdown and then restores readiness. A digital confirmation
+does not measure
+the antenna or RF path.
+
+On the LoRa card, `[ LISTEN RX ]` starts a receive window and changes to
+`[ STOP RX ]`. Tap it to end listening early; Button A or B also stops the
+window. GPIO4's active-low touch edge is latched during the radio operation,
+so a brief tap is not lost between polls. The channel scanner's `[ STOP SCAN ]`
+uses the same edge latch. The 2026-10-02 C153 test captured one successful
+18-byte receive and clean lifecycle readbacks. This stop-edge change is ready
+to flash; its live button behavior is still unverified.
+
+The ping has a 300 ms hardware TX limit. If the chip times out or a read
+fails, the card shows a radio error and serial records a warning. Listening
+and scanning report only successful signal/FIFO reads. `lora_metrics` reports
+half-dBm RSSI and quarter-dB SNR as scaled integers, alongside the existing
+whole-unit `lora_rx` line. Corrupt packets do not count as received packets.
 
 ### Step 5: Slide the lamp
 

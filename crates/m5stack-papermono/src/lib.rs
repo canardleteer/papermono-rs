@@ -17,6 +17,7 @@ pub use m5stack_papermono_lite::{
 };
 
 pub mod lora;
+mod lora_lifecycle;
 pub mod nfc;
 
 pub use lora::{

@@ -7,9 +7,8 @@ address-only `read` at `0x4F` had NAKed. PM1, RX8130,
 BMI270 ACK; leftover `0x50` NAK; FT `0x38` ACK after
 EN/RST (`tp=1`). Lite advertised roster
 (2026-09-02): `ack=32,38,4f,68,6e nak=50,6f,75`.
-Name `C153` vs `C153-Lite`
-([measure.md](measure.md),
-[nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack)).
+C153 system-I2C roster (2026-09-05), with `PYG4` asserted:
+`ack=32,38,4f,50,68,6e` ([measure.md](measure.md)).
 
 ## BMI270
 
@@ -22,8 +21,8 @@ Arduino intent; UserDemo `configureBmi270AnyMotion` tries
 ([user-demo.md](user-demo.md)). Confirm on a unit:
 [nyc-pm1-wake](../resources/not-yet-confirmed.md#nyc-pm1-wake).
 `CHIP_ID` payload: Lite CDC `imu_id=24` (2026-09-01 and
-2026-09-02). Optional later: a motion sample. `C153` still
-[nyc-bmi270](../resources/not-yet-confirmed.md#nyc-bmi270).
+2026-09-02). Optional later: a motion sample. The C153 roster
+confirms address ACK only; chip identity remains open.
 
 ### Enclosure orientation (embassy-debug `orient`)
 
@@ -64,8 +63,8 @@ Read-only `FLAG` (`0x1D`): Lite CDC `rtc_flag=31`
 (2026-09-02). Catalog id `rx8130ce`, Register Table Flag
 Register bits `[7:0]` `VBLF` / `0` / `UF` / `TF` / `AF` /
 `RSF` / `VLF` / `VBFF`. `0x31` is `UF|TF|VBFF`. Do not
-write `SEC`. `C153` still
-[nyc-rx8130](../resources/not-yet-confirmed.md#nyc-rx8130).
+write `SEC`. The C153 roster confirms address ACK only; a
+`FLAG` read remains open.
 
 Registers: cache id `rx8130ce`. UserDemo uses four bytes of
 user RAM from register base `0x20` (battery UI mode in index

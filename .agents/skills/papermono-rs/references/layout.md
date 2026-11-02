@@ -46,10 +46,12 @@ not default-members. Nearest rules:
 - Device I/O lives in `papermono-host` via the
   [`espflash`](https://crates.io/crates/espflash) **library**
   (`default-features = false`, `serialport`). Do not enable
-  espflash's `cli` feature. **MSRV is split on purpose:**
-  workspace `package.rust-version` is **1.85** (board crates).
-  `papermono-host` and `xtask` set
-  **1.88** because espflash 4.5 requires it.
+  espflash's `cli` feature. Workspace `package.rust-version` is **1.88**
+  for board/chip crates. `papermono-host`, `xtask` and simple firmware
+  require **1.95**; Embassy firmware requires **1.97**. Use published
+  espflash 4.7 and the ESP HAL 1.2.2 / RTOS 0.4.0 family. The approved
+  exceptions are the radio beta and full TrouBLE/crypto commit pins:
+  [dependencies.md](../../../../docs/dependencies.md).
 - Live `papermono-host` methods take
   [`uart_lock::try_acquire`](xtask.md#usb-session-lock). New
   USB-touching in-repo tools reuse that same lock.
@@ -71,7 +73,10 @@ not default-members. Nearest rules:
 - One workspace lockfile is committed. Pass `--locked`. After
   changing `crates/*/Cargo.toml`, `host/papermono-host/Cargo.toml`,
   `xtask/Cargo.toml`, `firmware/*/Cargo.toml`, or workspace
-  members, refresh it with `cargo generate-lockfile`.
+  members, refresh it and rerun the gate. In this mixed-minimum workspace,
+  `cargo update --ignore-rust-version` avoids downgrading host/crypto-only
+  dependencies to fit the board minimum. Require the documented Rust 1.88
+  board checks, Rust 1.95 host tests and firmware gate before committing.
 - Host-only `cargo xtask build-fw` wraps `cargo +esp` and
   `espflash save-image --flash-size 16mb` (no port) for a
   `flash-app` payload. `flash-app` writes snapshot `factory`

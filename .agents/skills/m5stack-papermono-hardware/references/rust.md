@@ -21,7 +21,7 @@ cards are dynamically skipped. Pruned Lite-only builds compile with
 MCU-agnostic. Register facts come from
 [datasheets.md](../resources/datasheets.md). USB/flash geometry:
 [flashing.md](flashing.md). Observed silicon:
-[measure.md](measure.md) (Lite USB/flash). Official HTML
+[measure.md](measure.md) (both SKUs USB/flash and C153 radio results). Official HTML
 `epd_*` times are PaperMono lab reference
 ([display.md](display.md)).
 
@@ -39,7 +39,17 @@ wiring evidence in [cpp-platformio.md](cpp-platformio.md). Do not
 treat `esp-hal` as the only legal Rust stack. Never a generic
 SSD1677 four-gray LUT. Never GPIO45/46 power latching. Never `bq27xxx`.
 
-## On-unit Wi-Fi and BLE (Lite measured)
+## Repository dependency stack
+
+The consuming repository records published releases and approved crypto
+pins in [dependencies.md](../../../../docs/dependencies.md). Board/chip
+crates retain Rust 1.88; host tools and simple firmware need 1.95, Embassy
+firmware 1.97. The radio feature registers software AES-128 ECB/CMAC,
+P-256 ECDH and one ChaCha12 RNG. Boot seeds it through an enabled HAL
+TRNG and releases the temporary ADC entropy source before wireless startup.
+These are software contracts, not fresh silicon measurements.
+
+## On-unit Wi-Fi and BLE (Lite measured; C153 scan open)
 
 Official HTML names 2.4 GHz Wi-Fi. Silicon also exposes BLE.
 Listen-only `wifi n=` / `ble n=`, BLE passkey pairing as
@@ -50,7 +60,7 @@ and SoftAP are mutually exclusive in the consuming firmware.
 WPA3/SAE is not available in the precompiled `esp-radio`
 ESP32-S3 blob. No NVS writes for radio bring-up. Close
 [nyc-wifi-ble](../resources/not-yet-confirmed.md#nyc-wifi-ble)
-per SKU; `C153` still open.
+per SKU; C153 NFC and LoRa are confirmed live, while other peripherals remain item-specific.
 
 Board crates live under `crates/` (host-testable, no `esp-hal`).
 `simple-debug-fw` is a workspace member, not a default-member.

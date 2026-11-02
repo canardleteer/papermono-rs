@@ -315,10 +315,6 @@ use core::net::{Ipv4Addr, SocketAddrV4};
 use core::sync::atomic::{AtomicBool, AtomicU16};
 
 #[cfg(feature = "radio")]
-use bt_hci::cmd::le::{LeSetAdvData, LeSetAdvEnable, LeSetAdvParams, LeSetScanResponseData};
-#[cfg(feature = "radio")]
-use bt_hci::controller::{ControllerCmdSync, ExternalController};
-#[cfg(feature = "radio")]
 use edge_dhcp::io::{self, DEFAULT_SERVER_PORT};
 #[cfg(feature = "radio")]
 use edge_dhcp::server::{Server as DhcpServer, ServerOptions};
@@ -739,11 +735,7 @@ async fn advertise_once<C>(
     server: &Server<'_>,
 ) -> Result<(), BleFailReason>
 where
-    C: Controller
-        + ControllerCmdSync<LeSetAdvData>
-        + ControllerCmdSync<LeSetAdvEnable>
-        + ControllerCmdSync<LeSetAdvParams>
-        + ControllerCmdSync<LeSetScanResponseData>,
+    C: Controller,
 {
     // Construct standard advertising packet (maximum 31 bytes).
     let mut adv_data = [0u8; 31];
@@ -815,7 +807,7 @@ pub async fn ble_run(bt: BT<'static>) {
     };
     let ble_controller: ExternalController<_, 10> = ExternalController::new(connector);
     let address = Address::random([0xF5, 0x42, 0x11, 0x22, 0x33, 0xF1]);
-    let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
+    let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
     let stack = trouble_host::new(ble_controller, &mut resources)
         .set_random_address(address)
         .set_io_capabilities(IoCapabilities::DisplayOnly)

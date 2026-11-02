@@ -7,9 +7,8 @@ Primary table source: the **PinMap** heading on
 [PaperMono-Lite](https://docs.m5stack.com/en/core/PaperMono-Lite)
 ([catalog.md](catalog.md)). Those HTML pages can change; re-read
 them when a net disagrees with this file. Dated **view as
-markdown** snapshot (2026-09-01):
+markdown** snapshot (2026-10-01):
 [official-html/SOURCE.md](../resources/official-html/SOURCE.md).
-[nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
 SKU column: `C153, C153-Lite` or `C153`.
 
 Do not copy GPIO numbers from other products onto this board.
@@ -76,8 +75,8 @@ often 100 kHz. Do not assume 400 kHz until measured.
 Lite (2026-09-02) advertised scan after official `begin`
 and FT EN/RST: `ack=32,38,4f,68,6e` (RTC / FT / board IOE /
 IMU / PM1) and `nak=50,6f,75` (leftover NFC / UM IOE /
-parked IP2315). `C153` still
-[nyc-i2c-ack](../resources/not-yet-confirmed.md#nyc-i2c-ack).
+parked IP2315). C153 (2026-09-05) with M5IOE1 `PYG4`
+asserted: `ack=32,38,4f,50,68,6e`; `0x50` is ST25R3916.
 
 M5PM1 and M5IOE1 GPIO outputs default **open-drain** (including
 PWM). Pull-up or push-pull, or the pin does not drive high.
@@ -134,8 +133,8 @@ SSD1677 write spec max 20 MHz; clock on a unit:
 SX1262 SPI spec max 16 MHz (C153). That is the **die**.
 The populated part is Stamp LoRa-1262 (module): 868–923 MHz,
 FPC antenna, `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`.
-[nyc-stamp-lora](../resources/not-yet-confirmed.md#nyc-stamp-lora).
-Die SPI status: [nyc-lora-ack](../resources/not-yet-confirmed.md#nyc-lora-ack).
+[measure.md](measure.md).
+Die SPI status: [measure.md](measure.md).
 
 USB-C CC1/CC2 are **5.1 kΩ Rd** to GND on the schematic: 5 V
 sink, no PD controller in the extract.
@@ -158,3 +157,30 @@ those nets as extra GPIO until
 /
 [nyc-lite-lora-pads](../resources/not-yet-confirmed.md#nyc-lite-lora-pads)
 close.
+
+## Shared panel policy
+
+Shared panel policy lives in `m5stack-papermono-lite::display`:
+`mono_full_due` requires OTP `MonoFull` after ten partials or when the
+mono baseline is missing, including same-card status/orientation redraws.
+The nets above are unchanged; [display.md](display.md) records the policy
+and remaining physical confirmation.
+
+## LoRa session ownership
+
+C153 `PYG2` antenna control is held high for the complete SX1262 session,
+including RX, TX, standby and channel changes. Board `RadioHooks` owns
+reset, rail and antenna sequencing. Startup enables the rail, waits 200 ms,
+asserts reset for 100 ms with antenna high, then releases reset and waits
+200 ms before BUSY readiness. These tutorial-derived timings are host-tested
+and their actual delays still await measurement. A normal C153 RX session on
+2026-10-02 confirmed startup/shutdown readbacks and one packet; fault recovery,
+sustained operation and TX output remain open. Generic `sx1262-phy` wraps published
+`lora-phy` 3.0.1 and `lora-modulation` 0.1.5. The stable adaptation validates
+parameters upstream, then programs modulation and its masked bandwidth
+workaround locally; board nets and sequencing are unchanged. `RadioContext`
+borrows system I2C for each control/readback call. Confirmation fields and source
+encodings:
+[Stamp LoRa-1262 session controls](../resources/stamp-lora-1262.md#session-control-and-confirmation).
+Remaining physical work is split across
+[NYC rows](../resources/not-yet-confirmed.md#nyc-lora-session-recovery).

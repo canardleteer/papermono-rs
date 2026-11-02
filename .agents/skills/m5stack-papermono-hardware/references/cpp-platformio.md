@@ -50,15 +50,17 @@ product’s pinout. Pins still come from M5Unified + this skill.
   (MIT). HAL under `main/hal/`. Pin the commit and sequences
   in [user-demo.md](user-demo.md). Lite stock table matches
   that CSV
-  ([measure.md](measure.md)); `C153` still
-  [nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table).
+  ([measure.md](measure.md)); the same table is confirmed on both SKUs
+  ([measure.md](measure.md)).
 - OTP:
   [M5PaperMono-OTP-Demo](https://github.com/m5stack/M5PaperMono-OTP-Demo)
   (MIT). Direct SSD1677 + OTP; names
   `DEPG0397BBS770F3HP-XM`. Direct IDF dep is
   [M5Unified](https://github.com/m5stack/M5Unified); lock
-  pulls [M5GFX](https://github.com/m5stack/M5GFX) `0.2.27`
-  as a private transitive. The panel sequences are
+  pulls M5GFX privately through M5Unified; do not treat that
+  example lock as the current M5GFX release. Current Arduino
+  tutorials require M5GFX >= 0.2.27; release 0.2.31 is current
+  as checked 2026-10-01. The panel sequences are
   `components/EDP_OTP_LUT_demo`, not
   `Panel_SSD1677_4Gray`.
 

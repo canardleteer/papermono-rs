@@ -5,6 +5,8 @@ use std::fs;
 
 include!("../../scripts/git_env.rs");
 
+/// Checks source checksum and packed bitmap size before linking the panel image.
+/// Missing or stale files fail the build with the asset regeneration command.
 fn check_ferris_asset() {
     let manifest =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into()));
@@ -55,7 +57,10 @@ fn check_ferris_asset() {
         ),
     };
 
-    let actual_sha = format!("{:x}", Sha256::digest(&svg_bytes));
+    let actual_sha: String = Sha256::digest(&svg_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     if actual_sha != recorded_sha {
         panic!(
             "\n\nERROR: Source SVG has changed since {} was generated!\n\
@@ -69,6 +74,7 @@ fn check_ferris_asset() {
     }
 }
 
+/// Emits git provenance and validates the cached Ferris asset without device I/O.
 fn main() {
     emit_git_env("EMBASSY_DEBUG_GIT", "EMBASSY_DEBUG_GIT_DIRTY");
     check_ferris_asset();

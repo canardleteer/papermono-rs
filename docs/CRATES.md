@@ -28,9 +28,9 @@ IP2315 crates.
 | BMI270 | possible later | **constants-in-BSP** (+ accel bring-up helpers) | `CHIP_ID` `0x00` / payload `0x24`. Soft-reset + Bosch standard 8 KiB config (`INIT_ADDR_*` + `INIT_DATA`) + raw `DATA_8`…`DATA_13`. Orientation classify is sticky-rs policy; Lite axis map USB-C down = −X. [nyc-bmi270](not-yet-confirmed.md#nyc-bmi270) |
 | RX8130CE | possible later | **constants-in-BSP** | Read `FLAG` `0x1D`. Do not write `SEC`. [nyc-rx8130](not-yet-confirmed.md#nyc-rx8130) |
 | IP2315 | possible later | **constants-in-BSP** | Park via `PYG11` except a gated charge transaction |
-| ST25R3916 | in-tree [`st25r3916`](../crates/st25r3916). [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here** | MCU-agnostic `embedded-hal` driver crate in `crates/st25r3916`. I2C `0x50`, `I2C_EN=VDD`. ISO14443-A initiator (WUPA/REQA, anticollision CL1/CL2, SAK read), ISO/IEC 14443-4 (ISO-DEP / T=CL) activation and APDU half-duplex block protocol with chaining/WTX, smart card application discovery (FIDO CTAP, PIV, OpenPGP), target/card emulation profiles (NFC-A, NFC-F, NFCIP-1), PT_Memory layout, and Type 2/4A / NDEF protocol framing. Re-exported with board nets in `m5stack-papermono::nfc`. Confirmed live on C153. [nyc-nfc-ack](not-yet-confirmed.md#nyc-nfc-ack) |
-| SX1262 die | [`lora-phy`](https://crates.io/crates/lora-phy) `Sx1262` (live tree [lora-rs](https://github.com/lora-rs/lora-rs)) | **written-here driver in BSP** | Complete `Sx1262` driver with opcodes, `RadioStatus` parser, modulation/packet configuration, buffer I/O, RSSI/SNR telemetry in `m5stack-papermono::lora`. Confirmed live on C153. [nyc-lora-ack](not-yet-confirmed.md#nyc-lora-ack) |
-| Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). Confirmed live on C153. [nyc-stamp-lora](not-yet-confirmed.md#nyc-stamp-lora) |
+| ST25R3916 | in-tree [`st25r3916`](../crates/st25r3916). [`st25r95`](https://crates.io/crates/st25r95) is a **different** chip | **written-here** | MCU-agnostic `embedded-hal` driver crate in `crates/st25r3916`. I2C `0x50`, `I2C_EN=VDD`. ISO14443-A initiator (WUPA/REQA, anticollision CL1/CL2, SAK read), ISO/IEC 14443-4 (ISO-DEP / T=CL) activation and APDU half-duplex block protocol with chaining/WTX, smart card application discovery (FIDO CTAP, PIV, OpenPGP), target/card emulation profiles (NFC-A, NFC-F, NFCIP-1), PT_Memory layout, and Type 2/4A / NDEF protocol framing. Re-exported with board nets in `m5stack-papermono::nfc`. Confirmed live on C153. [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md) |
+| SX1262 die | published `lora-phy` 3.0.1 and `lora-modulation` 0.1.5 | **pass-with-wrapper** | Generic [`sx1262-phy`](../crates/sx1262-phy) delegates modem operations and errata workarounds to upstream, adding async transport, diagnostic commands and explicit lifecycle/TX guards. A normal C153 async RX session has confirmed startup/shutdown readbacks and one controlled packet; fault recovery, sustained sessions, timing and TX power remain open. [Upstream comparison](#sx1262-upstream-comparison) |
+| Stamp LoRa-1262 | none | **constants-in-BSP / module wrapper** | Module rails `LoRa_EN` / `SX_NRST` / `SX_ANT_SW`, 868–923 MHz, FPC in `m5stack-papermono::lora` and [stamp-lora-1262](../.agents/skills/m5stack-papermono-hardware/resources/stamp-lora-1262.md). Confirmed live on C153. [hardware measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md) |
 
 ## Rejected
 
@@ -46,11 +46,12 @@ IP2315 crates.
 | Crate | Why |
 | --- | --- |
 | [`m5stack-papermono-lite`](../crates/m5stack-papermono-lite) | Shared pin map and `BoardModel` runtime profile. `C153-Lite` firmware depends on this only |
-| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board crate with verified ST25R3916 NFC and Stamp LoRa-1262 transceiver drivers. Included in unified builds, pruned via `--no-default-features --features lite` |
+| [`m5stack-papermono`](../crates/m5stack-papermono) | `C153` board nets, ST25R3916 support and SX1262 lifecycle hooks. Re-exports the generic driver; pruned via `--no-default-features --features lite` |
 | [`st25r3916`](../crates/st25r3916) | ST25R3916 NFC transceiver driver: initiator (reader), ISO-DEP / APDU block protocol, smart card app discovery (FIDO/PIV/OpenPGP), target (card emulation) profiles, PT_Memory, Type 2/4A framing, and NDEF |
 | [`ssd1677-otp`](../crates/ssd1677-otp) | Panel OTP sequences. `OtpRefresh`. No `0x32` LUT |
 | [`m5pm1`](../crates/m5pm1) | Register map, ADC, battery %, PWM0, red LED. Board nets stay in the BSP |
 | [`m5ioe1`](../crates/m5ioe1) | Register map, bank helpers, `PYG11` typestate. Board `0x4F` |
+| [`sx1262-phy`](../crates/sx1262-phy) | Generic wrapper around upstream SX126x operations, with caller lifecycle hooks, guarded TX and local diagnostic commands |
 | [`papermono-log`](../crates/papermono-log) | CDC line format for **both** `simple-debug-fw` and `embassy-debug-fw` |
 
 ## Radio
@@ -67,10 +68,18 @@ CDC. [nyc-wifi-ble](not-yet-confirmed.md#nyc-wifi-ble).
 
 | Crate | Use |
 | --- | --- |
-| `esp-radio` (esp-hal git tag, same as the images) | `wifi` + `ble` + `coex`. WPA2 SoftAP only: precompiled ESP32-S3 blob does not enable WPA3/SAE |
-| [`trouble-host`](https://crates.io/crates/trouble-host) 0.7 / [`bt-hci`](https://crates.io/crates/bt-hci) | BLE peripheral passkey pairing (and listen-only scan counts). No addresses on CDC |
-| [`embassy-net`](https://crates.io/crates/embassy-net) 0.9 | SoftAP IPv4 stack (`192.168.4.1/24`) |
+| `esp-radio` 1.0.0-beta.1 (approved release exception) | `wifi` + `ble` + `coex`. WPA2 SoftAP only: precompiled ESP32-S3 blob does not enable WPA3/SAE |
+| [`trouble-host` at `866ee711`](https://github.com/embassy-rs/trouble/tree/866ee711c14f9d4011ca7079c5c4af0f64a1f1bb) / [`bt-hci`](https://crates.io/crates/bt-hci) 0.11 | BLE peripheral passkey pairing (and listen-only scan counts). No addresses on CDC |
+| [`embassy-net`](https://crates.io/crates/embassy-net) 0.9.1 | SoftAP IPv4 stack (`192.168.4.1/24`) |
 | [`edge-dhcp`](https://crates.io/crates/edge-dhcp) 0.8 / [`edge-nal`](https://crates.io/crates/edge-nal) / [`edge-nal-embassy`](https://crates.io/crates/edge-nal-embassy) | DHCP server + tiny HTTP JSON on port 80 |
+
+Security links Embassy crypto and its RustCrypto backend at
+[`bd35bd7a`](https://github.com/embassy-rs/embassy/tree/bd35bd7a7d19147c8bcae9c2eda99b25e597294c).
+Only AES-128 ECB, AES-128 CMAC and P-256 ECDH drivers are registered,
+with a ChaCha12 RNG seeded from an enabled HAL TRNG before wireless
+initialization. The temporary ADC entropy source is released first.
+Bonds remain in RAM. Pins and compiler requirements:
+[dependencies.md](dependencies.md).
 
 Survey and SoftAP are mutually exclusive in firmware (one
 Wi-Fi mode at a time). Official HTML advertises 2.4 GHz
@@ -81,19 +90,68 @@ item alone. Lite SoftAP host-verified 2026-09-04:
 ## Infrastructure
 
 `papermono-host` uses [`espflash`](https://crates.io/crates/espflash)
-4.5 as a library (`default-features = false`, feature
+4.7 as a library (`default-features = false`, feature
 `serialport`). Do not enable espflash’s `cli` feature. Never
 call full-chip erase APIs. `cargo xtask` is clap over
 `papermono-host`.
 
-[`sha2`](https://crates.io/crates/sha2) (0.10) for firmware asset
+[`sha2`](https://crates.io/crates/sha2) (0.11.1) for firmware asset
 integrity checking at build time and during `cargo xtask encode-assets`.
 
-Firmware images take `esp-hal`, `esp-println`, `esp-backtrace`,
-`esp-bootloader-esp-idf` from git tag `esp-hal-v1.2.0-rc.0`.
-`embassy-debug-fw` also takes `esp-rtos` from that tag. One
+Firmware images use published `esp-hal` 1.2.2, `esp-println` 0.18.0,
+`esp-backtrace` 0.20.0 and `esp-bootloader-esp-idf` 0.6.0.
+`embassy-debug-fw` adds published `esp-rtos` 0.4.0. One
 workspace lockfile. `esp-bootloader-esp-idf` is only for
 `esp_app_desc!()`. Do not `--merge`.
 
 `embedded-hal` 1.0 and dev-only `embedded-hal-mock` (`eh1`) for
 `ssd1677-otp`, `m5pm1`, and `m5ioe1`.
+
+## SX1262 upstream comparison
+
+The wrapper uses published `lora-phy` 3.0.1 and `lora-modulation` 0.1.5,
+with default and LoRaWAN features disabled. Board/chip crates retain Rust
+1.88. Registry publication remains disabled pending separate package review.
+The generic wrapper borrows upstream SX126x backends for configuration, standby,
+channel and supported FIFO operations. Lifecycle hooks, TX guard, IRQ snapshots,
+diagnostics, calibration-band cache and timed-RX management remain local.
+The upstream instance is private; its timer-disabled TX and continuous-carrier
+operations cannot bypass our guard. Typed and raw TX require a nonzero timer.
+
+All chip I/O awaits async `SpiDevice`. BUSY checks surround every transaction;
+a one-us delay after NSS rises precedes the second check. The configurable
+budget starts at 100 ms with one-ms polls and excludes scheduler/SPI latency.
+Original SPI-device, BUSY-pin and upstream errors survive. Firmware composes
+NSS with `embedded-hal-bus::ExclusiveDevice` and retains access for recovery.
+Await sequences to completion; cancellation invalidates readiness and requires
+NSS recovery, shutdown and startup before TX. See upstream
+[issue 350](https://github.com/lora-rs/lora-rs/issues/350).
+
+The wrapper retains upstream validation and the IQ workaround from catalog
+`sx1262` Rev 2.2 §15.4.2 “Workaround”. It programs modulation locally per
+§13.4.5.2 “LoRa Modulation Parameters”, using LDRO calculated by
+`lora-modulation` for narrow bandwidths too, and applies the masked
+§15.1.2 bandwidth workaround without accessing upstream private fields. It retains
+SF5/SF6 minimum preambles. Local TX-clamp and timed-RX RTC workarounds follow
+§15.2.2 and §15.3.2 “Workaround”, preserving unrelated register bits and the
+existing PaperMono PA/OCP command profile. Calibration-band caching follows
+§9.2.1 “Image Calibration for Specific Frequency Bands”.
+
+Managed RX rejects CRC/header failures before FIFO, acknowledges observed
+interrupt bits during continuous RX, and supports wrapping offsets. Lossless
+half-dBm/quarter-dB metrics supplement existing whole-unit CDC records.
+The widened airtime helper includes optional CRC, 16-bit preambles and SF5/SF6
+rules from
+[Semtech's reference algorithm](https://github.com/Lora-net/sx126x_driver/blob/a10c5dfdf89788c6ac805e9fe98889de44175aa2/src/sx126x.c#L1084).
+A sticky IRQ snapshot cannot distinguish repeated arrivals of the same bit.
+
+Firmware preserves ping/listen/sweep interaction patterns and presets. Ping
+programs the existing 300 ms completion budget into the hardware timer.
+Read failures and IRQ timeouts warn and trigger cleanup; no signal readings
+are invented after failures. Session verification starts at one; twenty or
+forty requires deliberate configuration and C153 hardware evidence.
+One controlled packet was received on the current C153 async RX path on
+2026-10-02, with normal lifecycle readbacks passing. Settling and async timing,
+burst reception, failure recovery, RF output power and source conflicts still
+need C153 bench work. See the current [measurement ledger](../.agents/skills/m5stack-papermono-hardware/references/measure.md)
+and [NYC items](../.agents/skills/m5stack-papermono-hardware/resources/not-yet-confirmed.md#nyc-lora-session-recovery).

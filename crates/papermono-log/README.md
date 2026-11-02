@@ -60,3 +60,19 @@ report US915 channel energy sweeps and packet detections.
 
 `hello` / `git` / `gpio` repeat every 10 s so a late CDC attach
 still sees identity. Heartbeat is 1 Hz. Edges are 50 ms polls.
+
+## LoRa confirmation records
+
+`LoraControlSample` formats `lora_control`: phase, verification cadence,
+TX attempts, checks, expected level, output mode, push-pull drive, latch,
+sampled level and failure reason. Unavailable evidence is `unknown`.
+Failures set `warning=1`. `LoraSessionSample` formats `lora_session` with
+attempt/check/failure counters and the cleanup result. Both line kinds
+are classified by the host parser and tested with fixed buffer limits.
+These records describe digital control evidence. RF validation requires hardware
+measurements.
+
+`lora_metrics` preserves packet RSSI in half-dBm and SNR in quarter-dB units
+using scaled integers. `lora_rx` and `lora_scan` keep their whole-unit formats.
+The host parser recognizes the typed metrics record; formatting is tested at
+maximum field widths against its fixed buffer capacity.

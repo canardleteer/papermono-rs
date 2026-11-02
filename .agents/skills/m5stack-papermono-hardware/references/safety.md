@@ -22,7 +22,7 @@ physical unit point at an `nyc-*` id. Name `C153` vs
 
 | Hazard | Safe default | Forbidden until proven |
 | --- | --- | --- |
-| E-paper OTP / LUT | Call panel OTP only ([display.md](display.md) **What to do**). After ~10 partials, one OTP mono full | Invented or generic-example 105-byte `0x32` table; copying M5GFX `lut_*`; mapping `epd_*` onto OTP `0x22`; custom waveforms that are not DC-balanced; uninterrupted continuous partials; `0xFF` after `0xD7` without rebuild; a second bare `0x14` |
+| E-paper OTP / LUT | Call panel OTP only ([display.md](display.md) **What to do**). After ten partials, the next monochrome update uses OTP mono full, including same-card redraws | Invented or generic-example 105-byte `0x32` table; copying M5GFX `lut_*`; mapping `epd_*` onto OTP `0x22`; custom waveforms that are not DC-balanced; uninterrupted continuous partials; `0xFF` after `0xD7` without rebuild; a second bare `0x14` |
 | E-paper environment | Indoor, avoid prolonged sun / high UV / high temperature on the panel | Baking the glass in sun as a “feature” |
 | IP2315 on I2C | Mount via M5IOE1 `PYG11_PWM3` only for the charge transaction, then disconnect. Sheet: I2C high is VBAT; VIN detect needs pins 8/9 high | Leaving `0x75` on the bus; assuming it always enumerates at low VBAT |
 | Power path | M5PM1 button: short = on/reset, double = off, hold ~2 s until red blink = download | Driving GPIO45/46 as a power latch; pulsing PDM pins as `PWR_HOLD` / `PWR_LOCK` |
@@ -95,7 +95,7 @@ firmware. ESP32-S3 PHY calibration still typically lives in NVS.
 Until [nyc-nvs-phy](../resources/not-yet-confirmed.md#nyc-nvs-phy)
 closes (Lite table geometry is already in
 [measure.md](measure.md); `C153` still
-[nyc-partition-table](../resources/not-yet-confirmed.md#nyc-partition-table)):
+[measure.md](measure.md)):
 
 1. Prefer a full-chip snapshot of **your** unit before the first
    custom write. Keep it gitignored under `developer-data/`.
@@ -144,3 +144,34 @@ no Cargo `runner`. Do not treat bare `espflash`, `esptool`,
 When firmware lands, encode M5PM1/M5IOE1 rail enables, IP2315
 isolate, and EPD OTP-first as compile-time constraints so the
 sequences above are type errors rather than field failures.
+
+## SX1262 TX readiness
+
+PaperMono (`C153`) lifecycle hooks keep antenna control high through the
+active session. Startup and shutdown confirm output mode, push-pull
+drive, latch and sampled level. Initial verification interval is one,
+so each TX gets fresh enabled-state confirmation. Denial, mismatch or
+readback failure blocks TX, invalidates readiness, restores interval one
+and triggers cleanup. Shutdown attempts reset, antenna-low and rail-off
+even if an earlier step fails, then confirms the disabled control state.
+Recovery requires successful shutdown followed by startup.
+
+Raw `SetTx` uses the same guard. Default hooks deny TX; permanent-antenna
+permission requires an explicit caller policy. Continuous-carrier and
+infinite-preamble commands are unsupported. One normal async receive session
+on C153 (2026-10-02) confirmed startup/shutdown digital readbacks and one
+controlled packet. Digital readback does not measure TX RF output. Failure
+recovery, sustained operation and timing remain open in the
+[NYC ledger](../resources/not-yet-confirmed.md#nyc-lora-session-recovery).
+C153-Lite radio outputs remain undriven.
+
+Chip I/O awaits async SPI and cooperative BUSY polling. Every typed/raw TX
+requires a nonzero hardware timeout; the ping uses 300 ms. Interrupted chip
+sequences invalidate readiness. Restore caller-owned NSS before completing
+shutdown/startup recovery. Do not race command futures against cancellation.
+Managed RX rejects CRC/header failures before FIFO access, and timed reception
+or early stop applies the documented RTC cleanup (`sx1262` §15.3.2
+“Workaround”).
+The one-us NSS settling delay and detailed BUSY / timed-RX behavior still need
+C153 measurements. One normal receive path has been live-confirmed; see the
+[measurement ledger](measure.md).

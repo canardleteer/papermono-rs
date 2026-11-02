@@ -18,6 +18,13 @@ wiring, enclosure, and datasheets are
 Read that skill first for pins and rails. Do not mix a stack’s APIs
 into the pin map.
 
+The selected dependency stack and reproducible host checks live in
+[dependencies.md](../../../docs/dependencies.md). Board/chip crates retain
+Rust 1.88; host tools and simple firmware require 1.95, Embassy firmware
+1.97. The ESP family uses published releases with the approved radio beta;
+TrouBLE and Embassy crypto use full commit pins. Dated live results below
+precede the 2026-11-01 host-only upgrade.
+
 This repository is **host-verified by default**. Landing xtask source
 is not permission to open a port. Do not open USB-Serial/JTAG unless
 the human **explicitly asked to run** a live command on a device in
@@ -64,6 +71,13 @@ When a live ask is present, the **only** in-repo device I/O is
 `monitor` needs the usbfs udev rule
 ([xtask.md](references/xtask.md#usbfs-udev-for-monitor)).
 
+`flash-app --force` is an explicit identity override for a copied
+original. It still requires every local original to agree on the
+`factory` offset and size, match the measured live flash size, and
+cannot be combined with `--capture`.
+The write remains limited to the validated `factory` partition; image
+format and size checks and `--yes` remain required.
+
 When they accept `flash-app`, pack every **safe unattended**
 probe into that image (I2C roster, `FLAG`, `CHIP_ID`, lamp +
 `EPD_VDD`, leftover input levels). Do not split those across
@@ -81,15 +95,18 @@ Implemented is not proven. Read the
 [tool verification ledger](references/xtask.md#tool-verification-ledger)
 before assuming a command works on silicon.
 
-**Lite (`C153-Lite`) live so far:** `detect-connected` (run
-and download), `--probe` (`NoReset`), named backup /
-confirm / restore, `flash-app` (`factory` at `0x10000`;
-short-press red after), and `monitor` (stock silent;
-custom images print `simple-debug:`). Silicon facts:
+**Both SKUs have live factory evidence:** `detect-connected` (run
+and download) and C153 factory backup/partition results are recorded in the
+hardware measurement ledger. Host-tool live verification is mainly Lite:
+`detect-connected` (run and download), `--probe` (`NoReset`), named backup /
+confirm / restore, and `flash-app` (`factory` at `0x10000`; short-press red
+after). `monitor` has also been live-tested on C153 with the current custom
+image; stock is silent and custom images print `simple-debug:`. Silicon facts:
 hardware
 [measure.md](../m5stack-papermono-hardware/references/measure.md).
-`C153` USB / JEDEC / partition table have not been
-measured. Official HTML `epd_*` times are PaperMono lab
+C153 USB and partition-table results are recorded in the
+hardware ledger; JEDEC bytes and PSRAM remain unmeasured.
+Official HTML `epd_*` times are PaperMono lab
 reference only
 ([display.md](../m5stack-papermono-hardware/references/display.md)).
 
@@ -143,3 +160,40 @@ firmware is
 skill
 [user-demo.md](../m5stack-papermono-hardware/references/user-demo.md).
 Do not `idf.py flash` it from this repo.
+
+## SX1262 sessions
+
+The generic `sx1262-phy` wraps published `lora-phy` 3.0.1 operations and uses
+`lora-modulation` 0.1.5 types with default/LoRaWAN features disabled.
+Registry publication remains disabled pending separate package review.
+Retain upstream parameter validation; program modulation locally with
+computed LDRO and a masked TX bandwidth workaround, per catalog `sx1262`
+Rev 2.2 §13.4.5.2 “LoRa Modulation Parameters” and §15.1.2 “Workaround”.
+Every chip-I/O method awaits async `SpiDevice` and cooperative BUSY polling.
+Firmware composes NSS with `ExclusiveDevice`, awaits sequences to completion,
+and restores NSS before shutdown/startup recovery after cancellation.
+Typed/raw TX require a nonzero hardware timeout; ping uses 300 ms.
+Managed RX rejects corrupt frames before FIFO access, acknowledges observed
+IRQ bits, handles wrapping offsets and cleans up timed-RX RTC state.
+`lora_metrics` carries fractional readings without changing existing lines. BSP
+re-exports preserve imports; PaperMono pins/presets and `RadioHooks` stay in
+`m5stack-papermono::lora`.
+Borrow system I2C only for control and verification operations. Keep
+synchronization in firmware. Startup and shutdown always confirm antenna
+mode, drive, latch and sampled level; initial pre-TX cadence is one.
+Startup uses the current PaperMono LoRa tutorial's rail-first 200 ms
+wait, 100 ms reset assertion and 200 ms after release, then BUSY readiness.
+Host mocks check the timing. One normal async RX session on C153 was live-tested
+2026-10-02, confirming startup/shutdown readbacks and one controlled packet;
+the delay values, failure recovery, sustained sessions and actual TX power
+remain open in the hardware measurement ledger.
+Twenty or forty needs deliberate configuration and C153 evidence.
+Failures warn on serial, block TX and run cleanup. Session summaries
+report verification counts. Both short and sustained sessions keep
+antenna control high between packet, standby and channel operations.
+C153-Lite outputs stay undriven and pruned builds exclude `sx1262-phy`
+and `lora-phy`. Host verification cannot confirm RF behavior; the single C153
+receive result does not measure radiated TX power.
+
+Firmware remembers failed or interrupted cleanup across short diagnostic
+wrappers. A later operation must confirm shutdown before starting again.

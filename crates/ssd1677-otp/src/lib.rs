@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(ram_addr10(799), [0x1F, 0x03]);
         assert_eq!(gray_planes(GRAY_WHITE), (false, false));
         assert_eq!(gray_planes(GRAY_BLACK), (true, true));
-        const { assert!(OTP_RAM_WIDTH % 8 == 0) };
+        const { assert!(OTP_RAM_WIDTH.is_multiple_of(8)) };
         const { assert!(OTP_SPI_HZ <= WRITE_FSCL_MAX_HZ) };
     }
 

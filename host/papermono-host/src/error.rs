@@ -37,6 +37,13 @@ pub enum Error {
     },
     /// More than one original MANIFEST matches this unit.
     AmbiguousOriginal,
+    /// Forced snapshot flash size differs from the live measured flash size.
+    SnapshotFlashSizeMismatch {
+        /// Snapshot flash size in bytes.
+        snapshot: usize,
+        /// Live measured flash size in bytes.
+        live: usize,
+    },
     /// `board-info` did not report a usable flash size.
     FlashSizeUnknown(String),
     /// Dump length is not the measured full-chip size.
@@ -76,6 +83,10 @@ pub enum Error {
     RestoreNotConfirmed,
     /// `flash-app` without `--yes`.
     FlashNotConfirmed,
+    /// `--force` was combined with `--capture`.
+    ForceWithCapture,
+    /// Local original snapshots disagree on the `factory` app target.
+    InconsistentFactoryGeometry,
     /// Image is empty or an ELF, not a `save-image` payload.
     ImageNotApp,
     /// Image is larger than the snapshot `factory` partition.
@@ -87,6 +98,15 @@ pub enum Error {
     },
     /// Snapshot `factory` starts below the Lite measured app offset.
     UnsafeFactoryOffset(u32),
+    /// Snapshot `factory` extends beyond the live measured flash size.
+    FactoryOutOfBounds {
+        /// Factory start address.
+        offset: u32,
+        /// Factory partition length.
+        size: u32,
+        /// Live measured flash size.
+        flash_size: usize,
+    },
     /// `--part` label is not in the snapshot table.
     UnknownPartition(String),
     /// Live dump or restore refused because flash size was never measured.
@@ -120,7 +140,8 @@ impl fmt::Display for Error {
                 f,
                 "no snapshot matches this unit; run cargo xtask backup-factory-firmware first \
                  (originals in developer-data/backups/original/<unit-id>/, captures in \
-                 developer-data/backups/captures/<unit-id>/<slug>/)"
+                 developer-data/backups/captures/<unit-id>/<slug>/); for copied originals, \
+                 flash-app --force may be used when their factory geometries agree"
             ),
             Self::MissingCapture(slug) => write!(
                 f,
@@ -137,6 +158,10 @@ impl fmt::Display for Error {
             Self::AmbiguousOriginal => write!(
                 f,
                 "multiple originals; pass a by-id port from cargo xtask detect-connected"
+            ),
+            Self::SnapshotFlashSizeMismatch { snapshot, live } => write!(
+                f,
+                "snapshot flash size is {snapshot} bytes but the live unit reports {live} bytes; refusing forced flash"
             ),
             Self::FlashSizeUnknown(found) => {
                 write!(f, "board-info flash size is unusable: {found:?}")
@@ -187,6 +212,14 @@ impl fmt::Display for Error {
             }
             Self::RestoreNotConfirmed => write!(f, "restore refuses to write without --yes"),
             Self::FlashNotConfirmed => write!(f, "flash-app refuses to write without --yes"),
+            Self::ForceWithCapture => write!(
+                f,
+                "flash-app --force applies only to original snapshots; remove --capture"
+            ),
+            Self::InconsistentFactoryGeometry => write!(
+                f,
+                "local original snapshots disagree on factory offset or size; refusing forced flash"
+            ),
             Self::ImageNotApp => write!(
                 f,
                 "flash-app needs a save-image payload, not an ELF or empty file"
@@ -197,7 +230,16 @@ impl fmt::Display for Error {
             ),
             Self::UnsafeFactoryOffset(offset) => write!(
                 f,
-                "refusing factory offset {offset:#x}; Lite factory starts at 0x10000 (nvs/phy sit below)"
+                "refusing factory offset {offset:#x}; PaperMono factory starts at 0x10000 (nvs/phy sit below)"
+            ),
+            Self::FactoryOutOfBounds {
+                offset,
+                size,
+                flash_size,
+            } => write!(
+                f,
+                "factory range {offset:#x}..{:#x} exceeds live flash size {flash_size} bytes",
+                u64::from(*offset) + u64::from(*size)
             ),
             Self::UnknownPartition(label) => write!(f, "no partition labelled {label:?}"),
             Self::SizeNotMeasured => write!(

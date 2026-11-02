@@ -1,7 +1,8 @@
 # simple-debug-fw
 
-Blocking `esp-hal` proof-of-life image for PaperMono (`C153-Lite`
-baseline, or `C153` with `--features c153`). No Embassy, no panel
+Blocking `esp-hal` proof-of-life image for PaperMono (`C153`
+default, or `C153-Lite` with
+`--no-default-features --features lite`). No Embassy, no panel
 refresh, no I2C. Host-tested line format:
 [`crates/papermono-log`](../../crates/papermono-log)
 (wire prefix `simple-debug:`).
@@ -13,6 +14,10 @@ simple-debug: gpio boot=1 pmic_irq=0 tp=0 ioe=1 busy=0
 simple-debug: hb t=12 btn_a=1 btn_b=0
 simple-debug: edge t_ms=1250 btn_a=1->0
 ```
+
+Use an Espressif compiler based on Rust 1.95 or newer
+(`rustc +esp --version`); use 1.97 or newer if also building Embassy.
+See the [dependency stack](../../docs/dependencies.md).
 
 On the unit:
 

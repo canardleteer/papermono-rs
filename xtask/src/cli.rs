@@ -155,7 +155,7 @@ pub struct MonitorArgs {
     pub reset: bool,
 }
 
-/// Snapshot `factory`-only custom image write.
+/// Snapshot `factory`-only custom image write (needs `--yes`).
 #[derive(Debug, Args)]
 pub struct FlashAppArgs {
     /// Serial device. Also `ESPFLASH_PORT`.
@@ -170,6 +170,10 @@ pub struct FlashAppArgs {
     /// Use this capture slug instead of `original/`.
     #[arg(long, value_name = "SLUG")]
     pub capture: Option<String>,
+    /// Ignore original-to-unit identity only when originals match live flash size and geometry.
+    /// Requires `--yes`; applies to originals only, not `--capture`.
+    #[arg(long, requires = "yes", conflicts_with = "capture")]
+    pub force: bool,
 }
 
 /// Host-only idle-grammar check.
@@ -340,6 +344,7 @@ impl Cli {
                             &args.image,
                             args.yes,
                             args.capture.as_deref(),
+                            args.force,
                         )?;
                         println!("flash-app write-bin factory finished");
                         Ok(())
@@ -567,6 +572,44 @@ mod tests {
             super::Command::FlashApp(args) => {
                 assert!(args.yes);
                 assert_eq!(args.capture.as_deref(), Some("stock-lite"));
+            }
+            other => panic!("expected FlashApp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn flash_app_force_requires_yes_and_conflicts_with_capture() {
+        use clap::Parser;
+
+        let args = ["xtask", "flash-app", "--image", "app.bin", "--force"];
+        assert!(Cli::try_parse_from(args).is_err());
+
+        assert!(Cli::try_parse_from([
+            "xtask",
+            "flash-app",
+            "--image",
+            "app.bin",
+            "--yes",
+            "--capture",
+            "stock",
+            "--force",
+        ])
+        .is_err());
+
+        let cli = Cli::try_parse_from([
+            "xtask",
+            "flash-app",
+            "--image",
+            "app.bin",
+            "--yes",
+            "--force",
+        ])
+        .expect("forced original flash requires explicit --yes");
+        match cli.command {
+            super::Command::FlashApp(args) => {
+                assert!(args.yes);
+                assert!(args.force);
+                assert!(args.capture.is_none());
             }
             other => panic!("expected FlashApp, got {other:?}"),
         }

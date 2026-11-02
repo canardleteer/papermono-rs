@@ -4,19 +4,31 @@ version = "0.1.0"
 description = "PaperMono host CLI: USB inventory, snapshots, and host-only builds"
 publish = false
 edition.workspace = true
-# Matches cargo-espflash / espflash 4.5. Workspace crates stay 1.85.
-rust-version = "1.88"
+# Matches papermono-host and espflash 4.7; board crates retain Rust 1.88.
+rust-version = "1.95"
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-clap = { version = "4.5.41", features = ["derive", "env"] }
-env_logger = "0.11.8"
-image = { version = "0.25.9", default-features = false, features = ["png"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+env_logger = "0.11.11"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 papermono-host = { path = "../host/papermono-host" }
-resvg = { version = "0.48.1", default-features = false }
-sha2 = "0.10.9"
+resvg = { version = "0.49.0", default-features = false }
+
+[dev-dependencies]
+# The host harness compiles the firmware's MCU-independent RNG glue unchanged.
+embassy-crypto = { git = "https://github.com/embassy-rs/embassy.git", rev = "bd35bd7a7d19147c8bcae9c2eda99b25e597294c", default-features = false }
+embassy-crypto-rustcrypto = { git = "https://github.com/embassy-rs/embassy.git", rev = "bd35bd7a7d19147c8bcae9c2eda99b25e597294c", default-features = false, features = [
+  "embassy-crypto-aes128-ecb",
+  "embassy-crypto-aes128-cmac",
+  "embassy-crypto-p256-ecdh",
+] }
+embassy-sync = "0.8.0"
+rand_chacha = { version = "0.10.0", default-features = false }
+critical-section = { version = "1.2.0", features = ["std"] }
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

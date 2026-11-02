@@ -28,14 +28,12 @@ Host discovery and flash I/O belong to the consuming project’s
 tools, not this skill. Vendor Arduino / ESP-IDF / PlatformIO trees
 are wiring evidence, not a flash path here.
 
-Official docs, UserDemo, OTP-Demo, and FreeInk are not a
-measurement. Observed silicon:
-[measure.md](references/measure.md). Lite USB (run and
-download) is in
-[flashing.md](references/flashing.md#usb-measured). There are
-two SKUs: PaperMono (`C153`) and PaperMono-Lite
-(`C153-Lite`). Name which one you measured.
-Open nets live in
+Official docs and firmware are specifications and software
+intent, not measurements of our units. Live results for both
+PaperMono (`C153`) and PaperMono-Lite (`C153-Lite`) are in
+[measure.md](references/measure.md). Name the SKU and date for
+each live result. Do not copy results between variants. Remaining
+questions live in
 [not-yet-confirmed.md](resources/not-yet-confirmed.md).
 
 ## How to read this skill
@@ -48,30 +46,29 @@ Open nets live in
    symlink this page as `docs/SAFETY.md`.
 3. **Observed silicon** —
    [references/measure.md](references/measure.md). Chip, flash,
-   USB, factory image, and which peripherals ACK **on a
-   PaperMono or PaperMono-Lite in hand**. Lite USB (run and
-   download) is in
-   [flashing.md](references/flashing.md#usb-measured). Name
-   the SKU. A result on one variant does not confirm the
-   other. That beats SDK profiles when they disagree on those
-   fields.
+   USB, flash, factory-image, and peripheral results on both
+   SKUs. Name the SKU. A result on one variant does not confirm
+   the other. Read this ledger rather than assuming this summary
+   covers every measurement.
 4. **Enclosure** —
    [references/enclosure.md](references/enclosure.md). Where keys,
    USB-C, and the SD slot sit. Vendored product photos:
    [resources/enclosure/](resources/enclosure/SOURCE.md)
    (PNG for reading; WebP is upstream). Callouts: **BUTTON A
    (UP)**, **BUTTON B (DOWN)**, red power.
-5. **Pin map and rails** — remaining hardware pages (official
-   HTML **PinMap** tables until
-   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id)
-   and friends close). Living tables:
+5. **Pin map and rails** — subsystem pages distinguish official
+   PinMap claims from on-unit observations. Living sources and
+   checked revisions:
    [catalog.md](references/catalog.md).
 6. **Official docs and firmware catalog** —
-   [references/catalog.md](references/catalog.md). Dated
-   **view as markdown** snapshots of the two product pages
-   (2026-09-01):
+   [references/catalog.md](references/catalog.md). Dated exports
+   of the two product pages (current review: 2026-10-01; prior
+   snapshot retained):
    [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md).
    Living HTML can still change.
+   The current PaperMono LoRa tutorial supplies reset timing; its RX
+   antenna and TX power-label conflicts remain open in
+   [sources.md](references/sources.md#papermono-lora-antenna-and-power-conflicts).
 7. **Vendor datasheets** —
    [resources/datasheets.md](resources/datasheets.md). Registers,
    opcodes, timings for parts named on this model. **Vendor the
@@ -113,10 +110,11 @@ it does not silently pick a winner against the user.
    on-unit partition facts
    ([measure.md](references/measure.md)). **Name the SKU**
    (`C153` or `C153-Lite`). A measurement on one variant does
-   not confirm the other. Lite USB, chip rev, 16 MB flash
-   size, and the stock partition table are observed.
+   not confirm the other. Both SKUs have measured USB IDs, chip
+   revision, 16 MB flash size, and stock partition tables.
    Official HTML `epd_*` times are PaperMono lab reference,
-   not a silicon row. JEDEC/PSRAM/ACK lists stay open.
+   not a silicon row. JEDEC bytes and PSRAM remain open. Other
+   peripheral measurements are scoped by SKU in the backlog.
 3. **Official** board documentation, vendor SDKs, and **chip
    datasheets for parts named on this model.** Registers, opcodes,
    and timings belong here when they have **not been measured**.
@@ -225,16 +223,22 @@ flash size is 16 MB
    not invent a 105-byte `0x32` table (Table 7-1 is 105
    bytes) and do not map `RefreshMode` / `epd_*` onto OTP
    `0x22`. What to do: [display.md](references/display.md).
-   What not to do: [safety.md](references/safety.md). After
-   ~10 partials, one OTP mono full.
+   What not to do: [safety.md](references/safety.md). The
+   vendor recommends one full refresh after about 10 partial
+   fast refreshes and warns against uninterrupted partials.
+   The shared `display::mono_full_due` policy requires the next
+   monochrome update to use `MonoFull` after ten partials,
+   including same-card redraws. Physical ghosting confirmation
+   remains open; see [display.md](references/display.md).
 4. **Park IP2315 off the system I2C bus** except for the charge
    transaction. M5IOE1 `PYG11_PWM3` gates `0x75`. Sheet: I2C
    high is VBAT; pins 8/9 mux LED vs I2C; at VIN both must
    sample high or the chip stays in LED mode and can hang
    neighbors.
 5. **Download mode is the power button**, not DTR on a CH343.
-   Hold ~2 s until the red LED blinks, then release.
-   [nyc-download-mode](resources/not-yet-confirmed.md#nyc-download-mode).
+   On both measured SKUs, hold about 2 s until the small red LED
+   beside the power button blinks, then release. See
+   [flashing.md](references/flashing.md#usb-measured).
 6. **Ship a 16 MB-aware partition table.** Do not inherit 8 MB
    DevKit limits. Do not assume 32 MB geometry or arbitrary partition offsets.
 7. **Lite has no NFC and no LoRa.** Do not init ST25R3916 or
@@ -275,7 +279,7 @@ TRM. The cache does **not** replace the pin map or enclosure.
 
 It does not help for board wiring you already have from official
 pin tables, or for third-party project structure. Official
-product-page HTML as **view as markdown** (2026-09-01) lives
+product-page HTML as **view as markdown** (2026-10-01) lives
 in
 [resources/official-html/](resources/official-html/SOURCE.md).
 That is not a datasheet cache. Do not invent a second
@@ -307,9 +311,9 @@ later IPFS CIDv1.
 
 ## Bring-up order (official intent)
 
-Two vendor sequences. Lite official M5IOE1 `begin` ACKed
-([measure.md](references/measure.md)); the rest is **not
-measured**. Name both when they disagree
+Two vendor sequences. Live results for both SKUs are in
+[measure.md](references/measure.md). Remaining electrical
+results are **not measured**. Name both sources when they disagree
 ([sources.md](references/sources.md)).
 
 Arduino / M5PM1 docs:
@@ -325,7 +329,10 @@ Arduino / M5PM1 docs:
 6. Touch: `PYG13` VDD, `PYG6` RST; FT6336G `0x38`; INT GPIO4.
 7. Sensors on the same I2C: BMI270 `0x68`, RX8130CE `0x32`.
 8. C153 only: ST25R3916 `0x50`, SX1262 on the LoRa GPIOs
-   after `LoRa_EN` (M5PM1 G2).
+   after `LoRa_EN` (M5PM1 G2). Current LoRa tutorial reset timing:
+   rail-first 200 ms wait, 100 ms reset assertion, 200 ms after release,
+   then BUSY readiness. Host-tested only; see
+   [Stamp LoRa-1262](resources/stamp-lora-1262.md#session-control-and-confirmation).
 
 UserDemo eval HAL
 ([user-demo.md](references/user-demo.md)): 500 ms wait,
@@ -354,7 +361,7 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 | Official UserDemo eval HAL | [references/user-demo.md](references/user-demo.md) |
 | M5GFX `Panel_SSD1677_4Gray` / OTP-Demo panel SPI | [references/display.md](references/display.md), [references/cpp-platformio.md](references/cpp-platformio.md) |
 | Official URLs, firmware list | [references/catalog.md](references/catalog.md) |
-| Official HTML **view as markdown** (2026-09-01) | [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md) |
+| Official HTML **view as markdown** (2026-10-01) | [resources/official-html/SOURCE.md](resources/official-html/SOURCE.md) |
 | Vendor datasheets (catalog; local cache) | [resources/datasheets.md](resources/datasheets.md) |
 | Conflicts and citations | [references/sources.md](references/sources.md) |
 | Measurement backlog | [resources/not-yet-confirmed.md](resources/not-yet-confirmed.md) |
@@ -364,8 +371,8 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
 
 - **PSRAM:** 8 MB octal in the product table. Close
   [nyc-flash-id](resources/not-yet-confirmed.md#nyc-flash-id).
-- **Flash:** 16 MB. Lite measured 16 MB and a UserDemo-matching
-  table at `0x8000`. PlatformIO still uses `qio_opi` and
+- **Flash:** 16 MB. Both SKUs measured 16 MB and UserDemo-matching
+  tables at `0x8000`. PlatformIO still uses `qio_opi` and
   `default_16MB.csv` (different table). `simple-debug-fw` CDC:
   80 MHz CPU, 40 MHz XTAL. UserDemo runtime DIO vs QIO / 240
   MHz still
@@ -404,3 +411,50 @@ that probe succeeds. Mic, SD, and LoRa init stay deferred.
   `esp-hal` as the only legal Rust stack.
 - Write a “Confirmed live” row without a board in hand, or
   copy a `C153` result onto `C153-Lite` (or the reverse).
+
+## SX1262 lifecycle confirmation
+
+The generic `sx1262-phy` wrapper delegates modem operations to published
+`lora-phy`; pins and presets remain in the PaperMono BSP. PaperMono
+`RadioHooks` lends system I2C for reset, rail and antenna control and
+readback. Keep `PYG2` high across packet operations, standby and channel
+changes until shutdown. Startup/shutdown confirm output mode, push-pull
+drive, latch and sampled level. Initial pre-TX verification cadence is
+one; twenty or forty requires deliberate configuration and C153 evidence.
+Failures invalidate readiness, warn on serial and trigger cleanup.
+
+This software policy has host tests. One normal async receive session on
+physical `C153` (2026-10-02) confirmed the startup/high and shutdown/low
+digital readbacks and received one controlled 18-byte packet; details are in
+[measure.md](references/measure.md). That does not validate the local ping's
+three-check record, failure recovery, sustained sessions, rail/reset timing,
+or actual TX power. Digital confirmation cannot validate antenna impedance
+or output power. DIO2 RF switching is a separate function. See the
+[session control reference](resources/stamp-lora-1262.md#session-control-and-confirmation).
+
+Use the cached SX1262 Rev 2.2 as command authority. Record alternate
+revisions and module variants under [source leads](references/sources.md#sx1262-document-and-module-variants).
+The retained +14 power command and legacy PA names do not establish
+measured +14 dBm RF output. Current Stamp connector variants and legacy
+module controls must not replace PaperMono's own wiring references.
+
+## Async SX1262 commands
+
+The repository now uses published `lora-phy` 3.0.1 / `lora-modulation`
+0.1.5. Modulation is validated upstream, then programmed locally with LDRO
+from symbol duration and a masked TX bandwidth workaround. See the
+[encoding map](resources/stamp-lora-1262.md#session-control-and-confirmation).
+The [2026-11-01 dependency upgrade](../../../docs/dependencies.md) has
+host verification only; dated live results in this skill precede that stack.
+The software crypto change does not close BLE, coexistence or RF measurements.
+
+The generic chip wrapper uses awaited SPI devices and cooperative BUSY delays.
+Board pin/rail policy stays in `RadioHooks`; firmware composes NSS and retains
+it for cancellation recovery. TX requires a nonzero hardware timer. The default
+BUSY delay budget is 100 ms with one-ms polls, plus a one-us NSS settling delay;
+scheduler latency is additional. One normal C153 receive session has confirmed
+packet reception on the async path; timing, burst reception, timed-RX cleanup,
+and failure recovery still need measurements. Command/register sources,
+calibration bands and fractional metric encodings are recorded in
+[stamp-lora-1262.md](resources/stamp-lora-1262.md). C153-Lite radio outputs
+remain undriven.

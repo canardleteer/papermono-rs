@@ -2,13 +2,14 @@
 name = "simple-debug-fw"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.95"
 publish = false
-description = "PaperMono proof-of-life image (Lite baseline, or Full with --features c153). Flash only via cargo xtask flash-app after a matching snapshot exists."
+description = "PaperMono proof-of-life image (C153 default, or C153-Lite with --no-default-features --features lite). Flash only via cargo xtask flash-app after a matching snapshot exists."
 license = "MIT"
 
 # Workspace member, not a default-member: host `cargo test` skips this
-# package. Build with `cargo xtask build-fw simple-debug` (or
-# `cargo xtask build-fw simple-debug --features c153`). Host-tested log
+# package. Build with `cargo xtask build-fw simple-debug` (C153 default, or
+# `--no-default-features --features lite` for C153-Lite). Host-tested log
 # lines live in crates/papermono-log.
 # Do not inherit [lints] workspace = true (missing_docs / unsafe_code).
 
@@ -19,23 +20,22 @@ c153 = ["dep:m5stack-papermono"]
 lite = []
 
 [dependencies]
-# Same git tag as a later embassy-debug-fw. One lockfile cannot hold
-# crates.io `esp-println` and the tag's `links` crate at once.
-esp-hal = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+# Both firmware packages use the same published ESP release family.
+esp-hal = { version = "1.2.2", features = [
   "esp32s3",
   "unstable",
 ] }
-esp-println = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", default-features = false, features = [
+esp-println = { version = "0.18.0", default-features = false, features = [
   "esp32s3",
   "jtag-serial",
   "critical-section",
 ] }
-esp-backtrace = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-backtrace = { version = "0.20.0", features = [
   "esp32s3",
   "panic-handler",
   "println",
 ] }
-esp-bootloader-esp-idf = { git = "https://github.com/esp-rs/esp-hal", tag = "esp-hal-v1.2.0-rc.0", features = [
+esp-bootloader-esp-idf = { version = "0.6.0", features = [
   "esp32s3",
 ] }
 
